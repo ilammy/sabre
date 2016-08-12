@@ -1,0 +1,5 @@
+language: rust
+
+branches:
+  except:
+    - /^wip\/.*$/
