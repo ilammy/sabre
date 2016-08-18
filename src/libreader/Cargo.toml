@@ -1,0 +1,8 @@
+[package]
+name = "libreader"
+version = "0.1.0"
+authors = ["ilammy <a.lozovsky@gmail.com>"]
+
+[lib]
+name = "reader"
+path = "lib.rs"
