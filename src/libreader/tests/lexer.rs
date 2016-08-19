@@ -12,7 +12,7 @@ extern crate reader;
 
 use reader::diagnostics::{Span, Handler, Diagnostic, DiagnosticKind};
 use reader::lexer::{ScannedToken, StringScanner, Scanner};
-use reader::tokens::{Token};
+use reader::tokens::{Token, ParenType};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test macro helpers
@@ -36,9 +36,11 @@ macro_rules! check {
 }
 
 macro_rules! token {
-    { $tok:ident } => {
-        Token::$tok
-    }
+    { $tok:ident }                      => { Token::$tok };
+    { Open($ptype:ident) }              => { Token::Open(ParenType::$ptype) };
+    { OpenVector($ptype:ident) }        => { Token::OpenVector(ParenType::$ptype) };
+    { OpenBytevector($ptype:ident) }    => { Token::OpenBytevector(ParenType::$ptype) };
+    { Close($ptype:ident) }             => { Token::Close(ParenType::$ptype) };
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -61,6 +63,139 @@ fn garbage() {
     check! {
         ("\x01\x02\x03\x04" => Unrecognized),
             (0, 4) => err_lexer_unrecognized;
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Fixed-syntax tokens
+
+#[test]
+fn quotations() {
+    check! {
+        ("'"    => Quote);
+        ("`"    => Backquote);
+        (","    => Comma);
+        (",@"   => CommaSplicing);
+        ("."    => Dot);
+        ("'"    => Quote);
+        ("'"    => Quote);
+        ("'"    => Quote);
+        ("`"    => Backquote);
+        ("`"    => Backquote);
+        ("`"    => Backquote);
+        (","    => Comma);
+        (","    => Comma);
+        (",@"   => CommaSplicing);
+        (","    => Comma);
+        ("`"    => Backquote);
+        (","    => Comma);
+        ("."    => Dot);
+        ("'"    => Quote);
+        ("."    => Dot);
+    }
+}
+
+#[test]
+fn parentheses() {
+    check! {
+        ("("    => Open(Parenthesis));
+        (")"    => Close(Parenthesis));
+        (" "    => Whitespace);
+        ("("    => Open(Parenthesis));
+        (" "    => Whitespace);
+        (")"    => Close(Parenthesis));
+        (" "    => Whitespace);
+        (")"    => Close(Parenthesis));
+        (")"    => Close(Parenthesis));
+        (")"    => Close(Parenthesis));
+        (")"    => Close(Parenthesis));
+        ("\t"   => Whitespace);
+        ("#("   => OpenVector(Parenthesis));
+        ("#("   => OpenVector(Parenthesis));
+        (")"    => Close(Parenthesis));
+        ("#u8(" => OpenBytevector(Parenthesis));
+        ("#U8(" => OpenBytevector(Parenthesis));
+    }
+}
+
+#[test]
+fn brackets_and_braces() {
+    check! {
+        ("["    => Open(Bracket));
+        ("]"    => Close(Bracket));
+        (" "    => Whitespace);
+        ("{"    => Open(Brace));
+        ("}"    => Close(Brace));
+        (" "    => Whitespace);
+        ("#["   => OpenVector(Bracket));
+        ("#{"   => OpenVector(Brace));
+        (" "    => Whitespace);
+        ("#u8[" => OpenBytevector(Bracket));
+        ("#U8[" => OpenBytevector(Bracket));
+        ("#u8{" => OpenBytevector(Brace));
+        ("#U8{" => OpenBytevector(Brace));
+    }
+}
+
+#[test]
+fn recover_open_vector() {
+    check! {
+        ("#ahaha-oh-wow"    => Unrecognized),
+                    (0, 13) => err_lexer_unrecognized;
+        ("("                => Open(Parenthesis));
+        ("#:"               => Unrecognized),
+                    (0, 2)  => err_lexer_unrecognized;
+        ("["                => Open(Bracket));
+        ("#,"               => Unrecognized),
+                    (0, 2)  => err_lexer_unrecognized;
+        ("{"                => Open(Brace));
+        ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#,@"              => Unrecognized),
+                    (0, 3)  => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#`"               => Unrecognized),
+                    (0, 2)  => err_lexer_unrecognized;
+        ("["                => Open(Bracket));
+        (" "                => Whitespace);
+        ("#####"            => Unrecognized),
+                    (0, 5)  => err_lexer_unrecognized;
+        ("("                => Open(Parenthesis));
+        (" "                => Whitespace);
+        ("#."               => Unrecognized),
+                    (0, 2)  => err_lexer_unrecognized;
+        ("{"                => Open(Brace));
+    }
+}
+
+#[test]
+fn recover_open_bytevector() {
+    check! {
+        ("#u("              => OpenBytevector(Parenthesis)),
+                    (0, 3)  => err_lexer_invalid_bytevector;
+        (" "                => Whitespace);
+        ("#U["              => OpenBytevector(Bracket)),
+                    (0, 3)  => err_lexer_invalid_bytevector;
+        (" "                => Whitespace);
+        ("#ufo"             => Unrecognized),
+                    (0, 4)  => err_lexer_unrecognized;
+        ("("                => Open(Parenthesis));
+        (" "                => Whitespace);
+        ("#u16{"            => OpenBytevector(Brace)),
+                    (0, 5)  => err_lexer_invalid_bytevector;
+        (" "                => Whitespace);
+        ("#U571"            => Unrecognized),
+                    (0, 5)  => err_lexer_unrecognized;
+        ("["                => Open(Bracket));
+        (" "                => Whitespace);
+        ("#u90`ex.a'mp,le1" => Unrecognized),
+                    (0, 16) => err_lexer_unrecognized;
+        ("("                => Open(Parenthesis));
+        (" "                => Whitespace);
+        ("#8"               => Unrecognized),
+                    (0, 2)  => err_lexer_unrecognized;
+        ("["                => Open(Bracket));
     }
 }
 

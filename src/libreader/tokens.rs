@@ -17,6 +17,46 @@ pub enum Token {
     /// Non-significant whitespace.
     Whitespace,
 
+    /// Apostrophe (single quote): `'`.
+    Quote,
+
+    /// Grave accent (backquote): <code>`</code>.
+    Backquote,
+
+    /// Single dot: `.`.
+    Dot,
+
+    /// Comma: `,`.
+    Comma,
+
+    /// Comma-at-sign: `,@`.
+    CommaSplicing,
+
+    /// Opening parenthesis: `(`, `[`, `{`.
+    Open(ParenType),
+
+    /// Opening parenthesis of vector literals: `#(`, `#[`, `#{`.
+    OpenVector(ParenType),
+
+    /// Opening parenthesis of bytevector literals: `#u8(`, `#u8[`, `#u8{`.
+    OpenBytevector(ParenType),
+
+    /// Closing parenthesis: `)`, `]`, `}`.
+    Close(ParenType),
+
     /// Marker token denoting an invalid character sequences.
     Unrecognized,
+}
+
+/// Type of an opening or closing parenthesis.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum ParenType {
+    /// Parentheses: `( )`
+    Parenthesis,
+
+    /// Brackets: `[ ]`
+    Bracket,
+
+    /// Braces: `{ }`
+    Brace,
 }

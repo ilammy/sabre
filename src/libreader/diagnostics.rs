@@ -66,6 +66,9 @@ pub trait Reporter {
 pub enum DiagnosticKind {
     /// Lexer has encountered an invalid sequence of characters with unrecognized meaning.
     err_lexer_unrecognized,
+
+    /// Lexer has recovered from an invalid spelling of bytevector opener `#u8(`.
+    err_lexer_invalid_bytevector,
 }
 
 /// Convenience wrapper for reporting diagnostics with known spans.

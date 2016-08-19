@@ -10,7 +10,7 @@
 //! into tokens.
 
 use diagnostics::{Span, Handler, DiagnosticKind};
-use tokens::{Token};
+use tokens::{Token, ParenType};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Helper data structures
@@ -160,8 +160,30 @@ impl<'a> StringScanner<'a> {
             ' ' | '\t' | '\n' | '\r' => {
                 self.scan_whitespace()
             }
+            '(' => { self.read(); Token::Open(ParenType::Parenthesis) }
+            '[' => { self.read(); Token::Open(ParenType::Bracket) }
+            '{' => { self.read(); Token::Open(ParenType::Brace) }
+            '}' => { self.read(); Token::Close(ParenType::Brace) }
+            ']' => { self.read(); Token::Close(ParenType::Bracket) }
+            ')' => { self.read(); Token::Close(ParenType::Parenthesis) }
+            '`' => { self.read(); Token::Backquote }
+           '\'' => { self.read(); Token::Quote }
+            '.' => { self.read(); Token::Dot }
+            ',' => {
+                self.read();
+                if self.cur_is('@') {
+                    self.read();
+                    Token::CommaSplicing
+                } else {
+                    Token::Comma
+                }
+            }
+            '#' => {
+                self.scan_hash_token()
+            }
             _ => {
-                self.scan_unrecognized()
+                let start = self.prev_pos;
+                self.scan_unrecognized(start)
             }
         }
     }
@@ -178,12 +200,11 @@ impl<'a> StringScanner<'a> {
     }
 
     /// Scan over an unrecognized sequence of characters.
-    fn scan_unrecognized(&mut self) -> Token {
-        let start = self.prev_pos;
+    fn scan_unrecognized(&mut self, start: usize) -> Token {
         while !self.at_eof() {
             match self.cur.unwrap() {
-                ' ' | '\t' | '\n' | '\r' => { break; }
-                _                        => { self.read(); }
+                ' ' | '\t' | '\n' | '\r' | '(' | ')' | '[' | ']' | '{' | '}' => { break; }
+                _ => { self.read(); }
             }
         }
         let end = self.prev_pos;
@@ -191,5 +212,86 @@ impl<'a> StringScanner<'a> {
         self.diagnostic.report(DiagnosticKind::err_lexer_unrecognized, Span::new(start, end));
 
         return Token::Unrecognized;
+    }
+
+    /// Scan over a token starting with a hash `#`.
+    fn scan_hash_token(&mut self) -> Token {
+        let start = self.prev_pos;
+        assert!(self.cur_is('#'));
+        self.read();
+
+        match self.cur {
+            Some('(') => { self.read(); Token::OpenVector(ParenType::Parenthesis) }
+            Some('[') => { self.read(); Token::OpenVector(ParenType::Bracket) }
+            Some('{') => { self.read(); Token::OpenVector(ParenType::Brace) }
+            Some('u') | Some('U') => {
+                self.scan_bytevector_open(start)
+            }
+            _ => { self.scan_unrecognized(start) }
+        }
+    }
+
+    /// Scan over a bytevector opener `#u8(`.
+    fn scan_bytevector_open(&mut self, start: usize) -> Token {
+        assert!(self.cur_is('u') || self.cur_is('U'));
+        self.read();
+
+        // Try the happy path first.
+        if self.cur_is('8') {
+            match self.peek() {
+                Some('(') => {
+                    self.read();
+                    self.read();
+                    return Token::OpenBytevector(ParenType::Parenthesis);
+                }
+                Some('[') => {
+                    self.read();
+                    self.read();
+                    return Token::OpenBytevector(ParenType::Bracket);
+                }
+                Some('{') => {
+                    self.read();
+                    self.read();
+                    return Token::OpenBytevector(ParenType::Brace);
+                }
+                // Otherwise skip to recovery slow path.
+                _ => { }
+            }
+        }
+
+        // We've seen `#u` or maybe `#u8` at this point. All we need now is a parenthesis.
+        // This would allow us to conclude that this is a bytevector opener with a typo.
+        // Allow from zero to two decimal digits between `u` and the parenthesis, on the
+        // assumption that the user has typed slightly less or more than needed. Anything
+        // else is a clear violation of syntax so we bail out to the nearest delimiter.
+        for _ in 0..3 {
+            match self.cur {
+                Some('0') | Some('1') | Some('2') | Some('3') | Some('4') |
+                Some('5') | Some('6') | Some('7') | Some('8') | Some('9') => {
+                    self.read();
+                }
+                Some('(') => {
+                    self.read();
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_bytevector,
+                        Span::new(start, self.prev_pos));
+                    return Token::OpenBytevector(ParenType::Parenthesis);
+                }
+                Some('[') => {
+                    self.read();
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_bytevector,
+                        Span::new(start, self.prev_pos));
+                    return Token::OpenBytevector(ParenType::Bracket);
+                }
+                Some('{') => {
+                    self.read();
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_bytevector,
+                        Span::new(start, self.prev_pos));
+                    return Token::OpenBytevector(ParenType::Brace);
+                }
+                _ => { break; }
+            }
+        }
+
+        return self.scan_unrecognized(start);
     }
 }
