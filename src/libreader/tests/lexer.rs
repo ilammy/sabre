@@ -67,6 +67,91 @@ fn garbage() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Comments
+
+#[test]
+fn line_comments() {
+    check! {
+        ("; test comment please ignore\n"   => Comment);
+        (";;;;;;;;;;;;;;;;;;;;;;;;;;;;\n"   => Comment);
+        ("\n\n"                             => Whitespace);
+        (";;; \r\n"                         => Comment);
+        (";\r\n"                            => Comment);
+        ("\n"                               => Whitespace);
+        (";\r"                              => Comment);
+        (";\r\n"                            => Comment);
+        (";\u{042E}\u{043D}\u{0438}\u{043A}\u{043E}\u{0434}\n" => Comment);
+        ("\n"                               => Whitespace);
+        ("; #|\r\n"                         => Comment);
+    }
+}
+
+#[test]
+fn line_comments_eof() {
+    check! {
+        ("; EOF is okay" => Comment);
+    }
+}
+
+#[test]
+fn block_comments() {
+    check! {
+        ("#|basic block comment|#"          => Comment);
+        ("\n\n"                             => Whitespace);
+        ("#|spanning\nmultiple\r\nlines|#"  => Comment);
+        ("\n\n"                             => Whitespace);
+        ("#|\n|#"                           => Comment);
+        ("\n\n"                             => Whitespace);
+        ("#|;\n'123|#"                      => Comment);
+        ("\n\n"                             => Whitespace);
+        ("#||#"                             => Comment);
+        ("#|||#"                            => Comment);
+        ("#||||#"                           => Comment);
+        ("\n\n"                             => Whitespace);
+        ("#| # |#"                          => Comment);
+        ("\n\n"                             => Whitespace);
+        ("#|bare\rCR\rcharacters\rare\rok|#" => Comment);
+        ("\n\n"                             => Whitespace);
+        ("#| nested #|comments|# |#"        => Comment);
+        ("\n\n"                             => Whitespace);
+        ("#|#||#|#"                         => Comment);
+        ("\n\n"                             => Whitespace);
+        ("#|#|#|||###|||#|#|#"              => Comment);
+        ("\n\n"                             => Whitespace);
+        ("#|\u{042E}\u{043D}\u{0438}\u{043A}\u{043E}\u{0434}|#" => Comment);
+        ("\n\n"                             => Whitespace);
+        ("#|\\x7C;\\x23;|#"                 => Comment);
+        ("\n\n"                             => Whitespace);
+        ("#|#\\|#"                          => Comment);
+        ("#|\\#||#|#"                       => Comment);
+    }
+}
+
+#[test]
+fn block_comments_eof() {
+    check! {
+        ("#| EOF is not okay" => Unrecognized),
+            (0, 18) => fatal_lexer_unterminated_comment;
+    }
+}
+
+#[test]
+fn block_comments_eof_nested() {
+    check! {
+        ("#| nested #|comments #| are |#also handled| #" => Unrecognized),
+            (0, 45) => fatal_lexer_unterminated_comment;
+    }
+}
+
+#[test]
+fn sexpr_comments() {
+    check! {
+        ("#;" => CommentPrefix);
+        ("#;" => CommentPrefix);
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Fixed-syntax tokens
 
 #[test]

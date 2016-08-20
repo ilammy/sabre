@@ -17,6 +17,12 @@ pub enum Token {
     /// Non-significant whitespace.
     Whitespace,
 
+    /// Non-significant comment.
+    Comment,
+
+    /// S-expression comment prefix `#;`.
+    CommentPrefix,
+
     /// Apostrophe (single quote): `'`.
     Quote,
 

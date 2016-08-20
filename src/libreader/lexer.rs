@@ -169,6 +169,9 @@ impl<'a> StringScanner<'a> {
             '`' => { self.read(); Token::Backquote }
            '\'' => { self.read(); Token::Quote }
             '.' => { self.read(); Token::Dot }
+            ';' => {
+                self.scan_line_comment()
+            }
             ',' => {
                 self.read();
                 if self.cur_is('@') {
@@ -214,6 +217,73 @@ impl<'a> StringScanner<'a> {
         return Token::Unrecognized;
     }
 
+    /// Scan a line comment starting with `;`.
+    fn scan_line_comment(&mut self) -> Token {
+        assert!(self.cur_is(';'));
+
+        loop {
+            match self.cur {
+                Some('\n') => {
+                    self.read();
+                    break;
+                }
+                Some('\r') => {
+                    self.read();
+                    if self.cur_is('\n') {
+                        self.read();
+                    }
+                    break;
+                }
+                Some(_) => {
+                    self.read();
+                }
+                None => {
+                    break;
+                }
+            }
+        }
+
+        return Token::Comment;
+    }
+
+    /// Scan a possibly nested block comment `#| ... |#`.
+    fn scan_block_comment(&mut self, start: usize) -> Token {
+        assert!(self.cur_is('|'));
+        self.read();
+
+        let mut nesting_level = 1;
+
+        while nesting_level > 0 {
+            match self.cur {
+                Some('|') => {
+                    self.read();
+                    if self.cur_is('#') {
+                        self.read();
+                        nesting_level -= 1;
+                    }
+                }
+                Some('#') => {
+                    self.read();
+                    if self.cur_is('|') {
+                        self.read();
+                        nesting_level += 1;
+                    }
+                }
+                Some(_) => {
+                    self.read();
+                }
+                None => {
+                    self.diagnostic.report(DiagnosticKind::fatal_lexer_unterminated_comment,
+                        Span::new(start, self.prev_pos));
+
+                    return Token::Unrecognized;
+                }
+            }
+        }
+
+        return Token::Comment;
+    }
+
     /// Scan over a token starting with a hash `#`.
     fn scan_hash_token(&mut self) -> Token {
         let start = self.prev_pos;
@@ -224,6 +294,10 @@ impl<'a> StringScanner<'a> {
             Some('(') => { self.read(); Token::OpenVector(ParenType::Parenthesis) }
             Some('[') => { self.read(); Token::OpenVector(ParenType::Bracket) }
             Some('{') => { self.read(); Token::OpenVector(ParenType::Brace) }
+            Some(';') => { self.read(); Token::CommentPrefix }
+            Some('|') => {
+                self.scan_block_comment(start)
+            }
             Some('u') | Some('U') => {
                 self.scan_bytevector_open(start)
             }

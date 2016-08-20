@@ -69,6 +69,9 @@ pub enum DiagnosticKind {
 
     /// Lexer has recovered from an invalid spelling of bytevector opener `#u8(`.
     err_lexer_invalid_bytevector,
+
+    /// Lexer has encountered a block comment without matching termination token.
+    fatal_lexer_unterminated_comment,
 }
 
 /// Convenience wrapper for reporting diagnostics with known spans.
