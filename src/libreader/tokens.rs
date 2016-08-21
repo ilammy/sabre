@@ -50,6 +50,9 @@ pub enum Token {
     /// Closing parenthesis: `)`, `]`, `}`.
     Close(ParenType),
 
+    /// Character literal.
+    Character(char),
+
     /// Marker token denoting an invalid character sequences.
     Unrecognized,
 }

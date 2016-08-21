@@ -72,6 +72,15 @@ pub enum DiagnosticKind {
 
     /// Lexer has encountered a block comment without matching termination token.
     fatal_lexer_unterminated_comment,
+
+    /// Lexer has found a hex-coded Unicode code point literal outside of Unicode range.
+    err_lexer_invalid_unicode_range,
+
+    /// Lexer has expected an inline character after `#\` but there wasn't any.
+    err_lexer_character_missing,
+
+    /// Lexer has scanned a named character with unknown name.
+    err_lexer_unknown_character_name,
 }
 
 /// Convenience wrapper for reporting diagnostics with known spans.

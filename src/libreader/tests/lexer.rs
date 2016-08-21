@@ -41,6 +41,7 @@ macro_rules! token {
     { OpenVector($ptype:ident) }        => { Token::OpenVector(ParenType::$ptype) };
     { OpenBytevector($ptype:ident) }    => { Token::OpenBytevector(ParenType::$ptype) };
     { Close($ptype:ident) }             => { Token::Close(ParenType::$ptype) };
+    { Character($value:expr) }          => { Token::Character($value) };
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -231,22 +232,31 @@ fn recover_open_vector() {
         ("#:"               => Unrecognized),
                     (0, 2)  => err_lexer_unrecognized;
         ("["                => Open(Bracket));
-        ("#,"               => Unrecognized),
-                    (0, 2)  => err_lexer_unrecognized;
+        ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_unrecognized;
+        (","                => Comma);
         ("{"                => Open(Brace));
         ("#"                => Unrecognized),
                     (0, 1)  => err_lexer_unrecognized;
         (" "                => Whitespace);
-        ("#,@"              => Unrecognized),
-                    (0, 3)  => err_lexer_unrecognized;
+        ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_unrecognized;
+        (",@"               => CommaSplicing);
         (" "                => Whitespace);
-        ("#`"               => Unrecognized),
-                    (0, 2)  => err_lexer_unrecognized;
+        ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_unrecognized;
+        ("`"                => Backquote);
         ("["                => Open(Bracket));
         (" "                => Whitespace);
-        ("#####"            => Unrecognized),
-                    (0, 5)  => err_lexer_unrecognized;
-        ("("                => Open(Parenthesis));
+        ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_unrecognized;
+        ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_unrecognized;
+        ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_unrecognized;
+        ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_unrecognized;
+        ("#("               => OpenVector(Parenthesis));
         (" "                => Whitespace);
         ("#."               => Unrecognized),
                     (0, 2)  => err_lexer_unrecognized;
@@ -274,13 +284,213 @@ fn recover_open_bytevector() {
                     (0, 5)  => err_lexer_unrecognized;
         ("["                => Open(Bracket));
         (" "                => Whitespace);
-        ("#u90`ex.a'mp,le1" => Unrecognized),
+        ("#u90_ex.a@mp!le1" => Unrecognized),
                     (0, 16) => err_lexer_unrecognized;
         ("("                => Open(Parenthesis));
         (" "                => Whitespace);
         ("#8"               => Unrecognized),
                     (0, 2)  => err_lexer_unrecognized;
         ("["                => Open(Bracket));
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Characters
+
+#[test]
+fn characters_immediate() {
+    check! {
+        ("#\\t"         => Character('t'));
+        ("#\\e"         => Character('e'));
+        ("#\\s"         => Character('s'));
+        ("#\\t"         => Character('t'));
+        (" "            => Whitespace);
+        ("#\\X"         => Character('X'));
+        (" "            => Whitespace);
+        ("#\\\u{1234}"  => Character('\u{1234}'));
+        (" "            => Whitespace);
+        ("#\\("         => Character('('));
+        ("#\\)"         => Character(')'));
+        ("#\\."         => Character('.'));
+        ("#\\,"         => Character(','));
+    }
+}
+
+#[test]
+fn characters_named() {
+    check! {
+        ("#\\alarm"     => Character('\u{0007}'));
+        ("\n"           => Whitespace);
+        ("#\\escape"    => Character('\u{0008}'));
+        ("\n"           => Whitespace);
+        ("#\\delete"    => Character('\u{007F}'));
+        ("\n"           => Whitespace);
+        ("#\\newline"   => Character('\u{000A}'));
+        ("\n"           => Whitespace);
+        ("#\\null"      => Character('\u{0000}'));
+        ("\n"           => Whitespace);
+        ("#\\return"    => Character('\u{000D}'));
+        ("\n"           => Whitespace);
+        ("#\\space"     => Character('\u{0020}'));
+        ("\n"           => Whitespace);
+        ("#\\tab"       => Character('\u{0009}'));
+    }
+}
+
+#[test]
+fn characters_hexcoded() {
+    check! {
+        ("#\\x0000"     => Character('\u{0000}'));
+        ("  "           => Whitespace);
+        ("#\\xF00F"     => Character('\u{F00F}'));
+        ("  "           => Whitespace);
+        ("#\\X200C"     => Character('\u{200C}'));
+        ("  "           => Whitespace);
+        ("#\\x200c"     => Character('\u{200C}'));
+        ("  "           => Whitespace);
+        ("#\\xd"        => Character('\u{000D}'));
+        ("  "           => Whitespace);
+        ("#\\XFF"       => Character('\u{00FF}'));
+        ("  "           => Whitespace);
+        ("#\\x000000000000000000000000000000000000001" => Character('\u{0001}'));
+        ("  "           => Whitespace);
+        ("#\\xD7FF"     => Character('\u{D7FF}'));
+        ("  "           => Whitespace);
+        ("#\\xD800"     => Character('\u{FFFD}')),
+                 (0, 7) => err_lexer_invalid_unicode_range;
+        ("  "           => Whitespace);
+        ("#\\xDBFF"     => Character('\u{FFFD}')),
+                 (0, 7) => err_lexer_invalid_unicode_range;
+        ("  "           => Whitespace);
+        ("#\\xdC00"     => Character('\u{FFFD}')),
+                 (0, 7) => err_lexer_invalid_unicode_range;
+        ("  "           => Whitespace);
+        ("#\\xDffF"     => Character('\u{FFFD}')),
+                 (0, 7) => err_lexer_invalid_unicode_range;
+        ("  "           => Whitespace);
+        ("#\\xE000"     => Character('\u{E000}'));
+        ("  "           => Whitespace);
+        ("#\\X110000"   => Character('\u{FFFD}')),
+                 (0, 9) => err_lexer_invalid_unicode_range;
+        ("  "           => Whitespace);
+        ("#\\xFffFDECBbDFFFFfFFFF1238126318Faaaa" => Character('\u{FFFD}')),
+                (0, 37) => err_lexer_invalid_unicode_range;
+    }
+}
+
+#[test]
+fn characters_edge_cases() {
+    check! {
+        ("#\\\u{0000}"  => Character('\u{0000}'));
+        (" "            => Whitespace);
+        ("#\\\\"        => Character('\\'));
+        (" "            => Whitespace);
+        ("#\\\\"        => Character('\\'));
+        ("#\\#"         => Character('#'));
+        (" "            => Whitespace);
+        ("#\\\""        => Character('\"'));
+        (" "            => Whitespace);
+        ("#\\("         => Character('('));
+        ("("            => Open(Parenthesis));
+        (" "            => Whitespace);
+        ("#\\;"         => Character(';'));
+        ("#\\;"         => Character(';'));
+        (" "            => Whitespace);
+        ("#\\|"         => Character('|'));
+    }
+}
+
+#[test]
+fn characters_whitespace_eof_special() {
+    check! {
+        ("#\\"      => Character('\u{FFFD}')),
+             (2, 2) => err_lexer_character_missing;
+        (" "        => Whitespace);
+        ("#\\"      => Character('\u{FFFD}')),
+             (2, 2) => err_lexer_character_missing;
+        ("\t"       => Whitespace);
+        ("#\\"      => Character('\u{FFFD}')),
+             (2, 2) => err_lexer_character_missing;
+        ("\r"       => Whitespace);
+        ("#\\"      => Character('\u{FFFD}')),
+             (2, 2) => err_lexer_character_missing;
+        ("\n"       => Whitespace);
+        ("#\\"      => Character('\u{FFFD}')),
+             (2, 2) => err_lexer_character_missing;
+        ("\r\n"     => Whitespace);
+        ("#\\"      => Character('\u{FFFD}')),
+             (2, 2) => err_lexer_character_missing;
+    }
+}
+
+#[test]
+fn recover_character_names() {
+    check! {
+        ("#\\Space"                         => Character('\u{FFFD}')),
+                                     (0, 7) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\NEWLINE"                       => Character('\u{FFFD}')),
+                                     (0, 9) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\1234"                          => Character('\u{FFFD}')),
+                                     (0, 6) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\desu-desu"                     => Character('\u{FFFD}')),
+                (                    0, 11) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\..."                           => Character('\u{FFFD}')),
+                                     (0, 5) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\%%%"                           => Character('\u{FFFD}')),
+                                     (0, 5) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\^_^"                           => Character('\u{FFFD}')),
+                                     (0, 5) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\\\\\"                          => Character('\u{FFFD}')),
+                                     (0, 4) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\+inf.0"                        => Character('\u{FFFD}')),
+                                     (0, 8) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\-NaN.0"                        => Character('\u{FFFD}')),
+                                     (0, 8) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\-1.@.1"                        => Character('\u{FFFD}')),
+                                     (0, 8) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\Xample"                        => Character('\u{FFFD}')),
+                                     (0, 8) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\\\x1232"                       => Character('\u{FFFD}')),
+                                     (0, 8) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\\u{0}\u{1}\u{2}"               => Character('\u{FFFD}')),
+                                     (0, 5) => err_lexer_unknown_character_name;
+        ("#\\\u{4}\u{5}\u{6}"               => Character('\u{FFFD}')),
+                                     (0, 5) => err_lexer_unknown_character_name;
+        (";\n"                              => Comment);
+        ("#\\\u{1111}\u{2222}\u{3333}"      => Character('\u{FFFD}')),
+                                    (0, 11) => err_lexer_unknown_character_name;
+        ("("                                => Open(Parenthesis));
+        ("#\\\u{e801}xx\u{102323}_\u{7F}"   => Character('\u{FFFD}')),
+                                    (0, 13) => err_lexer_unknown_character_name;
+        ("]"                                => Close(Bracket));
+        (" "                                => Whitespace);
+        ("#\\\u{00EB}"                      => Character('\u{00EB}'));
+        (" "                                => Whitespace);
+        ("#\\\u{0451}"                      => Character('\u{0451}'));
+        (" "                                => Whitespace);
+        ("#\\\u{0435}\u{0308}"              => Character('\u{FFFD}')),
+                                     (0, 6) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\\u{0065}\u{0308}"              => Character('\u{FFFD}')),
+                                     (0, 5) => err_lexer_unknown_character_name;
+        (" "                                => Whitespace);
+        ("#\\\u{CE68}"                      => Character('\u{CE68}'));
+        (" "                                => Whitespace);
+        ("#\\\u{110E}\u{1175}\u{11B7}"      => Character('\u{FFFD}')),
+                                    (0, 11) => err_lexer_unknown_character_name;
     }
 }
 
