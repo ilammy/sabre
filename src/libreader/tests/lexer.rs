@@ -11,6 +11,7 @@
 extern crate reader;
 
 use reader::diagnostics::{Span, Handler, Diagnostic, DiagnosticKind};
+use reader::intern_pool::{InternPool};
 use reader::lexer::{ScannedToken, StringScanner, Scanner};
 use reader::tokens::{Token, ParenType};
 
@@ -19,10 +20,11 @@ use reader::tokens::{Token, ParenType};
 
 macro_rules! check {
     { $( ($str:expr => $($token:tt)+) $(, ($from:expr, $to:expr) => $kind:ident)* ; )* } => {{
+        let pool = InternPool::new();
         let slices = &[
             $(ScannerTestSlice {
                 slice: $str,
-                token: token!($($token)+),
+                token: token!(pool, $($token)+),
                 diagnostics: &[
                     $(ScannerTestDiagnostic {
                         kind: DiagnosticKind::$kind,
@@ -31,17 +33,18 @@ macro_rules! check {
                 ],
             },)*
         ];
-        check(slices);
+        check(&pool, slices);
     }}
 }
 
 macro_rules! token {
-    { $tok:ident }                      => { Token::$tok };
-    { Open($ptype:ident) }              => { Token::Open(ParenType::$ptype) };
-    { OpenVector($ptype:ident) }        => { Token::OpenVector(ParenType::$ptype) };
-    { OpenBytevector($ptype:ident) }    => { Token::OpenBytevector(ParenType::$ptype) };
-    { Close($ptype:ident) }             => { Token::Close(ParenType::$ptype) };
-    { Character($value:expr) }          => { Token::Character($value) };
+    { $pool:expr, $tok:ident }                      => { Token::$tok };
+    { $pool:expr, Open($ptype:ident) }              => { Token::Open(ParenType::$ptype) };
+    { $pool:expr, OpenVector($ptype:ident) }        => { Token::OpenVector(ParenType::$ptype) };
+    { $pool:expr, OpenBytevector($ptype:ident) }    => { Token::OpenBytevector(ParenType::$ptype) };
+    { $pool:expr, Close($ptype:ident) }             => { Token::Close(ParenType::$ptype) };
+    { $pool:expr, Character($value:expr) }          => { Token::Character($value) };
+    { $pool:expr, String($value:expr) }             => { Token::String($pool.intern($value)) };
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -495,6 +498,228 @@ fn recover_character_names() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Strings
+
+#[test]
+fn strings_basic() {
+    check! {
+        ("\"test\""     => String("test"));
+        (" "            => Whitespace);
+        ("\"\""         => String(""));
+        (" "            => Whitespace);
+        ("\"TesT\""     => String("TesT"));
+        (" "            => Whitespace);
+        ("\"12312\""    => String("12312"));
+        (" "            => Whitespace);
+        ("\" \""        => String(" "));
+        ("\"\t\""       => String("\t"));
+        ("\".\""        => String("."));
+        (" "            => Whitespace);
+        ("\"\u{0}\""    => String("\u{0000}"));
+        (" "            => Whitespace);
+        ("\"\u{044E}\u{043D}\u{0438}\u{043A}\u{043E}\u{0434}\""
+                        => String("\u{044E}\u{043D}\u{0438}\u{043A}\u{043E}\u{0434}"));
+        (" "            => Whitespace);
+        ("\"\u{1112}\u{1161}\u{11AB}\u{1100}\u{116E}\u{11A8}\u{110B}\u{1165}\""
+                        => String("\u{1112}\u{1161}\u{11AB}\u{1100}\u{116E}\u{11A8}\u{110B}\u{1165}"));
+    }
+}
+
+#[test]
+fn strings_escape_sequences() {
+    check! {
+        (r#""\a""#      => String("\u{0007}"));
+        (r#""\b""#      => String("\u{0008}"));
+        (r#""\t""#      => String("\u{0009}"));
+        (r#""\n""#      => String("\u{000A}"));
+        (r#""\r""#      => String("\u{000D}"));
+        (r#""\"""#      => String("\u{0022}"));
+        (r#""\\""#      => String("\u{005C}"));
+        (r#""\|""#      => String("\u{007C}"));
+        (r#""\r\n""#    => String("\u{000D}\u{000A}"));
+    }
+}
+
+#[test]
+fn strings_unicode_escapes() {
+    check! {
+        ("\"\\x0000;\""     => String("\u{0000}"));
+        (" "                => Whitespace);
+        ("\"\\X1234;\""     => String("\u{1234}"));
+        (" "                => Whitespace);
+        ("\"\\xBeeb;\""     => String("\u{BEEB}"));
+        (" "                => Whitespace);
+        ("\"\\Xf0F0C;\""    => String("\u{0F0F0C}"));
+        (" "                => Whitespace);
+        ("\"\\x00000001;\"" => String("\u{0001}"));
+        (" "                => Whitespace);
+        ("\"\\x10FFFF;\""   => String("\u{10FFFF}"));
+    }
+}
+
+#[test]
+fn strings_newlines() {
+    check! {
+        ("\"one\nline\""        => String("one\nline"));
+        ("\n"                   => Whitespace);
+        ("\"other\r\nline\""    => String("other\nline"));
+        ("\n"                   => Whitespace);
+        ("\"third\n\nline\""    => String("third\n\nline"));
+        ("\n"                   => Whitespace);
+        ("\"bare\rCR\""         => String("bare\nCR"));
+        ("\n"                   => Whitespace);
+        ("\"\n\""               => String("\n"));
+        ("\"\r\""               => String("\n"));
+        ("\"\r\n\""             => String("\n"));
+        ("\"\r\n\r\""           => String("\n\n"));
+        ("\"\n\r\n\""           => String("\n\n"));
+    }
+}
+
+#[test]
+fn strings_line_escape() {
+    check! {
+        ("\"text with \\  \t  \r\n \t one line\""   => String("text with one line"));
+        ("\n"                                       => Whitespace);
+        ("\"another\\\nline\""                      => String("anotherline"));
+        ("\r\n"                                     => Whitespace);
+        ("\"one\\\r\nmore\""                        => String("onemore"));
+        ("\r"                                       => Whitespace);
+        ("\"as\\\rwell\""                           => String("aswell"));
+        ("\n"                                       => Whitespace);
+        ("\"\\\n\""                                 => String(""));
+        ("\n"                                       => Whitespace);
+        ("\"\\\r\n\""                               => String(""));
+        ("\n"                                       => Whitespace);
+        ("\"\\\r\""                                 => String(""));
+        ("\n"                                       => Whitespace);
+        ("\"\\ \n \""                               => String(""));
+        ("\n"                                       => Whitespace);
+        ("\"\\ \r\n \""                             => String(""));
+        ("\n"                                       => Whitespace);
+        ("\"\\ \r \""                               => String(""));
+        ("\n"                                       => Whitespace);
+        ("\"\\\r\r\""                               => String("\n"));
+        ("\n"                                       => Whitespace);
+        ("\"<\\\r\n\r\t\r\n>\""                     => String("<\n\t\n>"));
+    }
+}
+
+#[test]
+fn recover_strings_eof_1() {
+    check! {
+        ("\"endless string" => Unrecognized),
+            (0, 15) => fatal_lexer_unterminated_string;
+    }
+}
+
+#[test]
+fn recover_strings_eof_2() {
+    check! {
+        ("\"" => Unrecognized),
+            (0, 1) => fatal_lexer_unterminated_string;
+    }
+}
+
+#[test]
+fn recover_strings_eof_3() {
+    check! {
+        ("\"\\" => Unrecognized),
+            (0, 2) => fatal_lexer_unterminated_string;
+    }
+}
+
+#[test]
+fn recover_strings_eof_4() {
+    check! {
+        ("\"\\ " => Unrecognized),
+            (1, 3) => err_lexer_invalid_line_escape,
+            (0, 3) => fatal_lexer_unterminated_string;
+    }
+}
+
+#[test]
+fn recover_strings_eof_5() {
+    check! {
+        ("\"\\x1" => Unrecognized),
+            (4, 4) => err_lexer_unicode_escape_missing_semicolon,
+            (0, 4) => fatal_lexer_unterminated_string;
+    }
+}
+
+#[test]
+fn recover_strings_escape_sequences() {
+    check! {
+        ("\"\\m\""          => String("m")),
+                     (1, 3) => err_lexer_invalid_escape_sequence;
+        (" "                => Whitespace);
+        ("\"\\1\\2\\3\""    => String("123")),
+                     (1, 3) => err_lexer_invalid_escape_sequence,
+                     (3, 5) => err_lexer_invalid_escape_sequence,
+                     (5, 7) => err_lexer_invalid_escape_sequence;
+        (" "                => Whitespace);
+        ("\"\\\u{0}\""      => String("\u{0000}")),
+                     (1, 3) => err_lexer_invalid_escape_sequence;
+        (" "                => Whitespace);
+        ("\"\\\r\""         => String("")); // line escape
+    }
+}
+
+#[test]
+fn recover_strings_line_escapes() {
+    check! {
+        ("\"xxx \\   !\""           => String("xxx !")),
+                             (5, 9) => err_lexer_invalid_line_escape;
+        ("\n"                       => Whitespace);
+        ("\"xxx \\\t\t\u{0000}\""   => String("xxx \u{0000}")),
+                             (5, 8) => err_lexer_invalid_line_escape;
+    }
+}
+
+#[test]
+fn recover_strings_unicode_escapes() {
+    check! {
+        ("\"\\xD7FF;\\xD800;\\xDFFF;\\xC000;\""     => String("\u{D7FF}\u{FFFD}\u{FFFD}\u{C000}")),
+                                            (8, 15) => err_lexer_invalid_unicode_range,
+                                           (15, 22) => err_lexer_invalid_unicode_range;
+        ("\n"                                       => Whitespace);
+        ("\"\\XfaBBCbCBDb9BCdeeeAa2123987005;\""    => String("\u{FFFD}")),
+                                            (1, 33) => err_lexer_invalid_unicode_range;
+        ("\n"                                       => Whitespace);
+        ("\"\\x110000;\\x0F00000;\""                => String("\u{FFFD}\u{FFFD}")),
+                                            (1, 10) => err_lexer_invalid_unicode_range,
+                                           (10, 20) => err_lexer_invalid_unicode_range;
+        ("\"\\x\""                                  => String("x")),
+                                             (1, 3) => err_lexer_invalid_escape_sequence;
+        ("\n"                                       => Whitespace);
+        ("\"\\X\""                                  => String("X")),
+                                             (1, 3) => err_lexer_invalid_escape_sequence;
+        ("\n"                                       => Whitespace);
+        ("\"\\x!\""                                 => String("x!")),
+                                             (1, 3) => err_lexer_invalid_escape_sequence;
+        ("\n"                                       => Whitespace);
+        ("\"\\x;\""                                 => String("\u{FFFD}")),
+                                             (3, 3) => err_lexer_unicode_escape_missing_digits;
+        ("\n"                                       => Whitespace);
+        ("\"\\X;\""                                 => String("\u{FFFD}")),
+                                             (3, 3) => err_lexer_unicode_escape_missing_digits;
+        ("\n"                                       => Whitespace);
+        ("\"\\xdesu\""                              => String("\u{00DE}su")),
+                                             (5, 5) => err_lexer_unicode_escape_missing_semicolon;
+        ("\n"                                       => Whitespace);
+        ("\"\\x11111111111111111x\""                => String("\u{FFFD}x")),
+                                           (20, 20) => err_lexer_unicode_escape_missing_semicolon,
+                                            (1, 20) => err_lexer_invalid_unicode_range;
+        ("\n"                                       => Whitespace);
+        ("\"\\x3711\\a\""                           => String("\u{3711}\u{0007}")),
+                                             (7, 7) => err_lexer_unicode_escape_missing_semicolon;
+        ("\n"                                       => Whitespace);
+        ("\"\\x0ded\""                              => String("\u{0DED}")),
+                                             (7, 7) => err_lexer_unicode_escape_missing_semicolon;
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
 use std::cell::RefCell;
@@ -525,14 +750,14 @@ struct ScannerTestResults {
 
 /// Check whether the scanner produces expected results and reports expected diagnostics
 /// when given a sequence of test string slices. Panic if this is not true.
-fn check(slices: &[ScannerTestSlice]) {
+fn check(pool: &InternPool, slices: &[ScannerTestSlice]) {
     let test_string = concatenate_test_slices(slices);
     let expected = compute_expected_results(slices);
-    let actual = compute_scanning_results(&test_string);
+    let actual = compute_scanning_results(&test_string, pool);
 
     let token_mismatches =
         verify("Tokens", &expected.tokens, &actual.tokens,
-            |token| print_token(token, &test_string));
+            |token| print_token(token, &test_string, pool));
 
     let diagnostic_mismatches =
         verify("Diagnostics", &expected.diagnostics, &actual.diagnostics,
@@ -603,14 +828,14 @@ fn compute_expected_results(test_slices: &[ScannerTestSlice]) -> ScannerTestResu
 }
 
 /// Scan over the string and remember all produced tokens and diagnostics.
-fn compute_scanning_results(string: &str) -> ScannerTestResults {
+fn compute_scanning_results(string: &str, pool: &InternPool) -> ScannerTestResults {
     let diagnostics = Rc::new(RefCell::new(Vec::new()));
     let mut tokens = Vec::new();
     {
         let reporter = SinkReporter::new(diagnostics.clone());
         let handler = Handler::with_reporter(Box::new(reporter));
 
-        let mut scanner = StringScanner::new(string, &handler);
+        let mut scanner = StringScanner::new(string, &handler, pool);
 
         loop {
             let token = scanner.next_token();
@@ -665,9 +890,9 @@ fn verify<T, F>(title: &str, expected: &[T], actual: &[T], to_string: F) -> Resu
 }
 
 /// Pretty-print a token in diffs.
-fn print_token(token: &ScannedToken, buf: &str) -> String {
+fn print_token(token: &ScannedToken, buf: &str, pool: &InternPool) -> String {
     format!("{token} @ [{from}, {to}] = {slice:?}",
-        token = pretty_print_token(token),
+        token = pretty_print_token(token, pool),
         from  = token.span.from,
         to    = token.span.to,
         slice = &buf[token.span.from..token.span.to],
@@ -691,8 +916,11 @@ fn print_diagnostic(diagnostic: &Diagnostic, buf: &str) -> String {
 }
 
 /// Pretty-print a token.
-fn pretty_print_token(token: &ScannedToken) -> String {
+fn pretty_print_token(token: &ScannedToken, pool: &InternPool) -> String {
     match token.tok {
+        Token::String(value) => {
+            format!("String({:?})", pool.get(value))
+        }
         _ => format!("{:?}", token.tok)
     }
 }

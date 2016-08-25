@@ -81,6 +81,22 @@ pub enum DiagnosticKind {
 
     /// Lexer has scanned a named character with unknown name.
     err_lexer_unknown_character_name,
+
+    /// Lexer has encountered a string without a closing quote.
+    fatal_lexer_unterminated_string,
+
+    /// Lexer has encountered an invalid escape sequence.
+    err_lexer_invalid_escape_sequence,
+
+    /// Lexer has encountered an invalid line escape, not followed by only whitespace.
+    err_lexer_invalid_line_escape,
+
+    /// Lexer has expected hex digits in a hexcoded character escape but there weren't any.
+    err_lexer_unicode_escape_missing_digits,
+
+    /// Lexer has expected a semicolon to terminate a hexcoded character escape
+    /// but there wasn't any.
+    err_lexer_unicode_escape_missing_semicolon,
 }
 
 /// Convenience wrapper for reporting diagnostics with known spans.

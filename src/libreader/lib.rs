@@ -9,5 +9,6 @@
 //! This crate contains modules implementing basic syntax analysis of Scheme source code.
 
 pub mod diagnostics;
+pub mod intern_pool;
 pub mod lexer;
 pub mod tokens;

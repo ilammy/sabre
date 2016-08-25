@@ -8,6 +8,8 @@
 //!
 //! This module contains definitions of tokens recognized and processed by Scheme reader.
 
+use intern_pool::Atom;
+
 /// Types of tokens recognized by the scanner.
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum Token {
@@ -52,6 +54,9 @@ pub enum Token {
 
     /// Character literal.
     Character(char),
+
+    /// String literal.
+    String(Atom),
 
     /// Marker token denoting an invalid character sequences.
     Unrecognized,

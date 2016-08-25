@@ -12,6 +12,7 @@
 use std::char;
 
 use diagnostics::{Span, Handler, DiagnosticKind};
+use intern_pool::{InternPool};
 use tokens::{Token, ParenType};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -55,6 +56,9 @@ pub struct StringScanner<'a> {
     /// The string being scanned.
     buf: &'a str,
 
+    /// The pool where scanned strings are stored.
+    pool: &'a InternPool,
+
     // Scanning state
     //
     //     buf
@@ -97,10 +101,11 @@ impl<'a> Scanner for StringScanner<'a> {
 
 impl<'a> StringScanner<'a> {
     /// Make a new scanner for the given string which will report scanning errors to the
-    /// given handler.
-    pub fn new(s: &'a str, handler: &'a Handler) -> StringScanner<'a> {
+    /// given handle and will store scanned strings into the given intern pool.
+    pub fn new(s: &'a str, handler: &'a Handler, pool: &'a InternPool) -> StringScanner<'a> {
         let mut scanner = StringScanner {
             buf: s,
+            pool: pool,
             cur: None, pos: 0, prev_pos: 0,
             diagnostic: handler,
         };
@@ -185,6 +190,9 @@ impl<'a> StringScanner<'a> {
             }
             '#' => {
                 self.scan_hash_token()
+            }
+            '"' => {
+                self.scan_string_literal()
             }
             _ => {
                 let start = self.prev_pos;
@@ -495,6 +503,227 @@ impl<'a> StringScanner<'a> {
 
                 return Token::Character(REPLACEMENT_CHARACTER);
             }
+        }
+    }
+
+    /// Scan a string literal. This method also expands any escape sequences and normalizes line
+    /// endings in the scanned string.
+    fn scan_string_literal(&mut self) -> Token {
+        let start = self.prev_pos;
+        assert!(self.cur_is('"'));
+        self.read();
+
+        let mut value = String::new();
+
+        loop {
+            match self.cur {
+                // If we see a terminating quote then the string literal is over.
+                Some('"') => {
+                    self.read();
+                    break;
+                }
+
+                // Backslashes start escape sequences which may or may not have a value.
+                Some('\\') => {
+                    if let Some(c) = self.scan_string_escape_sequence() {
+                        value.push(c);
+                    }
+                }
+
+                // Handle non-LF line endings (CR-LF and just CR), inserting LF into the string.
+                Some('\r') => {
+                    self.read();
+                    if self.cur_is('\n') {
+                        self.read();
+                    }
+                    value.push('\n');
+                }
+
+                // Scan over and add all other characters to the string value.
+                Some(c) => {
+                    self.read();
+                    value.push(c);
+                }
+
+                // If we suddenly run out of characters in the stream then we're toasted.
+                None => {
+                    self.diagnostic.report(DiagnosticKind::fatal_lexer_unterminated_string,
+                        Span::new(start, self.pos));
+
+                    return Token::Unrecognized;
+                }
+            }
+        }
+
+        return Token::String(self.pool.intern_string(value));
+    }
+
+    /// Scan a single escape sequence inside a string. Returns None if the sequence produces no
+    /// character (e.g., it is a line escape seqeunce) or an unexpected EOF occurs. Otherwise
+    /// returns Some value of the escape sequence (which may be REPLACEMENT_CHARACTER if the
+    /// escape sequence is invalid and the lexer recovers from an error).
+    fn scan_string_escape_sequence(&mut self) -> Option<char> {
+        let escape_start = self.prev_pos;
+        assert!(self.cur_is('\\'));
+        self.read();
+
+        match self.cur {
+            // Handle traditional escape sequences.
+            Some('a')  => { self.read(); return Some('\u{0007}'); }
+            Some('b')  => { self.read(); return Some('\u{0008}'); }
+            Some('t')  => { self.read(); return Some('\u{0009}'); }
+            Some('n')  => { self.read(); return Some('\u{000A}'); }
+            Some('r')  => { self.read(); return Some('\u{000D}'); }
+            Some('"')  => { self.read(); return Some('\u{0022}'); }
+            Some('\\') => { self.read(); return Some('\u{005C}'); }
+            Some('|')  => { self.read(); return Some('\u{007C}'); }
+
+            // A backslash followed by whitespace starts a line escape which is ignored.
+            Some(' ') | Some('\t') | Some('\r') | Some('\n') => {
+                self.scan_string_line_escape_sequence(escape_start);
+                return None;
+            }
+
+            // A backslash followed by `x` starts a hexcoded Unicode character escape
+            // (or is an invalid escape sequence, we handle both below).
+            Some('x') | Some('X') => {
+                let c = self.scan_string_unicode_escape_sequence(escape_start);
+                return Some(c);
+            }
+
+            // Any other character is not expected after a backslash, it is an error. Report
+            // the error and return the character, assuming that the backslash itself is a typo.
+            Some(c) => {
+                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_escape_sequence,
+                    Span::new(escape_start, self.pos));
+                self.read();
+                return Some(c);
+            }
+
+            // If we encounter an EOF then just return None. The caller will report this condition.
+            None => {
+                return None;
+            }
+        }
+    }
+
+    /// Scan a line escape sequence in string.
+    fn scan_string_line_escape_sequence(&mut self, escape_start: usize) {
+        // First we scan the optional sequence of intraline whitespace before the line ending.
+        loop {
+            match self.cur {
+                // Break out of the loop if we see our line ending.
+                Some('\n') => {
+                    self.read();
+                    break;
+                }
+                Some('\r') => {
+                    self.read();
+                    if self.cur_is('\n') {
+                        self.read();
+                    }
+                    break;
+                }
+
+                // Scan over intraline whitespace (non-line-endings).
+                Some(' ') | Some('\t') => {
+                    self.read();
+                }
+
+                // We do not expect any other character here or the EOF condition. If this happens
+                // then report bad syntax and get out.
+                Some(_) | None => {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_line_escape,
+                        Span::new(escape_start, self.prev_pos));
+
+                    return;
+                }
+            }
+        }
+
+        // Then we scan the second optional sequence of intraline whitespace after the line ending.
+        loop {
+            match self.cur {
+                // Scan over intraline whitespace.
+                Some(' ') | Some('\t') => {
+                    self.read();
+                }
+
+                // Any other character (including line endings) means that we're done with the
+                // line escape. This is also true for an (unexpected) EOF, the caller will
+                // report it properly to the user later.
+                Some(_) | None => {
+                    break;
+                }
+            }
+        }
+    }
+
+    /// Scan a Unicode escape sequence in string and return its value.
+    fn scan_string_unicode_escape_sequence(&mut self, escape_start: usize) -> char {
+        assert!(self.cur_is('x') || self.cur_is('X'));
+        let first_char = self.cur.unwrap();
+        self.read();
+
+        // Handle the happy path first. A proper Unicode escape matches /\\[xX][0-9A-Fa-f]+;/.
+        if self.cur.is_some() && is_digit(16, self.cur.unwrap()) {
+            let mut value: u32 = 0;
+
+            loop {
+                match self.cur {
+                    // Semicolon terminates Unicode escape sequence in strings.
+                    Some(';') => {
+                        self.read();
+                        break;
+                    }
+
+                    // Hexadecimal digits constitute the code point value. The user may write
+                    // literals like "\x00000000000000000001;" or "\xFFFFFFFFFFFFFFFF", so we
+                    // should be careful about overflows.
+                    Some(c) if is_digit(16, c) => {
+                        if value <= 0x00FFFFFF {
+                            value = (value << 4) | hex_value(c) as u32;
+                        }
+                        self.read();
+                    }
+
+                    // Any other character is treated as an unexpected terminator of the escape
+                    // sequence, assuming that the user has forgotten to type the semicolon. This
+                    // also includes the unexpected EOF which will be reported by the caller.
+                    Some(_) | None => {
+                        self.diagnostic.report(DiagnosticKind::err_lexer_unicode_escape_missing_semicolon,
+                            Span::new(self.prev_pos, self.prev_pos));
+                        break;
+                    }
+                }
+            }
+
+            // Check the resulting code point for correctness and return the value.
+            if let Some(c) = char::from_u32(value) {
+                return c;
+            } else {
+                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_unicode_range,
+                    Span::new(escape_start, self.prev_pos));
+
+                return REPLACEMENT_CHARACTER;
+            }
+        }
+
+        // Now we have the "\x" sequence which is not followed by a hexadecimal digit. Treat "\x;"
+        // as a special case, assuming it to be a Unicode escape sequence with no digits (the user
+        // may have forgotten to type the only digit there). If anything else follows then "\x"
+        // is an invalid escape sequence.
+        if self.cur_is(';') {
+            self.diagnostic.report(DiagnosticKind::err_lexer_unicode_escape_missing_digits,
+                Span::new(self.prev_pos, self.prev_pos));
+            self.read();
+
+            return REPLACEMENT_CHARACTER;
+        } else {
+            self.diagnostic.report(DiagnosticKind::err_lexer_invalid_escape_sequence,
+                Span::new(escape_start, self.prev_pos));
+
+            return first_char;
         }
     }
 }
