@@ -194,6 +194,9 @@ impl<'a> StringScanner<'a> {
             '"' => {
                 self.scan_string_literal()
             }
+            '|' => {
+                self.scan_escaped_identifier()
+            }
             _ => {
                 let start = self.prev_pos;
                 self.scan_unrecognized(start)
@@ -724,6 +727,93 @@ impl<'a> StringScanner<'a> {
                 Span::new(escape_start, self.prev_pos));
 
             return first_char;
+        }
+    }
+
+    /// Scan an escaped identifier. This method also expands any escape sequences in the scanned
+    /// identifier.
+    fn scan_escaped_identifier(&mut self) -> Token {
+        let start = self.prev_pos;
+        assert!(self.cur_is('|'));
+        self.read();
+
+        let mut value = String::new();
+
+        loop {
+            match self.cur {
+                // If we see a terminating vertical bar then the identifier is over.
+                Some('|') => {
+                    self.read();
+                    break;
+                }
+
+                // Backslashes start escape sequences which may or may not have a value.
+                Some('\\') => {
+                    if let Some(c) = self.scan_identifier_escape_sequence() {
+                        value.push(c);
+                    }
+                }
+
+                // All other characters are scanned verbatim in identifiers. We do not perform any
+                // line ending conversions here.
+                Some(c) => {
+                    self.read();
+                    value.push(c);
+                }
+
+                // If we suddenly run out of characters in the stream then we're toasted.
+                None => {
+                    self.diagnostic.report(DiagnosticKind::fatal_lexer_unterminated_identifier,
+                        Span::new(start, self.pos));
+
+                    return Token::Unrecognized;
+                }
+            }
+        }
+
+        return Token::Identifier(self.pool.intern_string(value));
+    }
+
+    /// Scan a single escape sequence inside an identifier. Returns None if an unexpected
+    /// EOF occurs. Otherwise returns Some value of the escape sequence (which may be
+    /// REPLACEMENT_CHARACTER if the escape sequence is invalid and the lexer recovers
+    /// from an error).
+    fn scan_identifier_escape_sequence(&mut self) -> Option<char> {
+        let escape_start = self.prev_pos;
+        assert!(self.cur_is('\\'));
+        self.read();
+
+        match self.cur {
+            // Handle traditional escape sequences.
+            Some('a')  => { self.read(); return Some('\u{0007}'); }
+            Some('b')  => { self.read(); return Some('\u{0008}'); }
+            Some('t')  => { self.read(); return Some('\u{0009}'); }
+            Some('n')  => { self.read(); return Some('\u{000A}'); }
+            Some('r')  => { self.read(); return Some('\u{000D}'); }
+            Some('"')  => { self.read(); return Some('\u{0022}'); }
+            Some('\\') => { self.read(); return Some('\u{005C}'); }
+            Some('|')  => { self.read(); return Some('\u{007C}'); }
+
+            // A backslash followed by `x` starts a hexcoded Unicode character escape
+            // (or is an invalid escape sequence, we handle both below).
+            Some('x') | Some('X') => {
+                let c = self.scan_string_unicode_escape_sequence(escape_start);
+                return Some(c);
+            }
+
+            // Any other character is not expected after a backslash, it is an error. Report
+            // the error and return the character, assuming that the backslash itself is a typo.
+            Some(c) => {
+                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_escape_sequence,
+                    Span::new(escape_start, self.pos));
+                self.read();
+                return Some(c);
+            }
+
+            // If we encounter an EOF then just return None. The caller will report this condition.
+            None => {
+                return None;
+            }
         }
     }
 }

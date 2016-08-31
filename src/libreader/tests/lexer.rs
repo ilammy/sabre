@@ -45,6 +45,7 @@ macro_rules! token {
     { $pool:expr, Close($ptype:ident) }             => { Token::Close(ParenType::$ptype) };
     { $pool:expr, Character($value:expr) }          => { Token::Character($value) };
     { $pool:expr, String($value:expr) }             => { Token::String($pool.intern($value)) };
+    { $pool:expr, Identifier($value:expr) }         => { Token::Identifier($pool.intern($value)) };
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -715,6 +716,208 @@ fn recover_strings_unicode_escapes() {
                                              (7, 7) => err_lexer_unicode_escape_missing_semicolon;
         ("\n"                                       => Whitespace);
         ("\"\\x0ded\""                              => String("\u{0DED}")),
+                                             (7, 7) => err_lexer_unicode_escape_missing_semicolon;
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Escaped identifiers
+
+#[test]
+fn identifiers_escaped_basic() {
+    check! {
+        ("|test|"       => Identifier("test"));
+        (" "            => Whitespace);
+        ("||"           => Identifier(""));
+        (" "            => Whitespace);
+        ("|TesT|"       => Identifier("TesT"));
+        (" "            => Whitespace);
+        ("|12312|"      => Identifier("12312"));
+        (" "            => Whitespace);
+        ("| |"          => Identifier(" "));
+        ("|\t|"         => Identifier("\t"));
+        ("|.|"          => Identifier("."));
+        ("|\"|"         => Identifier("\""));
+        (" "            => Whitespace);
+        ("|\u{0}|"      => Identifier("\u{0000}"));
+        (" "            => Whitespace);
+        ("|\u{044E}\u{043D}\u{0438}\u{043A}\u{043E}\u{0434}|"
+                        => Identifier("\u{044E}\u{043D}\u{0438}\u{043A}\u{043E}\u{0434}"));
+        (" "            => Whitespace);
+        ("|\u{1112}\u{1161}\u{11AB}\u{1100}\u{116E}\u{11A8}\u{110B}\u{1165}|"
+                        => Identifier("\u{1112}\u{1161}\u{11AB}\u{1100}\u{116E}\u{11A8}\u{110B}\u{1165}"));
+    }
+}
+
+#[test]
+fn identifiers_escaped_escape_sequences() {
+    check! {
+        ("|\\a|"        => Identifier("\u{0007}"));
+        ("|\\b|"        => Identifier("\u{0008}"));
+        ("|\\t|"        => Identifier("\u{0009}"));
+        ("|\\n|"        => Identifier("\u{000A}"));
+        ("|\\r|"        => Identifier("\u{000D}"));
+        ("|\\\"|"       => Identifier("\u{0022}"));
+        ("|\\\\|"       => Identifier("\u{005C}"));
+        ("|\\||"        => Identifier("\u{007C}"));
+        ("|\\r\\n|"     => Identifier("\u{000D}\u{000A}"));
+    }
+}
+
+#[test]
+fn identifiers_escaped_unicode_escapes() {
+    check! {
+        ("|\\x0000;|"       => Identifier("\u{0000}"));
+        (" "                => Whitespace);
+        ("|\\X1234;|"       => Identifier("\u{1234}"));
+        (" "                => Whitespace);
+        ("|\\xBeeb;|"       => Identifier("\u{BEEB}"));
+        (" "                => Whitespace);
+        ("|\\Xf0F0C;|"      => Identifier("\u{0F0F0C}"));
+        (" "                => Whitespace);
+        ("|\\x00000001;|"   => Identifier("\u{0001}"));
+        (" "                => Whitespace);
+        ("|\\x10FFFF;|"     => Identifier("\u{10FFFF}"));
+    }
+}
+
+#[test]
+fn identifiers_escaped_newlines() {
+    check! {
+        ("|one\nline|"          => Identifier("one\nline"));
+        ("\n"                   => Whitespace);
+        ("|other\r\nline|"      => Identifier("other\r\nline"));
+        ("\n"                   => Whitespace);
+        ("|third\n\nline|"      => Identifier("third\n\nline"));
+        ("\n"                   => Whitespace);
+        ("|bare\rCR|"           => Identifier("bare\rCR"));
+        ("\n"                   => Whitespace);
+        ("|\n|"                 => Identifier("\n"));
+        ("|\r|"                 => Identifier("\r"));
+        ("|\r\n|"               => Identifier("\r\n"));
+    }
+}
+
+#[test]
+fn identifiers_escaped_line_escape() {
+    check! {
+        ("|text with \\  \t  \r\n \t one line|"     => Identifier("text with   \t  \r\n \t one line")),
+                                           (11, 13) => err_lexer_invalid_escape_sequence;
+        ("\n"                                       => Whitespace);
+        ("|another\\\nline|"                        => Identifier("another\nline")),
+                                            (8, 10) => err_lexer_invalid_escape_sequence;
+        ("\n"                                       => Whitespace);
+        ("|\\\n|"                                   => Identifier("\n")),
+                                             (1, 3) => err_lexer_invalid_escape_sequence;
+        ("\n"                                       => Whitespace);
+        ("|\\ \n |"                                 => Identifier(" \n ")),
+                                             (1, 3) => err_lexer_invalid_escape_sequence;
+        ("\n"                                       => Whitespace);
+        ("|<\\\r\n\r\t\r\n>|"                       => Identifier("<\r\n\r\t\r\n>")),
+                                             (2, 4) => err_lexer_invalid_escape_sequence;
+    }
+}
+
+#[test]
+fn recover_identifiers_escaped_eof_1() {
+    check! {
+        ("|endless" => Unrecognized),
+            (0, 8) => fatal_lexer_unterminated_identifier;
+    }
+}
+
+#[test]
+fn recover_identifiers_escaped_eof_2() {
+    check! {
+        ("|" => Unrecognized),
+            (0, 1) => fatal_lexer_unterminated_identifier;
+    }
+}
+
+#[test]
+fn recover_identifiers_escaped_eof_3() {
+    check! {
+        ("|\\|" => Unrecognized),
+            (0, 3) => fatal_lexer_unterminated_identifier;
+    }
+}
+
+#[test]
+fn recover_identifiers_escaped_eof_4() {
+    check! {
+        ("|\\ " => Unrecognized),
+            (1, 3) => err_lexer_invalid_escape_sequence,
+            (0, 3) => fatal_lexer_unterminated_identifier;
+    }
+}
+
+#[test]
+fn recover_identifiers_escaped_eof_5() {
+    check! {
+        ("|\\x1" => Unrecognized),
+            (4, 4) => err_lexer_unicode_escape_missing_semicolon,
+            (0, 4) => fatal_lexer_unterminated_identifier;
+    }
+}
+
+#[test]
+fn recover_identifiers_escaped_escape_sequences() {
+    check! {
+        ("|\\m|"            => Identifier("m")),
+                     (1, 3) => err_lexer_invalid_escape_sequence;
+        (" "                => Whitespace);
+        ("|\\1\\2\\3|"      => Identifier("123")),
+                     (1, 3) => err_lexer_invalid_escape_sequence,
+                     (3, 5) => err_lexer_invalid_escape_sequence,
+                     (5, 7) => err_lexer_invalid_escape_sequence;
+        (" "                => Whitespace);
+        ("|\\\u{0}|"        => Identifier("\u{0000}")),
+                     (1, 3) => err_lexer_invalid_escape_sequence;
+        (" "                => Whitespace);
+        ("|\\\r|"           => Identifier("\r")),
+                     (1, 3) => err_lexer_invalid_escape_sequence;
+    }
+}
+
+#[test]
+fn recover_identifiers_escaped_unicode_escapes() {
+    check! {
+        ("|\\xD7FF;\\xD800;\\xDFFF;\\xC000;|"       => Identifier("\u{D7FF}\u{FFFD}\u{FFFD}\u{C000}")),
+                                            (8, 15) => err_lexer_invalid_unicode_range,
+                                           (15, 22) => err_lexer_invalid_unicode_range;
+        ("\n"                                       => Whitespace);
+        ("|\\XfaBBCbCBDb9BCdeeeAa2123987005;|"      => Identifier("\u{FFFD}")),
+                                            (1, 33) => err_lexer_invalid_unicode_range;
+        ("\n"                                       => Whitespace);
+        ("|\\x110000;\\x0F00000;|"                  => Identifier("\u{FFFD}\u{FFFD}")),
+                                            (1, 10) => err_lexer_invalid_unicode_range,
+                                           (10, 20) => err_lexer_invalid_unicode_range;
+        ("|\\x|"                                    => Identifier("x")),
+                                             (1, 3) => err_lexer_invalid_escape_sequence;
+        ("\n"                                       => Whitespace);
+        ("|\\X|"                                    => Identifier("X")),
+                                             (1, 3) => err_lexer_invalid_escape_sequence;
+        ("\n"                                       => Whitespace);
+        ("|\\x!|"                                   => Identifier("x!")),
+                                             (1, 3) => err_lexer_invalid_escape_sequence;
+        ("\n"                                       => Whitespace);
+        ("|\\x;|"                                   => Identifier("\u{FFFD}")),
+                                             (3, 3) => err_lexer_unicode_escape_missing_digits;
+        ("\n"                                       => Whitespace);
+        ("|\\X;|"                                   => Identifier("\u{FFFD}")),
+                                             (3, 3) => err_lexer_unicode_escape_missing_digits;
+        ("\n"                                       => Whitespace);
+        ("|\\xdesu|"                                => Identifier("\u{00DE}su")),
+                                             (5, 5) => err_lexer_unicode_escape_missing_semicolon;
+        ("\n"                                       => Whitespace);
+        ("|\\x11111111111111111x|"                  => Identifier("\u{FFFD}x")),
+                                           (20, 20) => err_lexer_unicode_escape_missing_semicolon,
+                                            (1, 20) => err_lexer_invalid_unicode_range;
+        ("\n"                                       => Whitespace);
+        ("|\\x3711\\a|"                             => Identifier("\u{3711}\u{0007}")),
+                                             (7, 7) => err_lexer_unicode_escape_missing_semicolon;
+        ("\n"                                       => Whitespace);
+        ("|\\x0ded|"                                => Identifier("\u{0DED}")),
                                              (7, 7) => err_lexer_unicode_escape_missing_semicolon;
     }
 }

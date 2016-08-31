@@ -97,6 +97,9 @@ pub enum DiagnosticKind {
     /// Lexer has expected a semicolon to terminate a hexcoded character escape
     /// but there wasn't any.
     err_lexer_unicode_escape_missing_semicolon,
+
+    /// Lexer has encountered an escaped identifier without a closing vertical bar.
+    fatal_lexer_unterminated_identifier,
 }
 
 /// Convenience wrapper for reporting diagnostics with known spans.

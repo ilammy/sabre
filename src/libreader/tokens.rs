@@ -58,6 +58,9 @@ pub enum Token {
     /// String literal.
     String(Atom),
 
+    /// Identifier (both plain or escaped).
+    Identifier(Atom),
+
     /// Marker token denoting an invalid character sequences.
     Unrecognized,
 }
