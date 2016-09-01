@@ -61,6 +61,9 @@ pub enum Token {
     /// Identifier (both plain or escaped).
     Identifier(Atom),
 
+    /// Number literal.
+    Number(Atom),
+
     /// Marker token denoting an invalid character sequences.
     Unrecognized,
 }

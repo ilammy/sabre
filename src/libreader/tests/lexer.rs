@@ -46,6 +46,7 @@ macro_rules! token {
     { $pool:expr, Character($value:expr) }          => { Token::Character($value) };
     { $pool:expr, String($value:expr) }             => { Token::String($pool.intern($value)) };
     { $pool:expr, Identifier($value:expr) }         => { Token::Identifier($pool.intern($value)) };
+    { $pool:expr, Number($value:expr) }             => { Token::Number($pool.intern($value)) };
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -231,38 +232,44 @@ fn brackets_and_braces() {
 fn recover_open_vector() {
     check! {
         ("#ahaha-oh-wow"    => Unrecognized),
+                    (0, 2)  => err_lexer_invalid_number_prefix,
                     (0, 13) => err_lexer_unrecognized;
         ("("                => Open(Parenthesis));
         ("#:"               => Unrecognized),
+                    (0, 2)  => err_lexer_invalid_number_prefix,
                     (0, 2)  => err_lexer_unrecognized;
         ("["                => Open(Bracket));
         ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_invalid_number_prefix,
                     (0, 1)  => err_lexer_unrecognized;
         (","                => Comma);
         ("{"                => Open(Brace));
         ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_invalid_number_prefix,
                     (0, 1)  => err_lexer_unrecognized;
         (" "                => Whitespace);
         ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_invalid_number_prefix,
                     (0, 1)  => err_lexer_unrecognized;
         (",@"               => CommaSplicing);
         (" "                => Whitespace);
         ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_invalid_number_prefix,
                     (0, 1)  => err_lexer_unrecognized;
         ("`"                => Backquote);
         ("["                => Open(Bracket));
         (" "                => Whitespace);
-        ("#"                => Unrecognized),
-                    (0, 1)  => err_lexer_unrecognized;
-        ("#"                => Unrecognized),
-                    (0, 1)  => err_lexer_unrecognized;
-        ("#"                => Unrecognized),
-                    (0, 1)  => err_lexer_unrecognized;
-        ("#"                => Unrecognized),
-                    (0, 1)  => err_lexer_unrecognized;
-        ("#("               => OpenVector(Parenthesis));
+        ("#####"            => Unrecognized),
+                    (0, 1)  => err_lexer_invalid_number_prefix,
+                    (1, 2)  => err_lexer_invalid_number_prefix,
+                    (2, 3)  => err_lexer_invalid_number_prefix,
+                    (3, 4)  => err_lexer_invalid_number_prefix,
+                    (4, 5)  => err_lexer_invalid_number_prefix,
+                    (0, 5)  => err_lexer_unrecognized;
+        ("("                => Open(Parenthesis));
         (" "                => Whitespace);
         ("#."               => Unrecognized),
+                    (0, 2)  => err_lexer_invalid_number_prefix,
                     (0, 2)  => err_lexer_unrecognized;
         ("{"                => Open(Brace));
     }
@@ -292,8 +299,8 @@ fn recover_open_bytevector() {
                     (0, 16) => err_lexer_unrecognized;
         ("("                => Open(Parenthesis));
         (" "                => Whitespace);
-        ("#8"               => Unrecognized),
-                    (0, 2)  => err_lexer_unrecognized;
+        ("#8"               => Number("#8")),
+                    (0, 1)  => err_lexer_invalid_number_prefix;
         ("["                => Open(Bracket));
     }
 }
@@ -721,6 +728,270 @@ fn recover_strings_unicode_escapes() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Numbers: integer
+
+#[test]
+fn numbers_integer_basic() {
+    check! {
+        ("0"                    => Number("0"));
+        (" "                    => Whitespace);
+        ("12345"                => Number("12345"));
+        (" "                    => Whitespace);
+        ("4294967296"           => Number("4294967296"));
+        (" "                    => Whitespace);
+        ("9223372036854775808"  => Number("9223372036854775808"));
+        (" "                    => Whitespace);
+        ("170141183460469231731687303715884105727" => Number("170141183460469231731687303715884105727"));
+    }
+}
+
+#[test]
+fn numbers_integer_signed() {
+    check! {
+        ("+9000"                => Number("+9000"));
+        (" "                    => Whitespace);
+        ("-1234"                => Number("-1234"));
+        (" "                    => Whitespace);
+        ("-0"                   => Number("-0"));
+        (" "                    => Whitespace);
+        ("+1"                   => Number("+1"));
+        (" "                    => Whitespace);
+        ("-9223372036854775808" => Number("-9223372036854775808"));
+    }
+}
+
+#[test]
+fn numbers_integer_radix() {
+    check! {
+        ("#b0"                  => Number("#b0"));
+        (" "                    => Whitespace);
+        ("#B1"                  => Number("#B1"));
+        (" "                    => Whitespace);
+        ("#b1111111101011011"   => Number("#b1111111101011011"));
+        ("\n"                   => Whitespace);
+        ("#o755"                => Number("#o755"));
+        (" "                    => Whitespace);
+        ("#O0"                  => Number("#O0"));
+        (" "                    => Whitespace);
+        ("#o01234567"           => Number("#o01234567"));
+        ("\n"                   => Whitespace);
+        ("#d1234138910"         => Number("#d1234138910"));
+        (" "                    => Whitespace);
+        ("#D0000123"            => Number("#D0000123"));
+        (" "                    => Whitespace);
+        ("#D3"                  => Number("#D3"));
+        ("\n"                   => Whitespace);
+        ("#x0123456789ABCDEF"   => Number("#x0123456789ABCDEF"));
+        (" "                    => Whitespace);
+        ("#X0123456789abcdef"   => Number("#X0123456789abcdef"));
+        (" "                    => Whitespace);
+        ("#xD"                  => Number("#xD"));
+    }
+}
+
+#[test]
+fn numbers_integer_exactness() {
+    check! {
+        ("#e9000"               => Number("#e9000"));
+        (" "                    => Whitespace);
+        ("#i386"                => Number("#i386"));
+        (" "                    => Whitespace);
+        ("#E3"                  => Number("#E3"));
+        (" "                    => Whitespace);
+        ("#I1"                  => Number("#I1"));
+    }
+}
+
+#[test]
+fn numbers_integer_both_radix_and_exactness() {
+    check! {
+        ("#b#e10101"            => Number("#b#e10101"));
+        (" "                    => Whitespace);
+        ("#E#B01010"            => Number("#E#B01010"));
+        (" "                    => Whitespace);
+        ("#i#o640"              => Number("#i#o640"));
+        (" "                    => Whitespace);
+        ("#x#EffF"              => Number("#x#EffF"));
+        (" "                    => Whitespace);
+        ("#d#I123"              => Number("#d#I123"));
+    }
+}
+
+#[test]
+fn numbers_integer_all_inclusive() {
+    check! {
+        ("#d-9000"              => Number("#d-9000"));
+        (" "                    => Whitespace);
+        ("#I#X+DEAD"            => Number("#I#X+DEAD"));
+        (" "                    => Whitespace);
+        ("#o#E+0"               => Number("#o#E+0"));
+    }
+}
+
+#[test]
+fn recover_numbers_integer_prefixed_garbage() {
+    check! {
+        ("+\u{1}\u{2}\u{3}"     => Unrecognized),
+                         (0, 4) => err_lexer_unrecognized;
+        ("\n"                   => Whitespace);
+        ("#O-\u{0}"             => Unrecognized),
+                         (0, 4) => err_lexer_unrecognized;
+        ("\n"                   => Whitespace);
+        ("#i#X\u{F}"            => Unrecognized),
+                         (0, 5) => err_lexer_unrecognized;
+        ("\n"                   => Whitespace);
+        ("#b#e-+-5"             => Unrecognized),
+                         (0, 8) => err_lexer_unrecognized;
+    }
+}
+
+#[test]
+fn recover_numbers_integer_duplicate_prefixes() {
+    check! {
+        ("#i#e5"                => Number("#i#e5")),
+                         (2, 4) => err_lexer_multiple_exactness;
+        ("\n"                   => Whitespace);
+        ("#E#e5"                => Number("#E#e5")),
+                         (2, 4) => err_lexer_multiple_exactness;
+        ("\n"                   => Whitespace);
+        ("#D#x00101"            => Number("#D#x00101")),
+                         (2, 4) => err_lexer_multiple_number_bases;
+        ("\n"                   => Whitespace);
+        ("#X#o#bF00FA"          => Number("#X#o#bF00FA")),
+                         (2, 4) => err_lexer_multiple_number_bases,
+                         (4, 6) => err_lexer_multiple_number_bases;
+        ("\n"                   => Whitespace);
+        ("#E#o#e#x#I#d#X#i#B9"  => Number("#E#o#e#x#I#d#X#i#B9")),
+                        (4,  6) => err_lexer_multiple_exactness,
+                        (6,  8) => err_lexer_multiple_number_bases,
+                        (8, 10) => err_lexer_multiple_exactness,
+                       (10, 12) => err_lexer_multiple_number_bases,
+                       (12, 14) => err_lexer_multiple_number_bases,
+                       (14, 16) => err_lexer_multiple_exactness,
+                       (16, 18) => err_lexer_multiple_number_bases,
+                       (18, 19) => err_lexer_invalid_number_digit;
+    }
+}
+
+#[test]
+fn recover_numbers_integer_invalid_prefixes() {
+    check! {
+        ("#@#"                  => Unrecognized),
+                         (0, 2) => err_lexer_invalid_number_prefix,
+                         (2, 3) => err_lexer_invalid_number_prefix,
+                         (0, 3) => err_lexer_unrecognized;
+        (" "                    => Whitespace);
+        ("##"                   => Unrecognized),
+                         (0, 1) => err_lexer_invalid_number_prefix,
+                         (1, 2) => err_lexer_invalid_number_prefix,
+                         (0, 2) => err_lexer_unrecognized;
+        (" "                    => Whitespace);
+        ("#"                    => Unrecognized),
+                         (0, 1) => err_lexer_invalid_number_prefix,
+                         (0, 1) => err_lexer_unrecognized;
+        (" "                    => Whitespace);
+        ("##123"                => Number("##123")),
+                         (0, 1) => err_lexer_invalid_number_prefix,
+                         (1, 2) => err_lexer_invalid_number_prefix;
+        (" "                    => Whitespace);
+        ("#123"                 => Number("#123")),
+                         (0, 1) => err_lexer_invalid_number_prefix;
+        (" "                    => Whitespace);
+        ("#+123"                => Number("#+123")),
+                         (0, 1) => err_lexer_invalid_number_prefix;
+        (" "                    => Whitespace);
+        ("#c123"                => Number("#c123")),
+                         (0, 2) => err_lexer_invalid_number_prefix;
+        (" "                    => Whitespace);
+        ("#c-123"               => Number("#c-123")),
+                         (0, 2) => err_lexer_invalid_number_prefix;
+        (" "                    => Whitespace);
+        ("#d#a0"                => Number("#d#a0")),
+                         (2, 4) => err_lexer_invalid_number_prefix;
+        (" "                    => Whitespace);
+        ("#x##a0"               => Number("#x##a0")),
+                         (2, 3) => err_lexer_invalid_number_prefix,
+                         (3, 5) => err_lexer_invalid_number_prefix;
+        (" "                    => Whitespace);
+        ("#o#"                  => Unrecognized),
+                         (2, 3) => err_lexer_invalid_number_prefix,
+                         (0, 3) => err_lexer_unrecognized;
+        (" "                    => Whitespace);
+        ("#x#"                  => Unrecognized),
+                         (2, 3) => err_lexer_invalid_number_prefix,
+                         (0, 3) => err_lexer_unrecognized;
+        (" "                    => Whitespace);
+        ("#"                    => Unrecognized),
+                         (0, 1) => err_lexer_invalid_number_prefix,
+                         (0, 1) => err_lexer_unrecognized;
+    }
+}
+
+#[test]
+fn recover_numbers_integer_invalid_digits() {
+    check! {
+        ("123DEAD"              => Number("123DEAD")),
+                        (3,  4) => err_lexer_invalid_number_character,
+                        (4,  5) => err_lexer_invalid_number_character,
+                        (5,  6) => err_lexer_invalid_number_character,
+                        (6,  7) => err_lexer_invalid_number_character;
+        (" "                    => Whitespace);
+        ("#b010051011f"         => Number("#b010051011f")),
+                        (6,  7) => err_lexer_invalid_number_digit,
+                       (11, 12) => err_lexer_invalid_number_character;
+        (" "                    => Whitespace);
+        ("#O0123456789abc"      => Number("#O0123456789abc")),
+                       (10, 11) => err_lexer_invalid_number_digit,
+                       (11, 12) => err_lexer_invalid_number_digit,
+                       (12, 13) => err_lexer_invalid_number_character,
+                       (13, 14) => err_lexer_invalid_number_character,
+                       (14, 15) => err_lexer_invalid_number_character;
+        (" "                    => Whitespace);
+        ("#d123123f"            => Number("#d123123f")),
+                        (8,  9) => err_lexer_invalid_number_character;
+    }
+}
+
+#[test]
+fn recover_numbers_integer_invalid_characters() {
+    check! {
+        ("0!OMG-I-CAN"          => Number("0!OMG-I-CAN")),
+                        (1,  2) => err_lexer_invalid_number_character,
+                        (2,  3) => err_lexer_invalid_number_character,
+                        (3,  4) => err_lexer_invalid_number_character,
+                        (4,  5) => err_lexer_invalid_number_character,
+                        (5,  6) => err_lexer_invalid_number_character,
+                        (6,  7) => err_lexer_invalid_number_character,
+                        (7,  8) => err_lexer_invalid_number_character,
+                        (8,  9) => err_lexer_invalid_number_character,
+                        (9, 10) => err_lexer_invalid_number_character,
+                       (10, 11) => err_lexer_invalid_number_character;
+        (" "                    => Whitespace);
+        ("#xDEADFOOD"           => Number("#xDEADFOOD")),
+                        (7,  8) => err_lexer_invalid_number_character,
+                        (8,  9) => err_lexer_invalid_number_character;
+        (" "                    => Whitespace);
+        ("1\u{2}3\u{4}"         => Number("1\u{2}3\u{4}")),
+                        (1,  2) => err_lexer_invalid_number_character,
+                        (3,  4) => err_lexer_invalid_number_character;
+        (" "                    => Whitespace);
+        ("#\u{0435}9\u{0434}\u{0443}\u{0440}\u{0430}!" => Number("#\u{0435}9\u{0434}\u{0443}\u{0440}\u{0430}!")),
+                        (0,  3) => err_lexer_invalid_number_prefix,
+                        (4,  6) => err_lexer_invalid_number_character,
+                        (6,  8) => err_lexer_invalid_number_character,
+                        (8, 10) => err_lexer_invalid_number_character,
+                       (10, 12) => err_lexer_invalid_number_character,
+                       (12, 13) => err_lexer_invalid_number_character;
+        (" "                    => Whitespace);
+        ("#x0C\u{0327}FE"       => Number("#x0C\u{0327}FE")),
+                        (4,  6) => err_lexer_invalid_number_character;
+        (" "                    => Whitespace);
+        ("123#567"              => Number("123#567")),
+                        (3,  4) => err_lexer_invalid_number_character;
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Escaped identifiers
 
 #[test]
@@ -1123,6 +1394,9 @@ fn pretty_print_token(token: &ScannedToken, pool: &InternPool) -> String {
     match token.tok {
         Token::String(value) => {
             format!("String({:?})", pool.get(value))
+        }
+        Token::Number(value) => {
+            format!("Number({:?})", pool.get(value))
         }
         _ => format!("{:?}", token.tok)
     }

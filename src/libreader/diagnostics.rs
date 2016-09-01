@@ -98,6 +98,21 @@ pub enum DiagnosticKind {
     /// but there wasn't any.
     err_lexer_unicode_escape_missing_semicolon,
 
+    /// Lexer has encountered multiple numeric base specifiers in a number literal.
+    err_lexer_multiple_number_bases,
+
+    /// Lexer has encountered multiple exactness specifiers in a number literal.
+    err_lexer_multiple_exactness,
+
+    /// Lexer has encountered an invalid number prefix.
+    err_lexer_invalid_number_prefix,
+
+    /// Lexer has encountered a digit of invalid base.
+    err_lexer_invalid_number_digit,
+
+    /// Lexer has encountered a character which is not allowed in numbers.
+    err_lexer_invalid_number_character,
+
     /// Lexer has encountered an escaped identifier without a closing vertical bar.
     fatal_lexer_unterminated_identifier,
 }

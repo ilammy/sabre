@@ -197,6 +197,20 @@ impl<'a> StringScanner<'a> {
             '|' => {
                 self.scan_escaped_identifier()
             }
+            '0'...'9' => {
+                self.scan_number_decimal()
+            }
+            '-' | '+' => {
+                let start = self.prev_pos;
+                match self.peek() {
+                    Some(c) if is_digit(10, c) => {
+                        self.scan_number_signed(start)
+                    }
+                    _ => {
+                        self.scan_unrecognized(start)
+                    }
+                }
+            }
             _ => {
                 let start = self.prev_pos;
                 self.scan_unrecognized(start)
@@ -260,7 +274,10 @@ impl<'a> StringScanner<'a> {
     }
 
     /// Scan a possibly nested block comment `#| ... |#`.
-    fn scan_block_comment(&mut self, start: usize) -> Token {
+    fn scan_block_comment(&mut self) -> Token {
+        let start = self.prev_pos;
+        assert!(self.cur_is('#'));
+        self.read();
         assert!(self.cur_is('|'));
         self.read();
 
@@ -301,28 +318,40 @@ impl<'a> StringScanner<'a> {
     fn scan_hash_token(&mut self) -> Token {
         let start = self.prev_pos;
         assert!(self.cur_is('#'));
-        self.read();
 
-        match self.cur {
-            Some('(') => { self.read(); Token::OpenVector(ParenType::Parenthesis) }
-            Some('[') => { self.read(); Token::OpenVector(ParenType::Bracket) }
-            Some('{') => { self.read(); Token::OpenVector(ParenType::Brace) }
-            Some(';') => { self.read(); Token::CommentPrefix }
+        match self.peek() {
+            Some('(') => { self.read(); self.read(); Token::OpenVector(ParenType::Parenthesis) }
+            Some('[') => { self.read(); self.read(); Token::OpenVector(ParenType::Bracket) }
+            Some('{') => { self.read(); self.read(); Token::OpenVector(ParenType::Brace) }
+            Some(';') => { self.read(); self.read(); Token::CommentPrefix }
             Some('|') => {
-                self.scan_block_comment(start)
+                self.scan_block_comment()
             }
             Some('\\') => {
-                self.scan_character_literal(start)
+                self.scan_character_literal()
             }
             Some('u') | Some('U') => {
-                self.scan_bytevector_open(start)
+                self.scan_bytevector_open()
             }
-            _ => { self.scan_unrecognized(start) }
+            Some('b') | Some('B') | Some('o') | Some('O') | Some('d') | Some('D') |
+            Some('x') | Some('X') | Some('i') | Some('I') | Some('e') | Some('E') => {
+                self.scan_number_prefixed(start)
+            }
+            _ => {
+                // Okay, we've exhausted lexically valid continuations, now we start guessing.
+                // Except for the tokens handled above, only numbers allow various hash prefixes,
+                // so we try interpreting the string as an (invalid) number literal.
+
+                self.scan_number_prefixed(start)
+            }
         }
     }
 
     /// Scan over a bytevector opener `#u8(`.
-    fn scan_bytevector_open(&mut self, start: usize) -> Token {
+    fn scan_bytevector_open(&mut self) -> Token {
+        let start = self.prev_pos;
+        assert!(self.cur_is('#'));
+        self.read();
         assert!(self.cur_is('u') || self.cur_is('U'));
         self.read();
 
@@ -386,7 +415,10 @@ impl<'a> StringScanner<'a> {
     }
 
     /// Scan a character literal (`#\\!`, `#\\x000F`, `#\\return`).
-    fn scan_character_literal(&mut self, start: usize) -> Token {
+    fn scan_character_literal(&mut self) -> Token {
+        let start = self.prev_pos;
+        assert!(self.cur_is('#'));
+        self.read();
         assert!(self.cur_is('\\'));
         self.read();
 
@@ -813,6 +845,195 @@ impl<'a> StringScanner<'a> {
             // If we encounter an EOF then just return None. The caller will report this condition.
             None => {
                 return None;
+            }
+        }
+    }
+
+    /// Scan a non-negative decimal number (the one that starts with a digit).
+    fn scan_number_decimal(&mut self) -> Token {
+        let start = self.prev_pos;
+        assert!(is_digit(10, self.cur.unwrap()));
+
+        self.scan_number_of_base(10, start)
+    }
+
+    /// Scan a decimal number (the one that starts with an explicit sign).
+    fn scan_number_signed(&mut self, start: usize) -> Token {
+        assert!(self.cur_is('+') || self.cur_is('-'));
+        self.read();
+        assert!(is_digit(10, self.cur.unwrap()));
+
+        self.scan_number_of_base(10, start)
+    }
+
+    /// Scan a prefixed number (the one that starts with a base or exactness prefix).
+    fn scan_number_prefixed(&mut self, start: usize) -> Token {
+        assert!(self.cur_is('#'));
+
+        let base = self.scan_number_prefix();
+
+        if self.cur_is('+') || self.cur_is('-') {
+            self.read();
+        }
+
+        // Technically, scan_number_prefix() will scan any garbage if it can understand it as
+        // an erroneous prefix and can recover from it. That's why we should test if we are really
+        // scanning a number after that. Check if the following character is a digit (of any base,
+        // scan_number_of_base() will scan over and report invalid digits after that). Hexadecimal
+        // digits are allowed only with explicit base specifiers, as otherwise this is more likely
+        // to be an invalid token like #foobar.
+        match self.cur {
+            Some(c) if ((base <= 10) && is_digit(10, c)) || is_digit(16, c) => {
+                self.scan_number_of_base(base, start)
+            }
+            _ => {
+                self.scan_unrecognized(start)
+            }
+        }
+    }
+
+    /// Scan a number written in specified base.
+    fn scan_number_of_base(&mut self, base: u8, start: usize) -> Token {
+        self.scan_integer_digits(base);
+        let end = self.prev_pos;
+
+        let value = &self.buf[start..end];
+
+        return Token::Number(self.pool.intern(value));
+    }
+
+    /// Scan all number literal prefixes. Returns the base of number.
+    fn scan_number_prefix(&mut self) -> u8 {
+        assert!(self.cur_is('#'));
+
+        let mut base = None;
+        let mut exact = None;
+
+        // Check if we can scan the next prefix (i.e., we have some # ahead), and then scan it.
+        // If it's not it then we are done with the prefix part of a number literal.
+        while self.cur_is('#') {
+            let start = self.prev_pos;
+            self.read();
+
+            match self.cur {
+                // Handle base specifiers. Do not allow multiple of them.
+                Some('b') | Some('B') | Some('o') | Some('O') | Some('x') | Some('X') |
+                Some('d') | Some('D') => {
+                    let c = self.cur.unwrap();
+                    self.read();
+
+                    if base.is_some() {
+                        self.diagnostic.report(DiagnosticKind::err_lexer_multiple_number_bases,
+                            Span::new(start, self.prev_pos));
+                    } else {
+                        base = Some(match c {
+                            'b' | 'B' => 2,
+                            'o' | 'O' => 8,
+                            'x' | 'X' => 16,
+                            'd' | 'D' => 10,
+                            _ => unreachable!(),
+                        });
+                    }
+                }
+
+                // Handle exactness specifiers. Do not allow multiple of them.
+                Some('i') | Some('I') | Some('e') | Some('E') => {
+                    let c = self.cur.unwrap();
+                    self.read();
+
+                    if exact.is_some() {
+                        self.diagnostic.report(DiagnosticKind::err_lexer_multiple_exactness,
+                            Span::new(start, self.prev_pos));
+                    } else {
+                        exact = Some(match c {
+                            'i' | 'I' => false,
+                            'e' | 'E' => true,
+                            _ => unreachable!(),
+                        });
+                    }
+                }
+
+                // We do not expect anything else after a hash, so this is definitely an invalid
+                // number prefix. If a delimiter follows the hash then this is not even a number.
+                // In this case report only the hash and get out (the caller will fail later).
+                Some(c) if (c != '#') && is_delimiter(c) => {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
+                        Span::new(start, self.prev_pos));
+                    break;
+                }
+                None => {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
+                        Span::new(start, self.prev_pos));
+                    break;
+                }
+                // If a digit follows the hash then the user may have forgotten to type the prefix.
+                // Report this lone hash and we're done with the prefix.
+                Some(c) if is_digit(10, c) => {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
+                        Span::new(start, self.prev_pos));
+                    break;
+                }
+                // The same goes for explicit signs.
+                Some('+') | Some('-') => {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
+                        Span::new(start, self.prev_pos));
+                    break;
+                }
+
+                // If we encounter consecutive hashes then suppose that the user has mistyped
+                // a prefix and forgotten to type the character between the hashes. Report the
+                // lone hash and continue scanning.
+                Some('#') => {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
+                        Span::new(start, self.prev_pos));
+                }
+
+                // Otherwise eat the character after the hash, report this pair as invalid, and
+                // continue scanning (maybe there are more prefixes ahead).
+                Some(_) => {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
+                        Span::new(start, self.pos));
+                    self.read();
+                }
+            }
+        }
+
+        // The numbers are read as decimal if there is no explicit base prefix.
+        return base.unwrap_or(10);
+    }
+
+    /// Scan an integer number written in specified base.
+    fn scan_integer_digits(&mut self, base: u8) {
+        loop {
+            match self.cur {
+                // Scan over all valid digits.
+                Some(c) if is_digit(base, c) => {
+                    self.read();
+                }
+
+                // Stop scanning as soon as we encounter a delimiter.
+                //
+                // Report the hash as an invalid character instead of treating it as a delimiter
+                // (older Schemes used it in inexact number syntax).
+                Some(c) if (c != '#') && is_delimiter(c) => {
+                    break;
+                }
+                None => {
+                    break;
+                }
+
+                // Scan over an report any other characters. If these are some digits then they
+                // are digits of an unexpected base.
+                Some(c) => {
+                    if is_digit(10, c) {
+                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_digit,
+                            Span::new(self.prev_pos, self.pos));
+                    } else {
+                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
+                            Span::new(self.prev_pos, self.pos));
+                    }
+                    self.read();
+                }
             }
         }
     }
