@@ -175,7 +175,6 @@ impl<'a> StringScanner<'a> {
             ')' => { self.read(); Token::Close(ParenType::Parenthesis) }
             '`' => { self.read(); Token::Backquote }
            '\'' => { self.read(); Token::Quote }
-            '.' => { self.read(); Token::Dot }
             ';' => {
                 self.scan_line_comment()
             }
@@ -200,9 +199,31 @@ impl<'a> StringScanner<'a> {
             '0'...'9' => {
                 self.scan_number_decimal()
             }
+            '.' => {
+                let start = self.prev_pos;
+                match self.peek() {
+                    Some(c) if is_delimiter(c) => {
+                        self.read();
+                        Token::Dot
+                    }
+                    None => {
+                        self.read();
+                        Token::Dot
+                    }
+                    Some(c) if is_digit(10, c) => {
+                        self.scan_number_float(start)
+                    }
+                    _ => {
+                        self.scan_unrecognized(start)
+                    }
+                }
+            }
             '-' | '+' => {
                 let start = self.prev_pos;
                 match self.peek() {
+                    Some('.') | Some('i') | Some('I') | Some('n') | Some('N') => {
+                        self.scan_number_signed(start)
+                    }
                     Some(c) if is_digit(10, c) => {
                         self.scan_number_signed(start)
                     }
@@ -854,23 +875,31 @@ impl<'a> StringScanner<'a> {
         let start = self.prev_pos;
         assert!(is_digit(10, self.cur.unwrap()));
 
-        self.scan_number_of_base(10, start)
+        self.scan_number_of_base(10, start, None)
     }
 
     /// Scan a decimal number (the one that starts with an explicit sign).
     fn scan_number_signed(&mut self, start: usize) -> Token {
         assert!(self.cur_is('+') || self.cur_is('-'));
         self.read();
-        assert!(is_digit(10, self.cur.unwrap()));
+        assert!(is_digit(10, self.cur.unwrap()) || self.cur_is('.') ||
+            self.cur_is('i') || self.cur_is('I') || self.cur_is('n') || self.cur_is('N'));
 
-        self.scan_number_of_base(10, start)
+        self.scan_number_of_base(10, start, None)
+    }
+
+    /// Scan a decimal float number (the one that has no integer part and starts with a dot).
+    fn scan_number_float(&mut self, start: usize) -> Token {
+        assert!(self.cur_is('.'));
+
+        self.scan_number_of_base(10, start, None)
     }
 
     /// Scan a prefixed number (the one that starts with a base or exactness prefix).
     fn scan_number_prefixed(&mut self, start: usize) -> Token {
         assert!(self.cur_is('#'));
 
-        let base = self.scan_number_prefix();
+        let (base, base_loc) = self.scan_number_prefix();
 
         if self.cur_is('+') || self.cur_is('-') {
             self.read();
@@ -883,8 +912,11 @@ impl<'a> StringScanner<'a> {
         // digits are allowed only with explicit base specifiers, as otherwise this is more likely
         // to be an invalid token like #foobar.
         match self.cur {
+            Some('.') | Some('i') | Some('I') | Some('n') | Some('N') => {
+                self.scan_number_of_base(base, start, base_loc)
+            }
             Some(c) if ((base <= 10) && is_digit(10, c)) || is_digit(16, c) => {
-                self.scan_number_of_base(base, start)
+                self.scan_number_of_base(base, start, base_loc)
             }
             _ => {
                 self.scan_unrecognized(start)
@@ -893,8 +925,216 @@ impl<'a> StringScanner<'a> {
     }
 
     /// Scan a number written in specified base.
-    fn scan_number_of_base(&mut self, base: u8, start: usize) -> Token {
-        self.scan_integer_digits(base);
+    fn scan_number_of_base(&mut self, base: u8, start: usize, base_loc: Option<Span>) -> Token {
+        let integer_start = self.prev_pos;
+
+        if self.cur_is('i') || self.cur_is('I') {
+            self.read();
+
+            // TODO: here we should fallback to identifiers, not Unrecognized
+
+            if self.cur_is('n') || self.cur_is('N') {
+                self.read();
+            } else {
+                return self.scan_unrecognized(start);
+            }
+
+            if self.cur_is('f') || self.cur_is('F') {
+                self.read();
+            } else {
+                return self.scan_unrecognized(start);
+            }
+
+            if self.cur_is('.') || self.cur_is('.') {
+                self.read();
+            } else {
+                return self.scan_unrecognized(start);
+            }
+
+            if self.cur_is('0') || self.cur_is('0') {
+                self.read();
+            } else {
+                return self.scan_unrecognized(start);
+            }
+
+            if !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
+                let suffix_start = self.prev_pos;
+
+                while !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
+                    self.read();
+                }
+
+                let suffix_end = self.prev_pos;
+
+                self.diagnostic.report(DiagnosticKind::err_lexer_infnan_suffix,
+                    Span::new(suffix_start, suffix_end));
+            }
+
+            let end = self.prev_pos;
+
+            let value = &self.buf[start..end];
+
+            return Token::Number(self.pool.intern(value));
+        }
+
+        if self.cur_is('n') || self.cur_is('N') {
+            self.read();
+
+            // TODO: here we should fallback to identifiers, not Unrecognized
+
+            if self.cur_is('a') || self.cur_is('A') {
+                self.read();
+            } else {
+                return self.scan_unrecognized(start);
+            }
+
+            if self.cur_is('n') || self.cur_is('N') {
+                self.read();
+            } else {
+                return self.scan_unrecognized(start);
+            }
+
+            if self.cur_is('.') || self.cur_is('.') {
+                self.read();
+            } else {
+                return self.scan_unrecognized(start);
+            }
+
+            if self.cur_is('0') || self.cur_is('0') {
+                self.read();
+            } else {
+                return self.scan_unrecognized(start);
+            }
+
+            if !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
+                let suffix_start = self.prev_pos;
+
+                while !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
+                    self.read();
+                }
+
+                let suffix_end = self.prev_pos;
+
+                self.diagnostic.report(DiagnosticKind::err_lexer_infnan_suffix,
+                    Span::new(suffix_start, suffix_end));
+            }
+
+            let end = self.prev_pos;
+
+            let value = &self.buf[start..end];
+
+            return Token::Number(self.pool.intern(value));
+        }
+
+        match self.scan_integer_digits(base, false, false) {
+            IntegerTerminator::Delimiter => {
+                let integer_end = self.prev_pos;
+
+                if integer_start == integer_end {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_digits_missing,
+                        Span::new(integer_start, integer_end));
+                }
+            }
+
+            IntegerTerminator::Exponent => {
+                let integer_end = self.prev_pos;
+
+                assert!(match self.cur {
+                    Some('e') | Some('E') | Some('f') | Some('F') | Some('s') | Some('S') |
+                    Some('d') | Some('D') | Some('l') | Some('L') => true,
+                    _ => false,
+                });
+
+                self.read();
+
+                if self.cur_is('+') || self.cur_is('-') {
+                    self.read();
+                }
+
+                let exponent_start = self.prev_pos;
+
+                match self.scan_integer_digits(base, true, true) {
+                    IntegerTerminator::Delimiter => { }
+                    IntegerTerminator::Exponent => { unreachable!() }
+                    IntegerTerminator::Fractional => { unreachable!() }
+                }
+
+                let exponent_end = self.prev_pos;
+
+                if integer_start == integer_end {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_digits_missing,
+                        Span::new(integer_start, integer_end));
+                }
+
+                if exponent_start == exponent_end {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_exponent_missing,
+                        Span::new(exponent_start, exponent_end));
+                }
+
+                if base != 10 {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_nondecimal_real,
+                        base_loc.unwrap());
+                }
+            }
+
+            IntegerTerminator::Fractional => {
+                let integer_end = self.prev_pos;
+
+                assert!(self.cur_is('.'));
+                self.read();
+
+                let fractional_start = self.prev_pos;
+                let fractional_end;
+
+                match self.scan_integer_digits(base, false, true) {
+                    IntegerTerminator::Delimiter => {
+                        fractional_end = self.prev_pos;
+                    }
+                    IntegerTerminator::Exponent => {
+                        fractional_end = self.prev_pos;
+
+                        assert!(match self.cur {
+                            Some('e') | Some('E') | Some('f') | Some('F') | Some('s') | Some('S') |
+                            Some('d') | Some('D') | Some('l') | Some('L') => true,
+                            _ => false,
+                        });
+
+                        self.read();
+
+                        if self.cur_is('+') || self.cur_is('-') {
+                            self.read();
+                        }
+
+                        let exponent_start = self.prev_pos;
+
+                        match self.scan_integer_digits(base, true, true) {
+                            IntegerTerminator::Delimiter => { }
+                            IntegerTerminator::Exponent => { unreachable!() }
+                            IntegerTerminator::Fractional => { unreachable!() }
+                        }
+
+                        let exponent_end = self.prev_pos;
+
+                        if exponent_start == exponent_end {
+                            self.diagnostic.report(DiagnosticKind::err_lexer_exponent_missing,
+                                Span::new(exponent_start, exponent_end));
+                        }
+                    }
+                    IntegerTerminator::Fractional => { unreachable!() }
+                }
+
+                if (integer_start == integer_end) && (fractional_start == fractional_end) {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_digits_missing,
+                        Span::new(integer_start, fractional_end));
+                }
+
+                if base != 10 {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_nondecimal_real,
+                        base_loc.unwrap());
+                }
+            }
+        }
+
         let end = self.prev_pos;
 
         let value = &self.buf[start..end];
@@ -902,11 +1142,13 @@ impl<'a> StringScanner<'a> {
         return Token::Number(self.pool.intern(value));
     }
 
-    /// Scan all number literal prefixes. Returns the base of number.
-    fn scan_number_prefix(&mut self) -> u8 {
+    /// Scan all number literal prefixes. Returns the base of number, and Some location of the base
+    /// prefix (if it is present).
+    fn scan_number_prefix(&mut self) -> (u8, Option<Span>) {
         assert!(self.cur_is('#'));
 
         let mut base = None;
+        let mut base_loc = None;
         let mut exact = None;
 
         // Check if we can scan the next prefix (i.e., we have some # ahead), and then scan it.
@@ -933,6 +1175,8 @@ impl<'a> StringScanner<'a> {
                             'd' | 'D' => 10,
                             _ => unreachable!(),
                         });
+
+                        base_loc = Some(Span::new(start, self.prev_pos));
                     }
                 }
 
@@ -973,8 +1217,8 @@ impl<'a> StringScanner<'a> {
                         Span::new(start, self.prev_pos));
                     break;
                 }
-                // The same goes for explicit signs.
-                Some('+') | Some('-') => {
+                // The same goes for explicit signs and decimal dots.
+                Some('+') | Some('-') | Some('.') => {
                     self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
                         Span::new(start, self.prev_pos));
                     break;
@@ -999,13 +1243,46 @@ impl<'a> StringScanner<'a> {
         }
 
         // The numbers are read as decimal if there is no explicit base prefix.
-        return base.unwrap_or(10);
+        return (base.unwrap_or(10), base_loc);
     }
 
-    /// Scan an integer number written in specified base.
-    fn scan_integer_digits(&mut self, base: u8) {
+    /// Scan an integer number written in specified base. Returns the kind of terminator that
+    /// caused the scanning to stop. The caller should act accordingly to the terminator.
+    fn scan_integer_digits(&mut self, base: u8, ignore_exponents: bool, ignore_dots: bool) -> IntegerTerminator {
         loop {
             match self.cur {
+                // Handle exponent markers. Some of them overlap with hexadecimal digits, so these
+                // demand extra attention. Exponent syntax is invalid for non-decimal numbers
+                // so we treat 'e', 'd', 'f' as exponent markers only when they are followed
+                // by an explicit sign.
+                Some('e') | Some('E') | Some('s') | Some('S') | Some('d') | Some('D') |
+                Some('f') | Some('F') | Some('l') | Some('L') if !ignore_exponents => {
+                    if base != 16 {
+                        return IntegerTerminator::Exponent;
+                    }
+
+                    match self.cur {
+                        Some('e') | Some('E') | Some('d') | Some('D') | Some('f') | Some('F') => {
+                            if self.peek_is('-') || self.peek_is('+') {
+                                return IntegerTerminator::Exponent;
+                            } else {
+                                self.read();
+                            }
+                        }
+
+                        Some('s') | Some('S') | Some('l') | Some('L') => {
+                            return IntegerTerminator::Exponent;
+                        }
+
+                        _ => { unreachable!() }
+                    }
+                }
+
+                // Handle decimal dots.
+                Some('.') if !ignore_dots => {
+                    return IntegerTerminator::Fractional;
+                }
+
                 // Scan over all valid digits.
                 Some(c) if is_digit(base, c) => {
                     self.read();
@@ -1016,10 +1293,10 @@ impl<'a> StringScanner<'a> {
                 // Report the hash as an invalid character instead of treating it as a delimiter
                 // (older Schemes used it in inexact number syntax).
                 Some(c) if (c != '#') && is_delimiter(c) => {
-                    break;
+                    return IntegerTerminator::Delimiter;
                 }
                 None => {
-                    break;
+                    return IntegerTerminator::Delimiter;
                 }
 
                 // Scan over an report any other characters. If these are some digits then they
@@ -1042,6 +1319,20 @@ impl<'a> StringScanner<'a> {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Utility definitions
 //
+
+/// The kind of character that terminates an integer number literal.
+#[must_use]
+#[derive(Eq, PartialEq)]
+enum IntegerTerminator {
+    /// The literal is terminated by a valid token delimiter. There is no continuation.
+    Delimiter,
+
+    /// The literal has an exponent part. Scanning has stopped right at its start.
+    Exponent,
+
+    /// The literal has a fractional part. Scanning has stopped right at the decimal dot.
+    Fractional,
+}
 
 /// Check if a character is a delimiter for tokens.
 fn is_delimiter(c: char) -> bool {

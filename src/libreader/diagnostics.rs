@@ -113,6 +113,18 @@ pub enum DiagnosticKind {
     /// Lexer has encountered a character which is not allowed in numbers.
     err_lexer_invalid_number_character,
 
+    /// Lexer has encountered a real number with non-decimal base prefix.
+    err_lexer_nondecimal_real,
+
+    /// Lexer has expected a floating point exponent but there wasn't any.
+    err_lexer_exponent_missing,
+
+    /// Lexer has expected some number digits but there weren't any.
+    err_lexer_digits_missing,
+
+    /// Lexer has scanned over unexpected suffix of an inf/nan literal.
+    err_lexer_infnan_suffix,
+
     /// Lexer has encountered an escaped identifier without a closing vertical bar.
     fatal_lexer_unterminated_identifier,
 }
