@@ -1067,7 +1067,7 @@ impl<'a> StringScanner<'a> {
                 }
 
                 if exponent_start == exponent_end {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_exponent_missing,
+                    self.diagnostic.report(DiagnosticKind::err_lexer_digits_missing,
                         Span::new(exponent_start, exponent_end));
                 }
 
@@ -1116,7 +1116,7 @@ impl<'a> StringScanner<'a> {
                         let exponent_end = self.prev_pos;
 
                         if exponent_start == exponent_end {
-                            self.diagnostic.report(DiagnosticKind::err_lexer_exponent_missing,
+                            self.diagnostic.report(DiagnosticKind::err_lexer_digits_missing,
                                 Span::new(exponent_start, exponent_end));
                         }
                     }
@@ -1165,7 +1165,7 @@ impl<'a> StringScanner<'a> {
                     self.read();
 
                     if base.is_some() {
-                        self.diagnostic.report(DiagnosticKind::err_lexer_multiple_number_bases,
+                        self.diagnostic.report(DiagnosticKind::err_lexer_multiple_number_radices,
                             Span::new(start, self.prev_pos));
                     } else {
                         base = Some(match c {

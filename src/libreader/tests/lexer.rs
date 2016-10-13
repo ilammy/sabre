@@ -855,20 +855,20 @@ fn recover_numbers_integer_duplicate_prefixes() {
                          (2, 4) => err_lexer_multiple_exactness;
         ("\n"                   => Whitespace);
         ("#D#x00101"            => Number("#D#x00101")),
-                         (2, 4) => err_lexer_multiple_number_bases;
+                         (2, 4) => err_lexer_multiple_number_radices;
         ("\n"                   => Whitespace);
         ("#X#o#bF00FA"          => Number("#X#o#bF00FA")),
-                         (2, 4) => err_lexer_multiple_number_bases,
-                         (4, 6) => err_lexer_multiple_number_bases;
+                         (2, 4) => err_lexer_multiple_number_radices,
+                         (4, 6) => err_lexer_multiple_number_radices;
         ("\n"                   => Whitespace);
         ("#E#o#e#x#I#d#X#i#B9"  => Number("#E#o#e#x#I#d#X#i#B9")),
                         (4,  6) => err_lexer_multiple_exactness,
-                        (6,  8) => err_lexer_multiple_number_bases,
+                        (6,  8) => err_lexer_multiple_number_radices,
                         (8, 10) => err_lexer_multiple_exactness,
-                       (10, 12) => err_lexer_multiple_number_bases,
-                       (12, 14) => err_lexer_multiple_number_bases,
+                       (10, 12) => err_lexer_multiple_number_radices,
+                       (12, 14) => err_lexer_multiple_number_radices,
                        (14, 16) => err_lexer_multiple_exactness,
-                       (16, 18) => err_lexer_multiple_number_bases,
+                       (16, 18) => err_lexer_multiple_number_radices,
                        (18, 19) => err_lexer_invalid_number_digit;
     }
 }
@@ -1161,7 +1161,7 @@ fn recover_numbers_float_digits_missing() {
         (" "                => Whitespace);
         ("#de"              => Number("#de")),
                      (2, 2) => err_lexer_digits_missing,
-                     (3, 3) => err_lexer_exponent_missing;
+                     (3, 3) => err_lexer_digits_missing;
         (" "                => Whitespace);
         ("#de+20"           => Number("#de+20")),
                      (2, 2) => err_lexer_digits_missing;
@@ -1172,20 +1172,20 @@ fn recover_numbers_float_digits_missing() {
 fn recover_numbers_float_exponent_missing() {
     check! {
         ("5.0e"             => Number("5.0e")),
-                     (4, 4) => err_lexer_exponent_missing;
+                     (4, 4) => err_lexer_digits_missing;
         (" "                => Whitespace);
         ("0e+"              => Number("0e+")),
-                     (3, 3) => err_lexer_exponent_missing;
+                     (3, 3) => err_lexer_digits_missing;
         (" "                => Whitespace);
         ("123e-"            => Number("123e-")),
-                     (5, 5) => err_lexer_exponent_missing;
+                     (5, 5) => err_lexer_digits_missing;
         (" "                => Whitespace);
         ("#b.1e"            => Number("#b.1e")),
-                     (5, 5) => err_lexer_exponent_missing,
+                     (5, 5) => err_lexer_digits_missing,
                      (0, 2) => err_lexer_nondecimal_real;
         (" "                => Whitespace);
         ("#x-BAD-"          => Number("#x-BAD-")),
-                     (7, 7) => err_lexer_exponent_missing,
+                     (7, 7) => err_lexer_digits_missing,
                      (0, 2) => err_lexer_nondecimal_real;
         (" "                => Whitespace);
         ("#xBAD"            => Number("#xBAD"));
@@ -1196,7 +1196,7 @@ fn recover_numbers_float_exponent_missing() {
                      (6, 7) => err_lexer_invalid_number_character;
         (" "                => Whitespace);
         ("+2E"              => Number("+2E")),
-                     (3, 3) => err_lexer_exponent_missing;
+                     (3, 3) => err_lexer_digits_missing;
     }
 }
 
