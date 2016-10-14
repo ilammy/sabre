@@ -946,104 +946,28 @@ impl<'a> StringScanner<'a> {
         // Skip over an optional sign.
         if self.cur_is('+') || self.cur_is('-') {
             self.read();
-        }
 
-        if self.cur_is('i') || self.cur_is('I') {
-            self.read();
+            // Handle IEEE 754 special values which must always have an explicit sign.
+            // (Just "inf.0" is a valid identifier.)
+            if self.cur_is('i') || self.cur_is('I') || self.cur_is('n') || self.cur_is('N') {
+                match self.scan_number_infnan() {
+                    InfNanResult::InfNanComplete => {
+                        let end = self.prev_pos;
 
-            // TODO: here we should fallback to identifiers, not Unrecognized
+                        let value = &self.buf[start..end];
 
-            if self.cur_is('n') || self.cur_is('N') {
-                self.read();
-            } else {
-                return self.scan_unrecognized_with_hashes(start);
-            }
-
-            if self.cur_is('f') || self.cur_is('F') {
-                self.read();
-            } else {
-                return self.scan_unrecognized_with_hashes(start);
-            }
-
-            if self.cur_is('.') || self.cur_is('.') {
-                self.read();
-            } else {
-                return self.scan_unrecognized_with_hashes(start);
-            }
-
-            if self.cur_is('0') || self.cur_is('0') {
-                self.read();
-            } else {
-                return self.scan_unrecognized_with_hashes(start);
-            }
-
-            if !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
-                let suffix_start = self.prev_pos;
-
-                while !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
-                    self.read();
+                        return Token::Number(self.pool.intern(value));
+                    }
+                    InfNanResult::InfNanIncomplete => {
+                        if has_prefix {
+                            return self.scan_unrecognized_with_hashes(start);
+                        } else {
+                            // TODO: here we should fallback to identifiers, not Unrecognized
+                            return self.scan_unrecognized_with_hashes(start);
+                        }
+                    }
                 }
-
-                let suffix_end = self.prev_pos;
-
-                self.diagnostic.report(DiagnosticKind::err_lexer_infnan_suffix,
-                    Span::new(suffix_start, suffix_end));
             }
-
-            let end = self.prev_pos;
-
-            let value = &self.buf[start..end];
-
-            return Token::Number(self.pool.intern(value));
-        }
-
-        if self.cur_is('n') || self.cur_is('N') {
-            self.read();
-
-            // TODO: here we should fallback to identifiers, not Unrecognized
-
-            if self.cur_is('a') || self.cur_is('A') {
-                self.read();
-            } else {
-                return self.scan_unrecognized_with_hashes(start);
-            }
-
-            if self.cur_is('n') || self.cur_is('N') {
-                self.read();
-            } else {
-                return self.scan_unrecognized_with_hashes(start);
-            }
-
-            if self.cur_is('.') || self.cur_is('.') {
-                self.read();
-            } else {
-                return self.scan_unrecognized_with_hashes(start);
-            }
-
-            if self.cur_is('0') || self.cur_is('0') {
-                self.read();
-            } else {
-                return self.scan_unrecognized_with_hashes(start);
-            }
-
-            if !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
-                let suffix_start = self.prev_pos;
-
-                while !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
-                    self.read();
-                }
-
-                let suffix_end = self.prev_pos;
-
-                self.diagnostic.report(DiagnosticKind::err_lexer_infnan_suffix,
-                    Span::new(suffix_start, suffix_end));
-            }
-
-            let end = self.prev_pos;
-
-            let value = &self.buf[start..end];
-
-            return Token::Number(self.pool.intern(value));
         }
 
         let mut is_fractional = false;
@@ -1174,6 +1098,72 @@ impl<'a> StringScanner<'a> {
         }
     }
 
+    /// Try scanning a numeric `+inf.0` or `+nan.0` value. The sign has been already scanned over.
+    fn scan_number_infnan(&mut self) -> InfNanResult {
+        assert!(self.cur_is('i') || self.cur_is('I') || self.cur_is('n') || self.cur_is('N'));
+
+        let result = match self.cur {
+            Some('i') | Some('I') => self.scan_number_inf(),
+            Some('n') | Some('N') => self.scan_number_nan(),
+            _                     => unreachable!(),
+        };
+
+        if result == InfNanResult::InfNanComplete {
+            if !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
+                let suffix_start = self.prev_pos;
+                while !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
+                    self.read();
+                }
+                let suffix_end = self.prev_pos;
+
+                self.diagnostic.report(DiagnosticKind::err_lexer_infnan_suffix,
+                    Span::new(suffix_start, suffix_end));
+            }
+        }
+
+        return result;
+    }
+
+    /// Try scanning a numeric `+inf.0` value. The sign has been already scanned over.
+    fn scan_number_inf(&mut self) -> InfNanResult {
+        if !(self.cur_is('i') || self.cur_is('I')) { return InfNanResult::InfNanIncomplete; }
+        self.read();
+
+        if !(self.cur_is('n') || self.cur_is('N')) { return InfNanResult::InfNanIncomplete; }
+        self.read();
+
+        if !(self.cur_is('f') || self.cur_is('F')) { return InfNanResult::InfNanIncomplete; }
+        self.read();
+
+        if !self.cur_is('.') { return InfNanResult::InfNanIncomplete; }
+        self.read();
+
+        if !self.cur_is('0') { return InfNanResult::InfNanIncomplete; }
+        self.read();
+
+        return InfNanResult::InfNanComplete;
+    }
+
+    /// Try scanning a numeric `+nan.0` value. The sign has been already scanned over.
+    fn scan_number_nan(&mut self) -> InfNanResult {
+        if !(self.cur_is('n') || self.cur_is('N')) { return InfNanResult::InfNanIncomplete; }
+        self.read();
+
+        if !(self.cur_is('a') || self.cur_is('A')) { return InfNanResult::InfNanIncomplete; }
+        self.read();
+
+        if !(self.cur_is('n') || self.cur_is('N')) { return InfNanResult::InfNanIncomplete; }
+        self.read();
+
+        if !self.cur_is('.') { return InfNanResult::InfNanIncomplete; }
+        self.read();
+
+        if !self.cur_is('0') { return InfNanResult::InfNanIncomplete; }
+        self.read();
+
+        return InfNanResult::InfNanComplete;
+    }
+
     /// Scan a single numeric value consisting of an actual value part and an optional exponent.
     /// Sets `is_fractional` to true if the scanned value is fractional.
     fn scan_number_value(&mut self, radix: u8, is_fractional: &mut bool) {
@@ -1282,6 +1272,16 @@ enum DigitScanningMode {
     /// We are scanning the exponent part of a number. Decimal dots and
     /// exponent markers are invalid here.
     Exponent,
+}
+
+/// Result of `scan_number_infnan()`.
+#[derive(Eq, PartialEq)]
+enum InfNanResult {
+    /// We have seen a complete `inf.0` or `nan.0` string (possibly followed by non-delimiter).
+    InfNanComplete,
+
+    /// We have seen an incomplete prefix of `inf.0` or `nan.0` (followed by anything).
+    InfNanIncomplete,
 }
 
 /// Check if a character is a delimiter for tokens.

@@ -1288,6 +1288,22 @@ fn recover_numbers_float_iee754_specials() {
         (" "                => Whitespace);
         ("+nan.e5"          => Unrecognized),
                      (0, 7) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("inf.0"            => Unrecognized),
+                     (0, 5) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("NaN.0"            => Unrecognized),
+                     (0, 5) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#xInf.0"          => Number("#xInf.0")),
+                     (2, 3) => err_lexer_invalid_number_character,
+                     (3, 4) => err_lexer_invalid_number_character,
+                     (0, 2) => err_lexer_nondecimal_real;
+        (" "                => Whitespace);
+        ("#inAn.0"          => Number("#inAn.0")),
+                     (2, 3) => err_lexer_invalid_number_character,
+                     (3, 4) => err_lexer_invalid_number_character,
+                     (4, 5) => err_lexer_invalid_number_character;
     }
 }
 
