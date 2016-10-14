@@ -1633,7 +1633,7 @@ fn verify<T, F>(title: &str, expected: &[T], actual: &[T], to_string: F) -> Resu
 
     writeln!(&mut report, "{}", title).unwrap();
 
-    let diff = sequence::diff(actual, expected);
+    let diff = sequence::diff(expected, actual);
 
     let mut okay = true;
 
