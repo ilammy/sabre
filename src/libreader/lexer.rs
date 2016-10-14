@@ -948,8 +948,6 @@ impl<'a> StringScanner<'a> {
             self.read();
         }
 
-        let integer_start = self.prev_pos;
-
         if self.cur_is('i') || self.cur_is('I') {
             self.read();
 
@@ -1048,116 +1046,20 @@ impl<'a> StringScanner<'a> {
             return Token::Number(self.pool.intern(value));
         }
 
-        match self.scan_integer_digits(effective_radix, false, false) {
-            IntegerTerminator::Delimiter => {
-                let integer_end = self.prev_pos;
+        let mut is_fractional = false;
 
-                if integer_start == integer_end {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_digits_missing,
-                        Span::new(integer_start, integer_end));
-                }
-            }
+        self.scan_number_value(effective_radix, &mut is_fractional);
 
-            IntegerTerminator::Exponent => {
-                let integer_end = self.prev_pos;
-
-                assert!(match self.cur {
-                    Some('e') | Some('E') | Some('f') | Some('F') | Some('s') | Some('S') |
-                    Some('d') | Some('D') | Some('l') | Some('L') => true,
-                    _ => false,
-                });
-
-                self.read();
-
-                if self.cur_is('+') || self.cur_is('-') {
-                    self.read();
-                }
-
-                let exponent_start = self.prev_pos;
-
-                match self.scan_integer_digits(effective_radix, true, true) {
-                    IntegerTerminator::Delimiter => { }
-                    IntegerTerminator::Exponent => { unreachable!() }
-                    IntegerTerminator::Fractional => { unreachable!() }
-                }
-
-                let exponent_end = self.prev_pos;
-
-                if integer_start == integer_end {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_digits_missing,
-                        Span::new(integer_start, integer_end));
-                }
-
-                if exponent_start == exponent_end {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_digits_missing,
-                        Span::new(exponent_start, exponent_end));
-                }
-
-                if effective_radix != 10 {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_nondecimal_real,
-                        radix_location.unwrap());
-                }
-            }
-
-            IntegerTerminator::Fractional => {
-                let integer_end = self.prev_pos;
-
-                assert!(self.cur_is('.'));
-                self.read();
-
-                let fractional_start = self.prev_pos;
-                let fractional_end;
-
-                match self.scan_integer_digits(effective_radix, false, true) {
-                    IntegerTerminator::Delimiter => {
-                        fractional_end = self.prev_pos;
-                    }
-                    IntegerTerminator::Exponent => {
-                        fractional_end = self.prev_pos;
-
-                        assert!(match self.cur {
-                            Some('e') | Some('E') | Some('f') | Some('F') | Some('s') | Some('S') |
-                            Some('d') | Some('D') | Some('l') | Some('L') => true,
-                            _ => false,
-                        });
-
-                        self.read();
-
-                        if self.cur_is('+') || self.cur_is('-') {
-                            self.read();
-                        }
-
-                        let exponent_start = self.prev_pos;
-
-                        match self.scan_integer_digits(effective_radix, true, true) {
-                            IntegerTerminator::Delimiter => { }
-                            IntegerTerminator::Exponent => { unreachable!() }
-                            IntegerTerminator::Fractional => { unreachable!() }
-                        }
-
-                        let exponent_end = self.prev_pos;
-
-                        if exponent_start == exponent_end {
-                            self.diagnostic.report(DiagnosticKind::err_lexer_digits_missing,
-                                Span::new(exponent_start, exponent_end));
-                        }
-                    }
-                    IntegerTerminator::Fractional => { unreachable!() }
-                }
-
-                if (integer_start == integer_end) && (fractional_start == fractional_end) {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_digits_missing,
-                        Span::new(integer_start, fractional_end));
-                }
-
-                if effective_radix != 10 {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_nondecimal_real,
-                        radix_location.unwrap());
-                }
-            }
-        }
+        assert!(self.cur.map_or(true, is_delimiter));
 
         let end = self.prev_pos;
+
+        // Late check for radix of a number. Scheme does not allow to use exponent and float forms
+        // with non-decimal numbers.
+        if is_fractional && (effective_radix != 10) {
+            self.diagnostic.report(DiagnosticKind::err_lexer_nondecimal_real,
+                radix_location.expect("non-decimal radix is always explicit"));
+        }
 
         let value = &self.buf[start..end];
 
@@ -1272,26 +1174,54 @@ impl<'a> StringScanner<'a> {
         }
     }
 
-    /// Scan an integer number written in specified base. Returns the kind of terminator that
-    /// caused the scanning to stop. The caller should act accordingly to the terminator.
-    fn scan_integer_digits(&mut self, base: u8, ignore_exponents: bool, ignore_dots: bool) -> IntegerTerminator {
+    /// Scan a single numeric value consisting of an actual value part and an optional exponent.
+    /// Sets `is_fractional` to true if the scanned value is fractional.
+    fn scan_number_value(&mut self, radix: u8, is_fractional: &mut bool) {
+        self.scan_number_digits(radix, DigitScanningMode::Value, is_fractional);
+
+        if let Some(c) = self.cur {
+            if is_exponent_marker(c) {
+                self.read();
+
+                if self.cur_is('+') || self.cur_is('-') {
+                    self.read();
+                }
+
+                self.scan_number_digits(radix, DigitScanningMode::Exponent, is_fractional);
+            }
+        }
+    }
+
+    /// Scan significant digits of a number (including a decimal dot). The scanning mode determines
+    /// what special characters are treated as terminators (otherwise they are scanned over just
+    /// like any other invalid character). Also sets `is_fractional` to true if a decimal dot has
+    /// been scanned over.
+    fn scan_number_digits(&mut self, radix: u8, mode: DigitScanningMode,
+        is_fractional: &mut bool)
+    {
+        let mut seen_dot = false;
+
+        let start = self.prev_pos;
+
         loop {
             match self.cur {
                 // Handle exponent markers. Some of them overlap with hexadecimal digits,
                 // so we allow exponents only when digits from 0 to 9 are involved.
-                Some('e') | Some('E') | Some('s') | Some('S') | Some('d') | Some('D') |
-                Some('f') | Some('F') | Some('l') | Some('L')
-                if (base == 10) && !ignore_exponents => {
-                    return IntegerTerminator::Exponent;
+                Some(c) if (radix == 10) && (mode != DigitScanningMode::Exponent)
+                    && is_exponent_marker(c) =>
+                {
+                    break;
                 }
 
-                // Handle decimal dots.
-                Some('.') if !ignore_dots => {
-                    return IntegerTerminator::Fractional;
+                // Handle decimal dot. Allow only one per number, treat extra ones as errors.
+                // Exponents are always integral, so no dots are allowed there.
+                Some('.') if !seen_dot && (mode != DigitScanningMode::Exponent) => {
+                    seen_dot = true;
+                    self.read();
                 }
 
                 // Scan over all valid digits.
-                Some(c) if is_digit(base, c) => {
+                Some(c) if is_digit(radix, c) => {
                     self.read();
                 }
 
@@ -1300,14 +1230,14 @@ impl<'a> StringScanner<'a> {
                 // Report the hash as an invalid character instead of treating it as a delimiter
                 // (older Schemes used it in inexact number syntax).
                 Some(c) if (c != '#') && is_delimiter(c) => {
-                    return IntegerTerminator::Delimiter;
+                    break;
                 }
                 None => {
-                    return IntegerTerminator::Delimiter;
+                    break;
                 }
 
                 // Scan over an report any other characters. If these are some digits then they
-                // are digits of an unexpected base.
+                // are digits of an unexpected radix (e.g., 9 used in binary literals).
                 Some(c) => {
                     if is_digit(10, c) {
                         self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_digit,
@@ -1320,6 +1250,20 @@ impl<'a> StringScanner<'a> {
                 }
             }
         }
+
+        let end = self.prev_pos;
+
+        // Check that there is at least one digit in the slice we have scanned over.
+        // Treat all decimal digits as valid to allow for user mistakes.
+        let check_radix = if radix <= 10 { 10 } else { radix };
+        if !self.buf[start..end].chars().any(|c| is_digit(check_radix, c)) {
+            self.diagnostic.report(DiagnosticKind::err_lexer_digits_missing,
+                Span::new(start, end));
+        }
+
+        if seen_dot {
+            *is_fractional = true;
+        }
     }
 }
 
@@ -1327,30 +1271,40 @@ impl<'a> StringScanner<'a> {
 // Utility definitions
 //
 
-/// The kind of character that terminates an integer number literal.
-#[must_use]
+/// Digit scanning modes of `scan_number_digits()`.
 #[derive(Eq, PartialEq)]
-enum IntegerTerminator {
-    /// The literal is terminated by a valid token delimiter. There is no continuation.
-    Delimiter,
+enum DigitScanningMode {
+    /// We are scanning the value part of a number (before the exponent).
+    /// At most one decimal dot is expected here. Exponent markers terminate
+    /// the number.
+    Value,
 
-    /// The literal has an exponent part. Scanning has stopped right at its start.
+    /// We are scanning the exponent part of a number. Decimal dots and
+    /// exponent markers are invalid here.
     Exponent,
-
-    /// The literal has a fractional part. Scanning has stopped right at the decimal dot.
-    Fractional,
 }
 
 /// Check if a character is a delimiter for tokens.
 fn is_delimiter(c: char) -> bool {
     match c {
-        /// R7RS defines only the following delimiters:
+        // R7RS defines only the following delimiters:
         ' ' | '\t' | '\n' | '\r' | '|' | '"' | ';' | '(' | ')' | '[' | ']' | '{' | '}' |
         // But we add to this list all quotes as they are expanded into forms,
         // so effectively they can be treatead as opening parentheses, and
         // the hash sign as it is a starter for directives and fixed-spelling
         // tokens, and it also cannot be used inside anything else.
         '\'' | ',' | '`' | '#' => true,
+        _ => false,
+    }
+}
+
+/// Check if a character is an exponent marker in number literals.
+fn is_exponent_marker(c: char) -> bool {
+    match c {
+        // R7RS defines only the following marker:
+        'e' | 'E' |
+        // But it also allows to include these ones:
+        's' | 'S' | 'd' | 'D' | 'f' | 'F' | 'l' | 'L' => true,
         _ => false,
     }
 }
