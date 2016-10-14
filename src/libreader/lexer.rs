@@ -1277,31 +1277,12 @@ impl<'a> StringScanner<'a> {
     fn scan_integer_digits(&mut self, base: u8, ignore_exponents: bool, ignore_dots: bool) -> IntegerTerminator {
         loop {
             match self.cur {
-                // Handle exponent markers. Some of them overlap with hexadecimal digits, so these
-                // demand extra attention. Exponent syntax is invalid for non-decimal numbers
-                // so we treat 'e', 'd', 'f' as exponent markers only when they are followed
-                // by an explicit sign.
+                // Handle exponent markers. Some of them overlap with hexadecimal digits,
+                // so we allow exponents only when digits from 0 to 9 are involved.
                 Some('e') | Some('E') | Some('s') | Some('S') | Some('d') | Some('D') |
-                Some('f') | Some('F') | Some('l') | Some('L') if !ignore_exponents => {
-                    if base != 16 {
-                        return IntegerTerminator::Exponent;
-                    }
-
-                    match self.cur {
-                        Some('e') | Some('E') | Some('d') | Some('D') | Some('f') | Some('F') => {
-                            if self.peek_is('-') || self.peek_is('+') {
-                                return IntegerTerminator::Exponent;
-                            } else {
-                                self.read();
-                            }
-                        }
-
-                        Some('s') | Some('S') | Some('l') | Some('L') => {
-                            return IntegerTerminator::Exponent;
-                        }
-
-                        _ => { unreachable!() }
-                    }
+                Some('f') | Some('F') | Some('l') | Some('L')
+                if (base == 10) && !ignore_exponents => {
+                    return IntegerTerminator::Exponent;
                 }
 
                 // Handle decimal dots.

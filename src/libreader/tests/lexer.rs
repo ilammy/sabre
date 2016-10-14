@@ -1104,6 +1104,7 @@ fn recover_numbers_float_nondecimal() {
         ("#d.0e+1"          => Number("#d.0e+1"));
         (" "                => Whitespace);
         ("#O5.ff"           => Number("#O5.ff")),
+                     (4, 5) => err_lexer_invalid_number_character,
                      (5, 6) => err_lexer_invalid_number_character,
                      (0, 2) => err_lexer_nondecimal_real;
         (" "                => Whitespace);
@@ -1111,25 +1112,28 @@ fn recover_numbers_float_nondecimal() {
                      (0, 2) => err_lexer_nondecimal_real;
         (" "                => Whitespace);
         ("#b1.d-1"          => Number("#b1.d-1")),
+                     (4, 5) => err_lexer_invalid_number_character,
+                     (5, 6) => err_lexer_invalid_number_character,
                      (0, 2) => err_lexer_nondecimal_real;
         (" "                => Whitespace);
         ("#d42e+9"          => Number("#d42e+9"));
         (" "                => Whitespace);
         ("#b010010e-01101"  => Number("#b010010e-01101")),
-                     (0, 2) => err_lexer_nondecimal_real;
+                    (8,  9) => err_lexer_invalid_number_character,
+                    (9, 10) => err_lexer_invalid_number_character;
         (" "                => Whitespace);
         ("#b111s123"        => Number("#b111s123")),
+                     (5, 6) => err_lexer_invalid_number_character,
                      (7, 8) => err_lexer_invalid_number_digit,
-                     (8, 9) => err_lexer_invalid_number_digit,
-                     (0, 2) => err_lexer_nondecimal_real;
+                     (8, 9) => err_lexer_invalid_number_digit;
         (" "                => Whitespace);
         ("#i#o373e0"        => Number("#i#o373e0")),
-                     (2, 4) => err_lexer_nondecimal_real;
+                     (7, 8) => err_lexer_invalid_number_character;
         (" "                => Whitespace);
         ("#xabcdef"         => Number("#xabcdef"));
         (" "                => Whitespace);
         ("#xabcde+f"        => Number("#xabcde+f")),
-                     (0, 2) => err_lexer_nondecimal_real;
+                     (7, 8) => err_lexer_invalid_number_character;
     }
 }
 
@@ -1175,12 +1179,11 @@ fn recover_numbers_float_exponent_missing() {
                      (5, 5) => err_lexer_digits_missing;
         (" "                => Whitespace);
         ("#b.1e"            => Number("#b.1e")),
-                     (5, 5) => err_lexer_digits_missing,
+                     (4, 5) => err_lexer_invalid_number_character,
                      (0, 2) => err_lexer_nondecimal_real;
         (" "                => Whitespace);
         ("#x-BAD-"          => Number("#x-BAD-")),
-                     (7, 7) => err_lexer_digits_missing,
-                     (0, 2) => err_lexer_nondecimal_real;
+                     (6, 7) => err_lexer_invalid_number_character;
         (" "                => Whitespace);
         ("#xBAD"            => Number("#xBAD"));
         (" "                => Whitespace);
@@ -1223,13 +1226,13 @@ fn recover_numbers_float_exponent_multiple_exponents() {
         (" "                => Whitespace);
         ("#o9e8s1"          => Number("#o9e8s1")),
                      (2, 3) => err_lexer_invalid_number_digit,
+                     (3, 4) => err_lexer_invalid_number_character,
                      (4, 5) => err_lexer_invalid_number_digit,
-                     (5, 6) => err_lexer_invalid_number_character,
-                     (0, 2) => err_lexer_nondecimal_real;
+                     (5, 6) => err_lexer_invalid_number_character;
         (" "                => Whitespace);
         ("#x1e-2e3e+4"      => Number("#x1e-2e3e+4")),
-                    (9, 10) => err_lexer_invalid_number_character,
-                    (0,  2) => err_lexer_nondecimal_real;
+                    (4,  5) => err_lexer_invalid_number_character,
+                    (9, 10) => err_lexer_invalid_number_character;
     }
 }
 
