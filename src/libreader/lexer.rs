@@ -949,9 +949,9 @@ impl<'a> StringScanner<'a> {
             }
         }
 
-        let mut is_fractional = false;
+        let mut not_integer = false;
 
-        self.scan_number_value(effective_radix, &mut is_fractional);
+        self.scan_number_part(effective_radix, &mut not_integer);
 
         assert!(self.cur.map_or(true, is_delimiter));
 
@@ -959,7 +959,7 @@ impl<'a> StringScanner<'a> {
 
         // Late check for radix of a number. Scheme does not allow to use exponent and float forms
         // with non-decimal numbers.
-        if is_fractional && (effective_radix != 10) {
+        if not_integer && (effective_radix != 10) {
             self.diagnostic.report(DiagnosticKind::err_lexer_nondecimal_real,
                 radix_location.expect("non-decimal radix is always explicit"));
         }
@@ -1137,30 +1137,79 @@ impl<'a> StringScanner<'a> {
         return InfNanResult::InfNanComplete;
     }
 
-    /// Scan a single numeric value consisting of an actual value part and an optional exponent.
-    /// Sets `is_fractional` to true if the scanned value is fractional.
-    fn scan_number_value(&mut self, radix: u8, is_fractional: &mut bool) {
-        self.scan_number_digits(radix, DigitScanningMode::Value, is_fractional);
+    /// Scan a real part of a number (an integer, a fractional, or a rational number).
+    /// Sets `not_integer` to true if the number is fractional or has an exponent anywhere.
+    fn scan_number_part(&mut self, radix: u8, not_integer: &mut bool) {
+        let mut noninteger_numerator = false;
+        let mut noninteger_denominator = false;
 
-        if let Some(c) = self.cur {
-            if is_exponent_marker(c) {
+        let numerator_start = self.prev_pos;
+        self.scan_number_value(radix, RationalScanningMode::Numerator,
+            &mut noninteger_numerator);
+        let numerator_end = self.prev_pos;
+
+        if self.cur_is('/') {
+            self.read();
+
+            // Allow signs right after a fraction slash, but report them.
+            if self.cur_is('+') || self.cur_is('-') {
+                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
+                    Span::new(self.prev_pos, self.pos));
                 self.read();
-
-                if self.cur_is('+') || self.cur_is('-') {
-                    self.read();
-                }
-
-                self.scan_number_digits(radix, DigitScanningMode::Exponent, is_fractional);
             }
+
+            let denominator_start = self.prev_pos;
+            self.scan_number_value(radix, RationalScanningMode::Denominator,
+                &mut noninteger_denominator);
+            let denominator_end = self.prev_pos;
+
+            // Fractions must be exact, they cannot contain floating-point parts.
+            if noninteger_numerator {
+                self.diagnostic.report(DiagnosticKind::err_lexer_noninteger_rational,
+                    Span::new(numerator_start, numerator_end));
+            }
+            if noninteger_denominator {
+                self.diagnostic.report(DiagnosticKind::err_lexer_noninteger_rational,
+                    Span::new(denominator_start, denominator_end));
+            }
+        }
+
+        if noninteger_numerator || noninteger_denominator {
+            *not_integer = true;
+        }
+    }
+
+    /// Scan a single numeric value consisting of an actual value part and an optional exponent.
+    /// Sets `not_integer` to true if the number is fractional and/or has an exponent.
+    fn scan_number_value(&mut self, radix: u8, rational_mode: RationalScanningMode,
+        not_integer: &mut bool)
+    {
+        self.scan_number_digits(radix, FractionScanningMode::Value, rational_mode,
+            not_integer);
+
+        // Handle an optional exponent.
+        if self.cur.map_or(false, is_exponent_marker) {
+            *not_integer = true;
+
+            self.read();
+
+            if self.cur_is('+') || self.cur_is('-') {
+                self.read();
+            }
+
+            self.scan_number_digits(radix, FractionScanningMode::Exponent, rational_mode,
+                not_integer);
         }
     }
 
     /// Scan significant digits of a number (including a decimal dot). The scanning mode determines
     /// what special characters are treated as terminators (otherwise they are scanned over just
-    /// like any other invalid character). Also sets `is_fractional` to true if a decimal dot has
+    /// like any other invalid character). Also sets `not_integer` to true if a decimal dot has
     /// been scanned over.
-    fn scan_number_digits(&mut self, radix: u8, mode: DigitScanningMode,
-        is_fractional: &mut bool)
+    fn scan_number_digits(&mut self, radix: u8,
+        fraction_mode: FractionScanningMode,
+        rational_mode: RationalScanningMode,
+        not_integer: &mut bool)
     {
         let mut seen_dot = false;
 
@@ -1170,7 +1219,7 @@ impl<'a> StringScanner<'a> {
             match self.cur {
                 // Handle exponent markers. Some of them overlap with hexadecimal digits,
                 // so we allow exponents only when digits from 0 to 9 are involved.
-                Some(c) if (radix == 10) && (mode != DigitScanningMode::Exponent)
+                Some(c) if (radix == 10) && (fraction_mode != FractionScanningMode::Exponent)
                     && is_exponent_marker(c) =>
                 {
                     break;
@@ -1178,9 +1227,14 @@ impl<'a> StringScanner<'a> {
 
                 // Handle decimal dot. Allow only one per number, treat extra ones as errors.
                 // Exponents are always integral, so no dots are allowed there.
-                Some('.') if !seen_dot && (mode != DigitScanningMode::Exponent) => {
+                Some('.') if !seen_dot && (fraction_mode != FractionScanningMode::Exponent) => {
                     seen_dot = true;
                     self.read();
+                }
+
+                // Handle rational slash. Only when we are scanning the numerator.
+                Some('/') if (rational_mode == RationalScanningMode::Numerator) => {
+                    break;
                 }
 
                 // Scan over all valid digits.
@@ -1222,7 +1276,7 @@ impl<'a> StringScanner<'a> {
         }
 
         if seen_dot {
-            *is_fractional = true;
+            *not_integer = true;
         }
     }
 }
@@ -1231,17 +1285,28 @@ impl<'a> StringScanner<'a> {
 // Utility definitions
 //
 
-/// Digit scanning modes of `scan_number_digits()`.
-#[derive(Eq, PartialEq)]
-enum DigitScanningMode {
-    /// We are scanning the value part of a number (before the exponent).
-    /// At most one decimal dot is expected here. Exponent markers terminate
-    /// the number.
+/// Specifies how to handle special characters of fractional numbers (dots and exponents)
+/// in `scan_number_digits()`.
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum FractionScanningMode {
+    /// We are scanning the value part of a number (before the exponent). At most one decimal dot
+    /// is expected here. Exponent markers terminate the number.
     Value,
 
-    /// We are scanning the exponent part of a number. Decimal dots and
-    /// exponent markers are invalid here.
+    /// We are scanning the exponent part of a number. Decimal dots and exponent markers are
+    /// invalid here.
     Exponent,
+}
+
+/// Specifies how to handle special characters of rational numbers (slashes)
+/// in `scan_number_digits()`.
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum RationalScanningMode {
+    /// We are scanning a numerator of a number. Rational slash terminates the numerator.
+    Numerator,
+
+    /// We are scanning a denominator of a rational number. A slash is treated as invalid.
+    Denominator,
 }
 
 /// Result of `scan_number_infnan()`.

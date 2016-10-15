@@ -122,6 +122,9 @@ pub enum DiagnosticKind {
     /// Lexer has scanned over unexpected suffix of an inf/nan literal.
     err_lexer_infnan_suffix,
 
+    /// Lexer has scanned over a non-integer part of a rational number.
+    err_lexer_noninteger_rational,
+
     /// Lexer has encountered an escaped identifier without a closing vertical bar.
     fatal_lexer_unterminated_identifier,
 }
