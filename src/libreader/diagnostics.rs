@@ -98,8 +98,8 @@ pub enum DiagnosticKind {
     /// but there wasn't any.
     err_lexer_unicode_escape_missing_semicolon,
 
-    /// Lexer has encountered multiple numeric base specifiers in a number literal.
-    err_lexer_multiple_number_bases,
+    /// Lexer has encountered multiple numeric radix specifiers in a number literal.
+    err_lexer_multiple_number_radices,
 
     /// Lexer has encountered multiple exactness specifiers in a number literal.
     err_lexer_multiple_exactness,
@@ -107,17 +107,14 @@ pub enum DiagnosticKind {
     /// Lexer has encountered an invalid number prefix.
     err_lexer_invalid_number_prefix,
 
-    /// Lexer has encountered a digit of invalid base.
+    /// Lexer has encountered a digit of invalid radix.
     err_lexer_invalid_number_digit,
 
     /// Lexer has encountered a character which is not allowed in numbers.
     err_lexer_invalid_number_character,
 
-    /// Lexer has encountered a real number with non-decimal base prefix.
+    /// Lexer has encountered a real number with non-decimal radix prefix.
     err_lexer_nondecimal_real,
-
-    /// Lexer has expected a floating point exponent but there wasn't any.
-    err_lexer_exponent_missing,
 
     /// Lexer has expected some number digits but there weren't any.
     err_lexer_digits_missing,
