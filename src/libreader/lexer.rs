@@ -246,12 +246,13 @@ impl<'a> StringScanner<'a> {
 
     /// Scan over a sequence of whitespace.
     fn scan_whitespace(&mut self) -> Token {
-        while !self.at_eof() {
-            match self.cur.unwrap() {
-                ' ' | '\t' | '\n' | '\r' => { self.read(); }
-                _                        => { break; }
+        while let Some(c) = self.cur {
+            if !is_whitespace(c) {
+                break;
             }
+            self.read();
         }
+
         return Token::Whitespace;
     }
 
@@ -259,22 +260,6 @@ impl<'a> StringScanner<'a> {
     fn scan_unrecognized(&mut self, start: usize) -> Token {
         while !self.at_eof() {
             if is_delimiter(self.cur.unwrap()) {
-                break;
-            }
-            self.read();
-        }
-        let end = self.prev_pos;
-
-        self.diagnostic.report(DiagnosticKind::err_lexer_unrecognized, Span::new(start, end));
-
-        return Token::Unrecognized;
-    }
-
-    /// Scan over an unrecognized sequence of characters (not treating `#` as a delimiter).
-    fn scan_unrecognized_with_hashes(&mut self, start: usize) -> Token {
-        while !self.at_eof() {
-            let c = self.cur.unwrap();
-            if (c != '#') && is_delimiter(c) {
                 break;
             }
             self.read();
@@ -413,7 +398,7 @@ impl<'a> StringScanner<'a> {
                 if looks_like_number {
                     self.scan_number_literal()
                 } else {
-                    self.scan_unrecognized_with_hashes(start)
+                    self.scan_unrecognized(start)
                 }
             }
         }
@@ -483,7 +468,7 @@ impl<'a> StringScanner<'a> {
             }
         }
 
-        return self.scan_unrecognized_with_hashes(start);
+        return self.scan_unrecognized(start);
     }
 
     /// Scan a character literal (`#\\!`, `#\\x000F`, `#\\return`).
@@ -497,26 +482,15 @@ impl<'a> StringScanner<'a> {
         // To be honest, syntax of character literals in Scheme is awfully ambiguous for machines
         // and humans alike. However, this is life and legacy design so we have to deal with it.
 
-        match self.cur {
-            // Whitespace *is* for delimiters. I don't care if this is not R7RS-compliant, but
-            // I will not allow "#\ " as fancy way to write a space character. There are named
-            // characters like #\space or #\newline for these cases. So if we run in any of these
-            // abominations (or if we run out of characters at all) then report it and get out.
-            Some(' ') | Some('\t') | Some('\r') | Some('\n') | None => {
-                self.diagnostic.report(DiagnosticKind::err_lexer_character_missing,
-                    Span::new(self.prev_pos, self.prev_pos));
+        // Whitespace *is* for delimiters. I don't care if this is not R7RS-compliant, but I will
+        // not allow "#\ " as fancy way to write a space character. There are named characters
+        // like #\space or #\newline for these cases. So if we run in any of these abominations
+        // (or if we run out of characters at all) then report it and get out.
+        if self.cur.map_or(true, is_whitespace) {
+            self.diagnostic.report(DiagnosticKind::err_lexer_character_missing,
+                Span::new(self.prev_pos, self.prev_pos));
 
-                return Token::Character(REPLACEMENT_CHARACTER);
-            }
-
-            // Handle the edge case when the literal is for a delimiter character,
-            // and continue with more complex cases.
-            Some(c) => {
-                if is_delimiter(c) {
-                    self.read();
-                    return Token::Character(c);
-                }
-            }
+            return Token::Character(REPLACEMENT_CHARACTER);
         }
 
         let name_start = self.prev_pos;
@@ -565,6 +539,11 @@ impl<'a> StringScanner<'a> {
                     value = (value << 4) | hex_value(c) as u32;
                 }
 
+                self.read();
+            }
+        } else {
+            // Handle the edge case when the literal is for a delimiter character.
+            if is_delimiter(first_character) {
                 self.read();
             }
         }
@@ -686,7 +665,7 @@ impl<'a> StringScanner<'a> {
             Some('|')  => { self.read(); return Some('\u{007C}'); }
 
             // A backslash followed by whitespace starts a line escape which is ignored.
-            Some(' ') | Some('\t') | Some('\r') | Some('\n') => {
+            Some(c) if is_whitespace(c) => {
                 self.scan_string_line_escape_sequence(escape_start);
                 return None;
             }
@@ -960,10 +939,10 @@ impl<'a> StringScanner<'a> {
                     }
                     InfNanResult::InfNanIncomplete => {
                         if has_prefix {
-                            return self.scan_unrecognized_with_hashes(start);
+                            return self.scan_unrecognized(start);
                         } else {
                             // TODO: here we should fallback to identifiers, not Unrecognized
-                            return self.scan_unrecognized_with_hashes(start);
+                            return self.scan_unrecognized(start);
                         }
                     }
                 }
@@ -1210,10 +1189,7 @@ impl<'a> StringScanner<'a> {
                 }
 
                 // Stop scanning as soon as we encounter a delimiter.
-                //
-                // Report the hash as an invalid character instead of treating it as a delimiter
-                // (older Schemes used it in inexact number syntax).
-                Some(c) if (c != '#') && is_delimiter(c) => {
+                Some(c) if is_delimiter(c) => {
                     break;
                 }
                 None => {
@@ -1278,16 +1254,22 @@ enum InfNanResult {
     InfNanIncomplete,
 }
 
+/// Check if a character is a whitespace.
+fn is_whitespace(c: char) -> bool {
+    match c {
+        ' ' | '\t' | '\n' | '\r' => true,
+        _ => false,
+    }
+}
+
 /// Check if a character is a delimiter for tokens.
 fn is_delimiter(c: char) -> bool {
     match c {
         // R7RS defines only the following delimiters:
         ' ' | '\t' | '\n' | '\r' | '|' | '"' | ';' | '(' | ')' | '[' | ']' | '{' | '}' |
         // But we add to this list all quotes as they are expanded into forms,
-        // so effectively they can be treatead as opening parentheses, and
-        // the hash sign as it is a starter for directives and fixed-spelling
-        // tokens, and it also cannot be used inside anything else.
-        '\'' | ',' | '`' | '#' => true,
+        // so effectively they can be treatead as opening parentheses.
+        '\'' | ',' | '`' => true,
         _ => false,
     }
 }

@@ -306,8 +306,11 @@ fn recover_open_bytevector() {
 fn characters_immediate() {
     check! {
         ("#\\t"         => Character('t'));
+        (" "            => Whitespace);
         ("#\\e"         => Character('e'));
+        (" "            => Whitespace);
         ("#\\s"         => Character('s'));
+        (" "            => Whitespace);
         ("#\\t"         => Character('t'));
         (" "            => Whitespace);
         ("#\\X"         => Character('X'));
@@ -315,8 +318,11 @@ fn characters_immediate() {
         ("#\\\u{1234}"  => Character('\u{1234}'));
         (" "            => Whitespace);
         ("#\\("         => Character('('));
+        (" "            => Whitespace);
         ("#\\)"         => Character(')'));
+        (" "            => Whitespace);
         ("#\\."         => Character('.'));
+        (" "            => Whitespace);
         ("#\\,"         => Character(','));
     }
 }
@@ -390,7 +396,6 @@ fn characters_edge_cases() {
         (" "            => Whitespace);
         ("#\\\\"        => Character('\\'));
         (" "            => Whitespace);
-        ("#\\\\"        => Character('\\'));
         ("#\\#"         => Character('#'));
         (" "            => Whitespace);
         ("#\\\""        => Character('\"'));
@@ -399,8 +404,7 @@ fn characters_edge_cases() {
         ("("            => Open(Parenthesis));
         (" "            => Whitespace);
         ("#\\;"         => Character(';'));
-        ("#\\;"         => Character(';'));
-        (" "            => Whitespace);
+        ("; \n"         => Comment);
         ("#\\|"         => Character('|'));
     }
 }
@@ -425,6 +429,50 @@ fn characters_whitespace_eof_special() {
         ("\r\n"     => Whitespace);
         ("#\\"      => Character('\u{FFFD}')),
              (2, 2) => err_lexer_character_missing;
+    }
+}
+
+#[test]
+fn recover_character_no_separator() {
+    check! {
+        ("#\\t#\\e#\\s#\\t" => Character('\u{FFFD}')),
+                    (0, 12) => err_lexer_unknown_character_name;
+        (" "                => Whitespace);
+        ("#\\("             => Character('('));
+        (")"                => Close(Parenthesis));
+        (" "                => Whitespace);
+        ("#\\(#\\"          => Character('\u{FFFD}')),
+                     (0, 5) => err_lexer_unknown_character_name;
+        ("("                => Open(Parenthesis));
+        (" "                => Whitespace);
+        ("#\\)"             => Character(')'));
+        ("]"                => Close(Bracket));
+        (" "                => Whitespace);
+        ("#\\)#\\"          => Character('\u{FFFD}')),
+                     (0, 5) => err_lexer_unknown_character_name;
+        ("]"                => Close(Bracket));
+        (" "                => Whitespace);
+        ("#\\.."            => Character('\u{FFFD}')),
+                     (0, 4) => err_lexer_unknown_character_name;
+        (" "                => Whitespace);
+        ("#\\..#\\."        => Character('\u{FFFD}')),
+                     (0, 7) => err_lexer_unknown_character_name;
+        (" "                => Whitespace);
+        ("#\\,"             => Character(','));
+        (","                => Comma);
+        (","                => Comma);
+        ("#\\,"             => Character(','));
+        (" "                => Whitespace);
+        ("#\\."             => Character('.'));
+        ("'"                => Quote);
+        ("#\\'"             => Character('\''));
+        (" "                => Whitespace);
+        ("#\\\\#\\#"        => Character('\u{FFFD}')),
+                     (0, 6) => err_lexer_unknown_character_name;
+        (" "                => Whitespace);
+        ("#\\;#\\"          => Character('\u{FFFD}')),
+                     (0, 5) => err_lexer_unknown_character_name;
+        (";"                => Comment);
     }
 }
 
@@ -470,10 +518,8 @@ fn recover_character_names() {
         ("#\\\\x1232"                       => Character('\u{FFFD}')),
                                      (0, 8) => err_lexer_unknown_character_name;
         (" "                                => Whitespace);
-        ("#\\\u{0}\u{1}\u{2}"               => Character('\u{FFFD}')),
-                                     (0, 5) => err_lexer_unknown_character_name;
-        ("#\\\u{4}\u{5}\u{6}"               => Character('\u{FFFD}')),
-                                     (0, 5) => err_lexer_unknown_character_name;
+        ("#\\\u{0}\u{1}#\\\u{2}\u{3}"       => Character('\u{FFFD}')),
+                                     (0, 8) => err_lexer_unknown_character_name;
         (";\n"                              => Comment);
         ("#\\\u{1111}\u{2222}\u{3333}"      => Character('\u{FFFD}')),
                                     (0, 11) => err_lexer_unknown_character_name;
