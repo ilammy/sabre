@@ -1053,46 +1053,40 @@ impl<'a> StringScanner<'a> {
                 }
 
                 // We do not expect anything else after a hash, so this is definitely an invalid
-                // number prefix. If a delimiter follows the hash then this is not even a number.
-                // In this case report only the hash and get out (the caller will fail later).
-                Some(c) if (c != '#') && is_delimiter(c) => {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
-                        Span::new(start, self.prev_pos));
-                    break;
-                }
-                None => {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
-                        Span::new(start, self.prev_pos));
-                    break;
-                }
-                // If a digit follows the hash then the user may have forgotten to type the prefix.
-                // Report this lone hash and we're done with the prefix.
-                Some(c) if is_digit(10, c) => {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
-                        Span::new(start, self.prev_pos));
-                    break;
-                }
-                // The same goes for explicit signs and decimal dots.
-                Some('+') | Some('-') | Some('.') => {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
-                        Span::new(start, self.prev_pos));
-                    break;
-                }
+                // number prefix. Try to recover.
+                _ => {
+                    // If we encounter consecutive hashes then suppose that the user has mistyped
+                    // a prefix and forgotten to type the character between the hashes. Report the
+                    // lone hash and continue scanning treating this hash a start of a new prefix.
+                    if self.cur_is('#') {
+                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
+                            Span::new(start, self.prev_pos));
+                        continue;
+                    }
 
-                // If we encounter consecutive hashes then suppose that the user has mistyped
-                // a prefix and forgotten to type the character between the hashes. Report the
-                // lone hash and continue scanning.
-                Some('#') => {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
-                        Span::new(start, self.prev_pos));
-                }
+                    // A delimiter means that this does not even seem to be a number, but meh.
+                    let delimiter = self.cur.map_or(true, is_delimiter);
 
-                // Otherwise eat the character after the hash, report this pair as invalid, and
-                // continue scanning (maybe there are more prefixes ahead).
-                Some(_) => {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
-                        Span::new(start, self.pos));
+                    // A digit, a sign, or a dot means that the user has missed the actual prefix
+                    // character and started typing the number right away. Okay.
+                    let digit = self.cur.map_or(false, |c| is_digit(10, c));
+                    let sign = self.cur_is('+') || self.cur_is('-');
+                    let dot = self.cur_is('.');
+
+                    // Stop scanning the prefix if we encounter any of these immediately after
+                    // the hash character.
+                    if delimiter || digit || sign || dot {
+                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
+                            Span::new(start, self.prev_pos));
+                        break;
+                    }
+
+                    // Otherwise eat the character after the hash, report this pair as invalid,
+                    // and continue scanning (maybe there are more prefixes ahead).
                     self.read();
+
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
+                        Span::new(start, self.prev_pos));
                 }
             }
         }
