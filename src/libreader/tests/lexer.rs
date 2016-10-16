@@ -1458,7 +1458,7 @@ fn recover_numbers_rational_exponent() {
                     (7,  8) => err_lexer_invalid_number_character,
                    (13, 14) => err_lexer_invalid_number_character,
                    (14, 15) => err_lexer_invalid_number_character,
-                    (3,  9) => err_lexer_noninteger_rational,
+                    (2,  9) => err_lexer_noninteger_rational,
                    (10, 16) => err_lexer_noninteger_rational;
     }
 }
@@ -1512,27 +1512,23 @@ fn recover_numbers_rational_fractional() {
 fn recover_numbers_rational_ieee754_specials() {
     check! {
         ("+inf.0/9"         => Number("+inf.0/9")),
-                     (6, 8) => err_lexer_infnan_suffix;
+                     (0, 6) => err_lexer_infnan_rational;
         (" "                => Whitespace);
         ("#e-NaN.0/0"       => Number("#e-NaN.0/0")),
-                    (8, 10) => err_lexer_infnan_suffix;
+                     (2, 8) => err_lexer_infnan_rational;
         (" "                => Whitespace);
         ("5/+inf.0"         => Number("5/+inf.0")),
                      (2, 3) => err_lexer_invalid_number_character,
-                     (3, 4) => err_lexer_invalid_number_character,
-                     (4, 5) => err_lexer_invalid_number_character,
-                     (5, 6) => err_lexer_invalid_number_character,
-                     (2, 8) => err_lexer_nondecimal_real;
+                     (2, 8) => err_lexer_infnan_rational;
         (" "                => Whitespace);
         ("0/+NaN.0"         => Number("0/+NaN.0")),
                      (2, 3) => err_lexer_invalid_number_character,
-                     (3, 4) => err_lexer_invalid_number_character,
-                     (4, 5) => err_lexer_invalid_number_character,
-                     (5, 6) => err_lexer_invalid_number_character,
-                     (2, 8) => err_lexer_nondecimal_real;
+                     (2, 8) => err_lexer_infnan_rational;
         (" "                => Whitespace);
         ("+inf.0/-inf.0"    => Number("+inf.0/-inf.0")),
-                    (6, 13) => err_lexer_infnan_suffix;
+                    (7,  8) => err_lexer_invalid_number_character,
+                    (0,  6) => err_lexer_infnan_rational,
+                    (7, 13) => err_lexer_infnan_rational;
     }
 }
 

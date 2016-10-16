@@ -908,6 +908,7 @@ impl<'a> StringScanner<'a> {
         let mut radix_location = None;
         let mut exact_location = None;
         let mut effective_radix = 10;
+        let mut not_integer = false;
 
         let start = self.prev_pos;
 
@@ -921,35 +922,6 @@ impl<'a> StringScanner<'a> {
 
             effective_radix = radix_value.unwrap_or(10);
         }
-
-        // Skip over an optional sign.
-        if self.cur_is('+') || self.cur_is('-') {
-            self.read();
-
-            // Handle IEEE 754 special values which must always have an explicit sign.
-            // (Just "inf.0" is a valid identifier.)
-            if self.cur_is('i') || self.cur_is('I') || self.cur_is('n') || self.cur_is('N') {
-                match self.scan_number_infnan() {
-                    InfNanResult::InfNanComplete => {
-                        let end = self.prev_pos;
-
-                        let value = &self.buf[start..end];
-
-                        return Token::Number(self.pool.intern(value));
-                    }
-                    InfNanResult::InfNanIncomplete => {
-                        if has_prefix {
-                            return self.scan_unrecognized(start);
-                        } else {
-                            // TODO: here we should fallback to identifiers, not Unrecognized
-                            return self.scan_unrecognized(start);
-                        }
-                    }
-                }
-            }
-        }
-
-        let mut not_integer = false;
 
         self.scan_number_part(effective_radix, &mut not_integer);
 
@@ -1071,99 +1043,37 @@ impl<'a> StringScanner<'a> {
         }
     }
 
-    /// Try scanning a numeric `+inf.0` or `+nan.0` value. The sign has been already scanned over.
-    fn scan_number_infnan(&mut self) -> InfNanResult {
-        assert!(self.cur_is('i') || self.cur_is('I') || self.cur_is('n') || self.cur_is('N'));
-
-        let result = match self.cur {
-            Some('i') | Some('I') => self.scan_number_inf(),
-            Some('n') | Some('N') => self.scan_number_nan(),
-            _                     => unreachable!(),
-        };
-
-        if result == InfNanResult::InfNanComplete {
-            if !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
-                let suffix_start = self.prev_pos;
-                while !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
-                    self.read();
-                }
-                let suffix_end = self.prev_pos;
-
-                self.diagnostic.report(DiagnosticKind::err_lexer_infnan_suffix,
-                    Span::new(suffix_start, suffix_end));
-            }
-        }
-
-        return result;
-    }
-
-    /// Try scanning a numeric `+inf.0` value. The sign has been already scanned over.
-    fn scan_number_inf(&mut self) -> InfNanResult {
-        if !(self.cur_is('i') || self.cur_is('I')) { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !(self.cur_is('n') || self.cur_is('N')) { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !(self.cur_is('f') || self.cur_is('F')) { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !self.cur_is('.') { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !self.cur_is('0') { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        return InfNanResult::InfNanComplete;
-    }
-
-    /// Try scanning a numeric `+nan.0` value. The sign has been already scanned over.
-    fn scan_number_nan(&mut self) -> InfNanResult {
-        if !(self.cur_is('n') || self.cur_is('N')) { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !(self.cur_is('a') || self.cur_is('A')) { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !(self.cur_is('n') || self.cur_is('N')) { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !self.cur_is('.') { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !self.cur_is('0') { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        return InfNanResult::InfNanComplete;
-    }
-
     /// Scan a real part of a number (an integer, a fractional, or a rational number).
     /// Sets `not_integer` to true if the number is fractional or has an exponent anywhere.
     fn scan_number_part(&mut self, radix: u8, not_integer: &mut bool) {
+        let mut infnan_numerator = false;
+        let mut infnan_denominator = false;
         let mut noninteger_numerator = false;
         let mut noninteger_denominator = false;
 
         let numerator_start = self.prev_pos;
         self.scan_number_value(radix, RationalScanningMode::Numerator,
-            &mut noninteger_numerator);
+            &mut infnan_numerator, &mut noninteger_numerator);
+
         let numerator_end = self.prev_pos;
 
         if self.cur_is('/') {
             self.read();
 
-            // Allow signs right after a fraction slash, but report them.
-            if self.cur_is('+') || self.cur_is('-') {
-                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
-                    Span::new(self.prev_pos, self.pos));
-                self.read();
-            }
-
             let denominator_start = self.prev_pos;
             self.scan_number_value(radix, RationalScanningMode::Denominator,
-                &mut noninteger_denominator);
+                &mut infnan_denominator, &mut noninteger_denominator);
             let denominator_end = self.prev_pos;
 
             // Fractions must be exact, they cannot contain floating-point parts.
+            if infnan_numerator {
+                self.diagnostic.report(DiagnosticKind::err_lexer_infnan_rational,
+                    Span::new(numerator_start, numerator_end));
+            }
+            if infnan_denominator {
+                self.diagnostic.report(DiagnosticKind::err_lexer_infnan_rational,
+                    Span::new(denominator_start, denominator_end));
+            }
             if noninteger_numerator {
                 self.diagnostic.report(DiagnosticKind::err_lexer_noninteger_rational,
                     Span::new(numerator_start, numerator_end));
@@ -1180,14 +1090,49 @@ impl<'a> StringScanner<'a> {
     }
 
     /// Scan a single numeric value consisting of an actual value part and an optional exponent.
+    /// Sets `is_infnan` to true if the scanned value was /[+-]inf.0/ or /[+-]nan.0/.
     /// Sets `not_integer` to true if the number is fractional and/or has an exponent.
     fn scan_number_value(&mut self, radix: u8, rational_mode: RationalScanningMode,
-        not_integer: &mut bool)
+        is_infnan: &mut bool, not_integer: &mut bool)
     {
+        // Skip over an optional sign.
+        if self.cur_is('+') || self.cur_is('-') {
+            // Allow signs right after a fraction slash, but report them.
+            if rational_mode == RationalScanningMode::Denominator {
+                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
+                    Span::new(self.prev_pos, self.pos));
+            }
+
+            // Handle IEEE 754 special values which must always have an explicit sign.
+            // (Just "inf.0" is a valid identifier.)
+            if self.try_scan_number_infnan() {
+                *is_infnan = true;
+
+                let suffix_start = self.prev_pos;
+                loop {
+                    match self.cur {
+                        Some('/') if rational_mode == RationalScanningMode::Numerator => { break; }
+                        Some(c) if is_delimiter(c)                                    => { break; }
+                        None                                                          => { break; }
+                        Some(_) => { self.read(); }
+                    }
+                }
+                let suffix_end = self.prev_pos;
+
+                if suffix_start != suffix_end {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_infnan_suffix,
+                        Span::new(suffix_start, suffix_end));
+                }
+
+                return;
+            }
+
+            self.read();
+        }
+
         self.scan_number_digits(radix, FractionScanningMode::Value, rational_mode,
             not_integer);
 
-        // Handle an optional exponent.
         if self.cur.map_or(false, is_exponent_marker) {
             *not_integer = true;
 
@@ -1279,6 +1224,37 @@ impl<'a> StringScanner<'a> {
             *not_integer = true;
         }
     }
+
+    /// Try scanning a numeric `+inf.0` or `-nan.0` value. Returns true if such value has been
+    /// successfully scanned over. Otherwise returns false and does not modify the scanning state.
+    fn try_scan_number_infnan(&mut self) -> bool {
+        assert!(self.cur_is('+') || self.cur_is('-'));
+
+        if self.ahead_is("inf.0") {
+            for _ in 0.."+inf.0".len() { self.read(); }
+            return true;
+        }
+
+        if self.ahead_is("nan.0") {
+            for _ in 0.."+nan.0".len() { self.read(); }
+            return true;
+        }
+
+        return false;
+    }
+
+    /// Check whether the lookahead has a given ASCII prefix ignoring case.
+    fn ahead_is(&self, prefix: &str) -> bool {
+        use std::ascii::AsciiExt;
+
+        assert!(prefix.chars().all(|c| c.is_ascii() && c == c.to_ascii_lowercase()));
+
+        self.buf[self.pos..]
+            .chars()
+            .map(|c| c.to_ascii_lowercase())
+            .take(prefix.len())
+            .eq(prefix.chars())
+    }
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1307,16 +1283,6 @@ enum RationalScanningMode {
 
     /// We are scanning a denominator of a rational number. A slash is treated as invalid.
     Denominator,
-}
-
-/// Result of `scan_number_infnan()`.
-#[derive(Eq, PartialEq)]
-enum InfNanResult {
-    /// We have seen a complete `inf.0` or `nan.0` string (possibly followed by non-delimiter).
-    InfNanComplete,
-
-    /// We have seen an incomplete prefix of `inf.0` or `nan.0` (followed by anything).
-    InfNanIncomplete,
 }
 
 /// Check if a character is a whitespace.
