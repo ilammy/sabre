@@ -128,6 +128,9 @@ pub enum DiagnosticKind {
     /// Lexer has scanned over an infnan numerator or denominator of a rational number.
     err_lexer_infnan_rational,
 
+    /// Lexer has encountered a number prefix before what appears to be an identifier.
+    err_lexer_prefixed_identifier,
+
     /// Lexer has encountered an escaped identifier without a closing vertical bar.
     fatal_lexer_unterminated_identifier,
 }

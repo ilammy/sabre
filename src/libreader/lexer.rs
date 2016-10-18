@@ -343,7 +343,6 @@ impl<'a> StringScanner<'a> {
 
     /// Scan over a token starting with a hash `#`.
     fn scan_hash_token(&mut self) -> Token {
-        let start = self.prev_pos;
         assert!(self.cur_is('#'));
 
         match self.peek() {
@@ -369,37 +368,10 @@ impl<'a> StringScanner<'a> {
                 //
                 // Except for the tokens handled above, only numbers allow various hash prefixes.
                 // So we try interpreting the string as a number literal with some invalid prefix
-                // if possible. That is, if what follows is a digit, a dot, a sign, or a prefix
-                // then the token can reasonably be assumed to be an intended number. Otherwise
-                // we won't bother and will fall back to Unrecognized.
-                //
-                // Carefully handle delimiters to avoid doing lookahead past the end of the token.
+                // if possible. Otherwise we are likely to succeed by treating it as a peculiar
+                // identifier with an (invalid) number prefix. Number scanning code handles this.
 
-                let looks_like_number = match self.peek() {
-                    Some('.')                           => { true }
-                    Some('#')                           => { true }
-                    Some('+') | Some('-')               => { true }
-                    Some(c) if is_digit(10, c)          => { true }
-                    Some(c) if is_delimiter(c)          => { false }
-                    None                                => { false }
-                    Some(_) => {
-                        match self.peekpeek() {
-                            Some('.')                   => { true }
-                            Some('#')                   => { true }
-                            Some('+') | Some('-')       => { true }
-                            Some(c) if is_digit(10, c)  => { true }
-                            Some(c) if is_delimiter(c)  => { false }
-                            None                        => { false }
-                            Some(_)                     => { false }
-                        }
-                    }
-                };
-
-                if looks_like_number {
-                    self.scan_number_literal()
-                } else {
-                    self.scan_unrecognized(start)
-                }
+                self.scan_number_literal()
             }
         }
     }
@@ -923,6 +895,22 @@ impl<'a> StringScanner<'a> {
             effective_radix = radix_value.unwrap_or(10);
         }
 
+        // If the token does not have a prefix then it can still look like a starter of a number
+        // while actually being a *pecualiar* identifier. Let's check for these abominations
+        // right here and now, and forget about them for the rest of the _number-scanning_ code.
+        // If the token has a prefix but surely is a pecualiar identifier then report the prefix.
+        // Accept all decimal digits regardless of specified radix to allow for user mistakes.
+        let check_radix = if effective_radix <= 10 { 10 } else { effective_radix };
+        if self.peculiar_identifier_ahead(check_radix) {
+            if has_prefix {
+                self.diagnostic.report(DiagnosticKind::err_lexer_prefixed_identifier,
+                    Span::new(start, self.prev_pos));
+            }
+
+            // TODO: return actual identifier
+            return self.scan_unrecognized(start);
+        }
+
         self.scan_number_part(effective_radix, &mut not_integer);
 
         assert!(self.cur.map_or(true, is_delimiter));
@@ -1041,6 +1029,86 @@ impl<'a> StringScanner<'a> {
                 }
             }
         }
+    }
+
+    /// Check whether we were fooled and there is a peculiar identifier ahead instead of a number.
+    fn peculiar_identifier_ahead(&self, radix: u8) -> bool {
+        // Now, the whole notion of peculiar identifiers is abominable. That's what you get when
+        // you make identifier syntax as permissive as it is in Scheme. Well, whatever. This is
+        // just another hysterical raisin to deal with.
+        //
+        // Here is the formal grammar of peculiar identifiers from R7RS:
+        //
+        //     <peculiar-identifier> ::= <explicit-sign>                                    (1)
+        //                            |  <explicit-sign>  <sign-subsequent> <subsequent>*   (2)
+        //                            |  <explicit-sign> . <dot-subsequent> <subsequent>*   (3)
+        //                            |                  . <dot-subsequent> <subsequent>*   (4)
+        //
+        //     <explicit-sign> ::= + | -
+        //
+        //     <sign-subsequent> ::= <initial> | <explicit-sign> | @
+        //
+        //     <dot-subsequent> ::= <sign-subsequent> | .
+        //
+        // where <subsequent> can be thought of as effectively anything except for <delimiter>,
+        // and <initial> is <subsequent> minus decimal digits and [+-.@]
+        //
+        // And there is an exception: +i, -i, +inf.0, -inf.0, +nan.0, -nan.0 (case-insensitive)
+        // are parsed as numbers, not peculiar identifiers. Note that they must match exactly.
+        //
+        // One wacky point about these exceptions, which is not immediately obvious from the
+        // formal grammar and R7RS commentary, is whether a string like "+inf.0+40000monkeys"
+        // is a valid peculiar identifer, or an invalid number literal, or something else.
+        //
+        // This could be a peculiar identifier as it matches its grammar and does not match
+        // the grammar of numbers. However, there is another rule that says that an identifier
+        // cannot have a valid number as its prefix, and in our case we have this "+inf.0".
+        // So we should treat this string as ungrammatical and we can report anything we want.
+        // But that rule also invalidates all identifiers starting with "+i", just this one
+        // special letter. Which is obviously dumb.
+        //
+        // Thus we take the following stance on this issue: if we see /[+-](inf|nan).0/i
+        // as a prefix then this is *not* a peculiar identifier. Otherwise it is, except
+        // for the exact case /[+-]i[:delimiter:]/i which is a number.
+
+        let first  = self.cur;
+        let second = self.peek();
+        let third  = self.peekpeek();
+
+        // Cases (1), (2), (3)
+        if first == Some('+') || first == Some('-') {
+            // Case (1)
+            if second.map_or(true, is_delimiter) {
+                return true;
+            }
+
+            // Case (3)
+            if second == Some('.') {
+                return third.map_or(true, |c| !is_delimiter(c) && !is_digit(radix, c));
+            }
+
+            // Case (2) with exceptions
+            if second.map_or(true, |c| !is_digit(radix, c)) {
+                if self.ahead_is("inf.0") || self.ahead_is("nan.0") {
+                    return false;
+                }
+                if self.ahead_is("i") && third.map_or(true, is_delimiter) {
+                    return false;
+                }
+                return true;
+            }
+
+            // Anything starting with a sign followed by a digit must be a number.
+            return false;
+        }
+
+        // Case (4)
+        if first == Some('.') {
+            return second.map_or(true, |c| !is_delimiter(c) && !is_digit(radix, c));
+        }
+
+        // Anything starting with a digit must be a number.
+        return first.map_or(true, |c| !is_digit(radix, c));
     }
 
     /// Scan a real part of a number (an integer, a fractional, or a rational number).
