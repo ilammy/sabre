@@ -232,34 +232,47 @@ fn brackets_and_braces() {
 fn recover_open_vector() {
     check! {
         ("#ahaha-oh-wow"    => Unrecognized),
+                    (0, 2)  => err_lexer_invalid_number_prefix,
+                    (0, 2)  => err_lexer_prefixed_identifier,
                     (0, 13) => err_lexer_unrecognized;
         ("("                => Open(Parenthesis));
         ("#:"               => Unrecognized),
+                    (0, 2)  => err_lexer_invalid_number_prefix,
+                    (0, 2)  => err_lexer_prefixed_identifier,
                     (0, 2)  => err_lexer_unrecognized;
         ("["                => Open(Bracket));
         ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_invalid_number_prefix,
+                    (0, 1)  => err_lexer_prefixed_identifier,
                     (0, 1)  => err_lexer_unrecognized;
         (","                => Comma);
         ("{"                => Open(Brace));
         ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_invalid_number_prefix,
+                    (0, 1)  => err_lexer_prefixed_identifier,
                     (0, 1)  => err_lexer_unrecognized;
         (" "                => Whitespace);
         ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_invalid_number_prefix,
+                    (0, 1)  => err_lexer_prefixed_identifier,
                     (0, 1)  => err_lexer_unrecognized;
         (",@"               => CommaSplicing);
         (" "                => Whitespace);
         ("#"                => Unrecognized),
+                    (0, 1)  => err_lexer_invalid_number_prefix,
+                    (0, 1)  => err_lexer_prefixed_identifier,
                     (0, 1)  => err_lexer_unrecognized;
         ("`"                => Backquote);
         ("["                => Open(Bracket));
         (" "                => Whitespace);
-        ("#####"            => Number("#####")),
+        ("#####"            => Unrecognized),
                     (0, 1)  => err_lexer_invalid_number_prefix,
                     (1, 2)  => err_lexer_invalid_number_prefix,
                     (2, 3)  => err_lexer_invalid_number_prefix,
                     (3, 4)  => err_lexer_invalid_number_prefix,
                     (4, 5)  => err_lexer_invalid_number_prefix,
-                    (5, 5)  => err_lexer_digits_missing;
+                    (0, 5)  => err_lexer_prefixed_identifier,
+                    (0, 5)  => err_lexer_unrecognized;
         ("("                => Open(Parenthesis));
         (" "                => Whitespace);
         ("#."               => Number("#.")),
@@ -874,18 +887,17 @@ fn recover_numbers_integer_prefixed_garbage() {
         ("+\u{1}\u{2}\u{3}"     => Unrecognized),
                          (0, 4) => err_lexer_unrecognized;
         ("\n"                   => Whitespace);
-        ("#O-\u{0}"             => Number("#O-\u{0}")),
-                         (3, 4) => err_lexer_invalid_number_character,
-                         (3, 4) => err_lexer_digits_missing;
+        ("#O-\u{0}"             => Unrecognized),
+                         (0, 2) => err_lexer_prefixed_identifier,
+                         (0, 4) => err_lexer_unrecognized;
         ("\n"                   => Whitespace);
-        ("#i#X\u{F}"            => Number("#i#X\u{F}")),
-                         (4, 5) => err_lexer_invalid_number_character,
-                         (4, 5) => err_lexer_digits_missing;
+        ("#i#X\u{F}"            => Unrecognized),
+                         (0, 4) => err_lexer_prefixed_identifier,
+                         (0, 5) => err_lexer_unrecognized;
         ("\n"                   => Whitespace);
-        ("#b#e-+-5"             => Number("#b#e-+-5")),
-                         (5, 6) => err_lexer_invalid_number_character,
-                         (6, 7) => err_lexer_invalid_number_character,
-                         (7, 8) => err_lexer_invalid_number_digit;
+        ("#b#e-+-5"             => Unrecognized),
+                         (0, 4) => err_lexer_prefixed_identifier,
+                         (0, 8) => err_lexer_unrecognized;
     }
 }
 
@@ -920,17 +932,21 @@ fn recover_numbers_integer_duplicate_prefixes() {
 #[test]
 fn recover_numbers_integer_invalid_prefixes() {
     check! {
-        ("#@#"                  => Number("#@#")),
+        ("#@#"                  => Unrecognized),
                          (0, 2) => err_lexer_invalid_number_prefix,
                          (2, 3) => err_lexer_invalid_number_prefix,
-                         (3, 3) => err_lexer_digits_missing;
+                         (0, 3) => err_lexer_prefixed_identifier,
+                         (0, 3) => err_lexer_unrecognized;
         (" "                    => Whitespace);
-        ("##"                   => Number("##")),
+        ("##"                   => Unrecognized),
                          (0, 1) => err_lexer_invalid_number_prefix,
                          (1, 2) => err_lexer_invalid_number_prefix,
-                         (2, 2) => err_lexer_digits_missing;
+                         (0, 2) => err_lexer_prefixed_identifier,
+                         (0, 2) => err_lexer_unrecognized;
         (" "                    => Whitespace);
         ("#"                    => Unrecognized),
+                         (0, 1) => err_lexer_invalid_number_prefix,
+                         (0, 1) => err_lexer_prefixed_identifier,
                          (0, 1) => err_lexer_unrecognized;
         (" "                    => Whitespace);
         ("##123"                => Number("##123")),
@@ -956,15 +972,19 @@ fn recover_numbers_integer_invalid_prefixes() {
                          (2, 3) => err_lexer_invalid_number_prefix,
                          (3, 5) => err_lexer_invalid_number_prefix;
         (" "                    => Whitespace);
-        ("#o#"                  => Number("#o#")),
+        ("#o#"                  => Unrecognized),
                          (2, 3) => err_lexer_invalid_number_prefix,
-                         (3, 3) => err_lexer_digits_missing;
+                         (0, 3) => err_lexer_prefixed_identifier,
+                         (0, 3) => err_lexer_unrecognized;
         (" "                    => Whitespace);
-        ("#x#"                  => Number("#x#")),
+        ("#x#"                  => Unrecognized),
                          (2, 3) => err_lexer_invalid_number_prefix,
-                         (3, 3) => err_lexer_digits_missing;
+                         (0, 3) => err_lexer_prefixed_identifier,
+                         (0, 3) => err_lexer_unrecognized;
         (" "                    => Whitespace);
         ("#"                    => Unrecognized),
+                         (0, 1) => err_lexer_invalid_number_prefix,
+                         (0, 1) => err_lexer_prefixed_identifier,
                          (0, 1) => err_lexer_unrecognized;
     }
 }
@@ -1191,26 +1211,30 @@ fn recover_numbers_float_digits_missing() {
         (".e0"              => Unrecognized),
                      (0, 3) => err_lexer_unrecognized;
         (" "                => Whitespace);
-        ("#i.e0"            => Number("#i.e0")),
-                     (2, 3) => err_lexer_digits_missing;
+        ("#i.e0"            => Unrecognized),
+                     (0, 2) => err_lexer_prefixed_identifier,
+                     (0, 5) => err_lexer_unrecognized;
         (" "                => Whitespace);
-        ("#d.e0"            => Number("#d.e0")),
-                     (2, 3) => err_lexer_digits_missing;
+        ("#d.e0"            => Unrecognized),
+                     (0, 2) => err_lexer_prefixed_identifier,
+                     (0, 5) => err_lexer_unrecognized;
         (" "                => Whitespace);
-        ("#.e0"             => Number("#.e0")),
+        ("#.e0"             => Unrecognized),
                      (0, 1) => err_lexer_invalid_number_prefix,
-                     (1, 2) => err_lexer_digits_missing;
+                     (0, 1) => err_lexer_prefixed_identifier,
+                     (0, 4) => err_lexer_unrecognized;
         (" "                => Whitespace);
         ("#."               => Number("#.")),
                      (0, 1) => err_lexer_invalid_number_prefix,
                      (1, 2) => err_lexer_digits_missing;
         (" "                => Whitespace);
-        ("#de"              => Number("#de")),
-                     (2, 2) => err_lexer_digits_missing,
-                     (3, 3) => err_lexer_digits_missing;
+        ("#de"              => Unrecognized),
+                     (0, 2) => err_lexer_prefixed_identifier,
+                     (0, 3) => err_lexer_unrecognized;
         (" "                => Whitespace);
-        ("#de+20"           => Number("#de+20")),
-                     (2, 2) => err_lexer_digits_missing;
+        ("#de+20"           => Unrecognized),
+                     (0, 2) => err_lexer_prefixed_identifier,
+                     (0, 6) => err_lexer_unrecognized;
     }
 }
 
@@ -1318,6 +1342,7 @@ fn recover_numbers_float_iee754_specials() {
                      (0, 9) => err_lexer_unrecognized;
         (" "                => Whitespace);
         ("#d-infinity"      => Unrecognized),
+                    (0,  2) => err_lexer_prefixed_identifier,
                     (0, 11) => err_lexer_unrecognized;
         (" "                => Whitespace);
         ("+inf.01234"       => Number("+inf.01234")),
@@ -1341,15 +1366,309 @@ fn recover_numbers_float_iee754_specials() {
         ("NaN.0"            => Unrecognized),
                      (0, 5) => err_lexer_unrecognized;
         (" "                => Whitespace);
-        ("#xInf.0"          => Number("#xInf.0")),
-                     (2, 3) => err_lexer_invalid_number_character,
-                     (3, 4) => err_lexer_invalid_number_character,
+        ("#xInf.0"          => Unrecognized),
+                     (0, 2) => err_lexer_prefixed_identifier,
+                     (0, 7) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#inAn.0"          => Unrecognized),
+                     (0, 2) => err_lexer_prefixed_identifier,
+                     (0, 7) => err_lexer_unrecognized;
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Numbers: rational
+
+#[test]
+fn numbers_rational_simple() {
+    check! {
+        ("1/2"              => Number("1/2"));
+        (" "                => Whitespace);
+        ("123456789/12"     => Number("123456789/12"));
+        (" "                => Whitespace);
+        ("1/23456789"       => Number("1/23456789"));
+        (" "                => Whitespace);
+        ("0/0"              => Number("0/0"));
+    }
+}
+
+#[test]
+fn numbers_rational_prefixed() {
+    check! {
+        ("+5/7"             => Number("+5/7"));
+        (" "                => Whitespace);
+        ("-11/2"            => Number("-11/2"));
+        (" "                => Whitespace);
+        ("#D#i1/2"          => Number("#D#i1/2"));
+        (" "                => Whitespace);
+        ("#e+1/12"          => Number("#e+1/12"));
+    }
+}
+
+#[test]
+fn numbers_rational_nondecimal() {
+    check! {
+        ("#b11101011/101"   => Number("#b11101011/101"));
+        (" "                => Whitespace);
+        ("#o-755/777"       => Number("#o-755/777"));
+        (" "                => Whitespace);
+        ("#xDEAD/BEEF"      => Number("#xDEAD/BEEF"));
+    }
+}
+
+#[test]
+fn recover_numbers_rational_missing_numerator() {
+    check! {
+        ("+/9"              => Unrecognized), // TODO: actually identifier
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#d+/9"            => Unrecognized), // TODO: actually identifier
+                     (0, 2) => err_lexer_prefixed_identifier,
+                     (0, 5) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#e/0"             => Unrecognized), // TODO: actually identifier
+                     (0, 2) => err_lexer_prefixed_identifier,
+                     (0, 4) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("/123"             => Unrecognized), // TODO: actually identifier
+                     (0, 4) => err_lexer_unrecognized;
+    }
+}
+
+#[test]
+fn recover_numbers_rational_missing_denominator() {
+    check! {
+        ("5/"               => Number("5/")),
+                     (2, 2) => err_lexer_digits_missing;
+        (" "                => Whitespace);
+        ("#i-9/"            => Number("#i-9/")),
+                     (5, 5) => err_lexer_digits_missing;
+    }
+}
+
+#[test]
+fn recover_numbers_rational_denominator_sign() {
+    check! {
+        ("+1/-2"            => Number("+1/-2")),
+                     (3, 4) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("3/+4"             => Number("3/+4")),
+                     (2, 3) => err_lexer_invalid_number_character;
+    }
+}
+
+#[test]
+fn recover_numbers_rational_exponent() {
+    check! {
+        ("1/2e10"           => Number("1/2e10")),
+                     (2, 6) => err_lexer_noninteger_rational;
+        (" "                => Whitespace);
+        ("1/e10"            => Number("1/e10")),
+                     (2, 2) => err_lexer_digits_missing,
+                     (2, 5) => err_lexer_noninteger_rational;
+        (" "                => Whitespace);
+        ("1/10e+"           => Number("1/10e+")),
+                     (6, 6) => err_lexer_digits_missing,
+                     (2, 6) => err_lexer_noninteger_rational;
+        (" "                => Whitespace);
+        ("#xA/ee5"          => Number("#xA/ee5"));
+        (" "                => Whitespace);
+        ("#xA/ee+5"         => Number("#xA/ee+5")),
+                     (6, 7) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("#xA/e-5"          => Number("#xA/e-5")),
+                     (5, 6) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("123e45/6"         => Number("123e45/6")),
+                     (0, 6) => err_lexer_noninteger_rational;
+        (" "                => Whitespace);
+        ("#e+1e-2e3/4e5e+6" => Number("#e+1e-2e3/4e5e+6")),
+                    (7,  8) => err_lexer_invalid_number_character,
+                   (13, 14) => err_lexer_invalid_number_character,
+                   (14, 15) => err_lexer_invalid_number_character,
+                    (2,  9) => err_lexer_noninteger_rational,
+                   (10, 16) => err_lexer_noninteger_rational;
+    }
+}
+
+#[test]
+fn recover_numbers_rational_fractional() {
+    check! {
+        ("123.456/789"      => Number("123.456/789")),
+                     (0, 7) => err_lexer_noninteger_rational;
+        (" "                => Whitespace);
+        ("123/456.789"      => Number("123/456.789")),
+                    (4, 11) => err_lexer_noninteger_rational;
+        (" "                => Whitespace);
+        ("+1/2.3e4"         => Number("+1/2.3e4")),
+                     (3, 8) => err_lexer_noninteger_rational;
+        (" "                => Whitespace);
+        ("#o.1/2"           => Number("#o.1/2")),
+                     (2, 4) => err_lexer_noninteger_rational,
                      (0, 2) => err_lexer_nondecimal_real;
         (" "                => Whitespace);
-        ("#inAn.0"          => Number("#inAn.0")),
+        ("./5"              => Unrecognized), // TODO: actually identifier
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("1./5"             => Number("1./5")),
+                     (0, 2) => err_lexer_noninteger_rational;
+        (" "                => Whitespace);
+        ("1/.5"             => Number("1/.5")),
+                     (2, 4) => err_lexer_noninteger_rational;
+        (" "                => Whitespace);
+        ("9/."              => Number("9/.")),
+                     (2, 3) => err_lexer_digits_missing,
+                     (2, 3) => err_lexer_noninteger_rational;
+        (" "                => Whitespace);
+        ("9./"              => Number("9./")),
+                     (3, 3) => err_lexer_digits_missing,
+                     (0, 2) => err_lexer_noninteger_rational;
+        (" "                => Whitespace);
+        ("1/2.3/4.5"        => Number("1/2.3/4.5")),
+                     (5, 6) => err_lexer_invalid_number_character,
+                     (7, 8) => err_lexer_invalid_number_character,
+                     (2, 9) => err_lexer_noninteger_rational;
+        (" "                => Whitespace);
+        ("1.2/3.4/5"        => Number("1.2/3.4/5")),
+                     (7, 8) => err_lexer_invalid_number_character,
+                     (0, 3) => err_lexer_noninteger_rational,
+                     (4, 9) => err_lexer_noninteger_rational;
+    }
+}
+
+#[test]
+fn recover_numbers_rational_ieee754_specials() {
+    check! {
+        ("+inf.0/9"         => Number("+inf.0/9")),
+                     (0, 6) => err_lexer_infnan_rational;
+        (" "                => Whitespace);
+        ("#e-NaN.0/0"       => Number("#e-NaN.0/0")),
+                     (2, 8) => err_lexer_infnan_rational;
+        (" "                => Whitespace);
+        ("5/+inf.0"         => Number("5/+inf.0")),
                      (2, 3) => err_lexer_invalid_number_character,
-                     (3, 4) => err_lexer_invalid_number_character,
-                     (4, 5) => err_lexer_invalid_number_character;
+                     (2, 8) => err_lexer_infnan_rational;
+        (" "                => Whitespace);
+        ("0/+NaN.0"         => Number("0/+NaN.0")),
+                     (2, 3) => err_lexer_invalid_number_character,
+                     (2, 8) => err_lexer_infnan_rational;
+        (" "                => Whitespace);
+        ("+inf.0/-inf.0"    => Number("+inf.0/-inf.0")),
+                    (7,  8) => err_lexer_invalid_number_character,
+                    (0,  6) => err_lexer_infnan_rational,
+                    (7, 13) => err_lexer_infnan_rational;
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Peculiar identifiers
+
+#[test]
+fn identifiers_peculiar_explicit_sign() {
+    check! {
+        ("+"                => Unrecognized),
+                     (0, 1) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("-"                => Unrecognized),
+                     (0, 1) => err_lexer_unrecognized;
+        ("("                => Open(Parenthesis));
+        (" "                => Whitespace);
+        ("+"                => Unrecognized),
+                     (0, 1) => err_lexer_unrecognized;
+    }
+}
+
+#[test]
+fn identifiers_peculiar_explicit_sign_dot() {
+    check! {
+        ("+.x"              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("-.-"              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("+.@"              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("+.._..+"          => Unrecognized),
+                     (0, 7) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("+."               => Unrecognized),
+                     (0, 2) => err_lexer_unrecognized;
+    }
+}
+
+#[test]
+fn identifiers_peculiar_explicit_sign_nondot() {
+    check! {
+        ("-some-"           => Unrecognized),
+                     (0, 6) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("+++"              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("+@--o"            => Unrecognized),
+                     (0, 5) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("+_+"              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("+I1"              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("-not"             => Unrecognized),
+                     (0, 4) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("-NANI"            => Unrecognized),
+                     (0, 5) => err_lexer_unrecognized;
+    }
+}
+
+#[test]
+fn identifiers_peculiar_dot() {
+    check! {
+        ("."                => Dot);
+        (" "                => Whitespace);
+        (".."               => Unrecognized),
+                     (0, 2) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("..."              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        (".Net"             => Unrecognized),
+                     (0, 4) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        (".-."              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        (".!."              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        (".@com"            => Unrecognized),
+                     (0, 5) => err_lexer_unrecognized;
+    }
+}
+
+#[test]
+fn recover_identifiers_peculiar_prefixed() {
+    check! {
+        ("#identifier"      => Unrecognized),
+                    (0,  2) => err_lexer_prefixed_identifier,
+                    (0, 11) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#.+"              => Unrecognized),
+                     (0, 1) => err_lexer_invalid_number_prefix,
+                     (0, 1) => err_lexer_prefixed_identifier,
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#+."              => Number("#+.")),
+                     (0, 1) => err_lexer_invalid_number_prefix,
+                     (2, 3) => err_lexer_digits_missing;
+        (" "                => Whitespace);
+        ("#/i"              => Unrecognized),
+                     (0, 2) => err_lexer_invalid_number_prefix,
+                     (0, 2) => err_lexer_prefixed_identifier,
+                     (0, 3) => err_lexer_unrecognized;
     }
 }
 

@@ -343,7 +343,6 @@ impl<'a> StringScanner<'a> {
 
     /// Scan over a token starting with a hash `#`.
     fn scan_hash_token(&mut self) -> Token {
-        let start = self.prev_pos;
         assert!(self.cur_is('#'));
 
         match self.peek() {
@@ -369,37 +368,10 @@ impl<'a> StringScanner<'a> {
                 //
                 // Except for the tokens handled above, only numbers allow various hash prefixes.
                 // So we try interpreting the string as a number literal with some invalid prefix
-                // if possible. That is, if what follows is a digit, a dot, a sign, or a prefix
-                // then the token can reasonably be assumed to be an intended number. Otherwise
-                // we won't bother and will fall back to Unrecognized.
-                //
-                // Carefully handle delimiters to avoid doing lookahead past the end of the token.
+                // if possible. Otherwise we are likely to succeed by treating it as a peculiar
+                // identifier with an (invalid) number prefix. Number scanning code handles this.
 
-                let looks_like_number = match self.peek() {
-                    Some('.')                           => { true }
-                    Some('#')                           => { true }
-                    Some('+') | Some('-')               => { true }
-                    Some(c) if is_digit(10, c)          => { true }
-                    Some(c) if is_delimiter(c)          => { false }
-                    None                                => { false }
-                    Some(_) => {
-                        match self.peekpeek() {
-                            Some('.')                   => { true }
-                            Some('#')                   => { true }
-                            Some('+') | Some('-')       => { true }
-                            Some(c) if is_digit(10, c)  => { true }
-                            Some(c) if is_delimiter(c)  => { false }
-                            None                        => { false }
-                            Some(_)                     => { false }
-                        }
-                    }
-                };
-
-                if looks_like_number {
-                    self.scan_number_literal()
-                } else {
-                    self.scan_unrecognized(start)
-                }
+                self.scan_number_literal()
             }
         }
     }
@@ -908,6 +880,7 @@ impl<'a> StringScanner<'a> {
         let mut radix_location = None;
         let mut exact_location = None;
         let mut effective_radix = 10;
+        let mut not_integer = false;
 
         let start = self.prev_pos;
 
@@ -922,36 +895,23 @@ impl<'a> StringScanner<'a> {
             effective_radix = radix_value.unwrap_or(10);
         }
 
-        // Skip over an optional sign.
-        if self.cur_is('+') || self.cur_is('-') {
-            self.read();
-
-            // Handle IEEE 754 special values which must always have an explicit sign.
-            // (Just "inf.0" is a valid identifier.)
-            if self.cur_is('i') || self.cur_is('I') || self.cur_is('n') || self.cur_is('N') {
-                match self.scan_number_infnan() {
-                    InfNanResult::InfNanComplete => {
-                        let end = self.prev_pos;
-
-                        let value = &self.buf[start..end];
-
-                        return Token::Number(self.pool.intern(value));
-                    }
-                    InfNanResult::InfNanIncomplete => {
-                        if has_prefix {
-                            return self.scan_unrecognized(start);
-                        } else {
-                            // TODO: here we should fallback to identifiers, not Unrecognized
-                            return self.scan_unrecognized(start);
-                        }
-                    }
-                }
+        // If the token does not have a prefix then it can still look like a starter of a number
+        // while actually being a *pecualiar* identifier. Let's check for these abominations
+        // right here and now, and forget about them for the rest of the _number-scanning_ code.
+        // If the token has a prefix but surely is a pecualiar identifier then report the prefix.
+        // Accept all decimal digits regardless of specified radix to allow for user mistakes.
+        let check_radix = if effective_radix <= 10 { 10 } else { effective_radix };
+        if self.peculiar_identifier_ahead(check_radix) {
+            if has_prefix {
+                self.diagnostic.report(DiagnosticKind::err_lexer_prefixed_identifier,
+                    Span::new(start, self.prev_pos));
             }
+
+            // TODO: return actual identifier
+            return self.scan_unrecognized(start);
         }
 
-        let mut is_fractional = false;
-
-        self.scan_number_value(effective_radix, &mut is_fractional);
+        self.scan_number_part(effective_radix, &mut not_integer);
 
         assert!(self.cur.map_or(true, is_delimiter));
 
@@ -959,7 +919,7 @@ impl<'a> StringScanner<'a> {
 
         // Late check for radix of a number. Scheme does not allow to use exponent and float forms
         // with non-decimal numbers.
-        if is_fractional && (effective_radix != 10) {
+        if not_integer && (effective_radix != 10) {
             self.diagnostic.report(DiagnosticKind::err_lexer_nondecimal_real,
                 radix_location.expect("non-decimal radix is always explicit"));
         }
@@ -1071,96 +1031,198 @@ impl<'a> StringScanner<'a> {
         }
     }
 
-    /// Try scanning a numeric `+inf.0` or `+nan.0` value. The sign has been already scanned over.
-    fn scan_number_infnan(&mut self) -> InfNanResult {
-        assert!(self.cur_is('i') || self.cur_is('I') || self.cur_is('n') || self.cur_is('N'));
+    /// Check whether we were fooled and there is a peculiar identifier ahead instead of a number.
+    fn peculiar_identifier_ahead(&self, radix: u8) -> bool {
+        // Now, the whole notion of peculiar identifiers is abominable. That's what you get when
+        // you make identifier syntax as permissive as it is in Scheme. Well, whatever. This is
+        // just another hysterical raisin to deal with.
+        //
+        // Here is the formal grammar of peculiar identifiers from R7RS:
+        //
+        //     <peculiar-identifier> ::= <explicit-sign>                                    (1)
+        //                            |  <explicit-sign>  <sign-subsequent> <subsequent>*   (2)
+        //                            |  <explicit-sign> . <dot-subsequent> <subsequent>*   (3)
+        //                            |                  . <dot-subsequent> <subsequent>*   (4)
+        //
+        //     <explicit-sign> ::= + | -
+        //
+        //     <sign-subsequent> ::= <initial> | <explicit-sign> | @
+        //
+        //     <dot-subsequent> ::= <sign-subsequent> | .
+        //
+        // where <subsequent> can be thought of as effectively anything except for <delimiter>,
+        // and <initial> is <subsequent> minus decimal digits and [+-.@]
+        //
+        // And there is an exception: +i, -i, +inf.0, -inf.0, +nan.0, -nan.0 (case-insensitive)
+        // are parsed as numbers, not peculiar identifiers. Note that they must match exactly.
+        //
+        // One wacky point about these exceptions, which is not immediately obvious from the
+        // formal grammar and R7RS commentary, is whether a string like "+inf.0+40000monkeys"
+        // is a valid peculiar identifer, or an invalid number literal, or something else.
+        //
+        // This could be a peculiar identifier as it matches its grammar and does not match
+        // the grammar of numbers. However, there is another rule that says that an identifier
+        // cannot have a valid number as its prefix, and in our case we have this "+inf.0".
+        // So we should treat this string as ungrammatical and we can report anything we want.
+        // But that rule also invalidates all identifiers starting with "+i", just this one
+        // special letter. Which is obviously dumb.
+        //
+        // Thus we take the following stance on this issue: if we see /[+-](inf|nan).0/i
+        // as a prefix then this is *not* a peculiar identifier. Otherwise it is, except
+        // for the exact case /[+-]i[:delimiter:]/i which is a number.
 
-        let result = match self.cur {
-            Some('i') | Some('I') => self.scan_number_inf(),
-            Some('n') | Some('N') => self.scan_number_nan(),
-            _                     => unreachable!(),
-        };
+        let first  = self.cur;
+        let second = self.peek();
+        let third  = self.peekpeek();
 
-        if result == InfNanResult::InfNanComplete {
-            if !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
-                let suffix_start = self.prev_pos;
-                while !self.at_eof() && !is_delimiter(self.cur.unwrap()) {
-                    self.read();
+        // Cases (1), (2), (3)
+        if first == Some('+') || first == Some('-') {
+            // Case (1)
+            if second.map_or(true, is_delimiter) {
+                return true;
+            }
+
+            // Case (3)
+            if second == Some('.') {
+                return third.map_or(true, |c| !is_delimiter(c) && !is_digit(radix, c));
+            }
+
+            // Case (2) with exceptions
+            if second.map_or(true, |c| !is_digit(radix, c)) {
+                if self.ahead_is("inf.0") || self.ahead_is("nan.0") {
+                    return false;
                 }
-                let suffix_end = self.prev_pos;
+                if self.ahead_is("i") && third.map_or(true, is_delimiter) {
+                    return false;
+                }
+                return true;
+            }
 
-                self.diagnostic.report(DiagnosticKind::err_lexer_infnan_suffix,
-                    Span::new(suffix_start, suffix_end));
+            // Anything starting with a sign followed by a digit must be a number.
+            return false;
+        }
+
+        // Case (4)
+        if first == Some('.') {
+            return second.map_or(true, |c| !is_delimiter(c) && !is_digit(radix, c));
+        }
+
+        // Anything starting with a digit must be a number.
+        return first.map_or(true, |c| !is_digit(radix, c));
+    }
+
+    /// Scan a real part of a number (an integer, a fractional, or a rational number).
+    /// Sets `not_integer` to true if the number is fractional or has an exponent anywhere.
+    fn scan_number_part(&mut self, radix: u8, not_integer: &mut bool) {
+        let mut infnan_numerator = false;
+        let mut infnan_denominator = false;
+        let mut noninteger_numerator = false;
+        let mut noninteger_denominator = false;
+
+        let numerator_start = self.prev_pos;
+        self.scan_number_value(radix, RationalScanningMode::Numerator,
+            &mut infnan_numerator, &mut noninteger_numerator);
+
+        let numerator_end = self.prev_pos;
+
+        if self.cur_is('/') {
+            self.read();
+
+            let denominator_start = self.prev_pos;
+            self.scan_number_value(radix, RationalScanningMode::Denominator,
+                &mut infnan_denominator, &mut noninteger_denominator);
+            let denominator_end = self.prev_pos;
+
+            // Fractions must be exact, they cannot contain floating-point parts.
+            if infnan_numerator {
+                self.diagnostic.report(DiagnosticKind::err_lexer_infnan_rational,
+                    Span::new(numerator_start, numerator_end));
+            }
+            if infnan_denominator {
+                self.diagnostic.report(DiagnosticKind::err_lexer_infnan_rational,
+                    Span::new(denominator_start, denominator_end));
+            }
+            if noninteger_numerator {
+                self.diagnostic.report(DiagnosticKind::err_lexer_noninteger_rational,
+                    Span::new(numerator_start, numerator_end));
+            }
+            if noninteger_denominator {
+                self.diagnostic.report(DiagnosticKind::err_lexer_noninteger_rational,
+                    Span::new(denominator_start, denominator_end));
             }
         }
 
-        return result;
-    }
-
-    /// Try scanning a numeric `+inf.0` value. The sign has been already scanned over.
-    fn scan_number_inf(&mut self) -> InfNanResult {
-        if !(self.cur_is('i') || self.cur_is('I')) { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !(self.cur_is('n') || self.cur_is('N')) { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !(self.cur_is('f') || self.cur_is('F')) { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !self.cur_is('.') { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !self.cur_is('0') { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        return InfNanResult::InfNanComplete;
-    }
-
-    /// Try scanning a numeric `+nan.0` value. The sign has been already scanned over.
-    fn scan_number_nan(&mut self) -> InfNanResult {
-        if !(self.cur_is('n') || self.cur_is('N')) { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !(self.cur_is('a') || self.cur_is('A')) { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !(self.cur_is('n') || self.cur_is('N')) { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !self.cur_is('.') { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        if !self.cur_is('0') { return InfNanResult::InfNanIncomplete; }
-        self.read();
-
-        return InfNanResult::InfNanComplete;
+        if noninteger_numerator || noninteger_denominator {
+            *not_integer = true;
+        }
     }
 
     /// Scan a single numeric value consisting of an actual value part and an optional exponent.
-    /// Sets `is_fractional` to true if the scanned value is fractional.
-    fn scan_number_value(&mut self, radix: u8, is_fractional: &mut bool) {
-        self.scan_number_digits(radix, DigitScanningMode::Value, is_fractional);
+    /// Sets `is_infnan` to true if the scanned value was /[+-]inf.0/ or /[+-]nan.0/.
+    /// Sets `not_integer` to true if the number is fractional and/or has an exponent.
+    fn scan_number_value(&mut self, radix: u8, rational_mode: RationalScanningMode,
+        is_infnan: &mut bool, not_integer: &mut bool)
+    {
+        // Skip over an optional sign.
+        if self.cur_is('+') || self.cur_is('-') {
+            // Allow signs right after a fraction slash, but report them.
+            if rational_mode == RationalScanningMode::Denominator {
+                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
+                    Span::new(self.prev_pos, self.pos));
+            }
 
-        if let Some(c) = self.cur {
-            if is_exponent_marker(c) {
-                self.read();
+            // Handle IEEE 754 special values which must always have an explicit sign.
+            // (Just "inf.0" is a valid identifier.)
+            if self.try_scan_number_infnan() {
+                *is_infnan = true;
 
-                if self.cur_is('+') || self.cur_is('-') {
-                    self.read();
+                let suffix_start = self.prev_pos;
+                loop {
+                    match self.cur {
+                        Some('/') if rational_mode == RationalScanningMode::Numerator => { break; }
+                        Some(c) if is_delimiter(c)                                    => { break; }
+                        None                                                          => { break; }
+                        Some(_) => { self.read(); }
+                    }
+                }
+                let suffix_end = self.prev_pos;
+
+                if suffix_start != suffix_end {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_infnan_suffix,
+                        Span::new(suffix_start, suffix_end));
                 }
 
-                self.scan_number_digits(radix, DigitScanningMode::Exponent, is_fractional);
+                return;
             }
+
+            self.read();
+        }
+
+        self.scan_number_digits(radix, FractionScanningMode::Value, rational_mode,
+            not_integer);
+
+        if self.cur.map_or(false, is_exponent_marker) {
+            *not_integer = true;
+
+            self.read();
+
+            if self.cur_is('+') || self.cur_is('-') {
+                self.read();
+            }
+
+            self.scan_number_digits(radix, FractionScanningMode::Exponent, rational_mode,
+                not_integer);
         }
     }
 
     /// Scan significant digits of a number (including a decimal dot). The scanning mode determines
     /// what special characters are treated as terminators (otherwise they are scanned over just
-    /// like any other invalid character). Also sets `is_fractional` to true if a decimal dot has
+    /// like any other invalid character). Also sets `not_integer` to true if a decimal dot has
     /// been scanned over.
-    fn scan_number_digits(&mut self, radix: u8, mode: DigitScanningMode,
-        is_fractional: &mut bool)
+    fn scan_number_digits(&mut self, radix: u8,
+        fraction_mode: FractionScanningMode,
+        rational_mode: RationalScanningMode,
+        not_integer: &mut bool)
     {
         let mut seen_dot = false;
 
@@ -1170,7 +1232,7 @@ impl<'a> StringScanner<'a> {
             match self.cur {
                 // Handle exponent markers. Some of them overlap with hexadecimal digits,
                 // so we allow exponents only when digits from 0 to 9 are involved.
-                Some(c) if (radix == 10) && (mode != DigitScanningMode::Exponent)
+                Some(c) if (radix == 10) && (fraction_mode != FractionScanningMode::Exponent)
                     && is_exponent_marker(c) =>
                 {
                     break;
@@ -1178,9 +1240,14 @@ impl<'a> StringScanner<'a> {
 
                 // Handle decimal dot. Allow only one per number, treat extra ones as errors.
                 // Exponents are always integral, so no dots are allowed there.
-                Some('.') if !seen_dot && (mode != DigitScanningMode::Exponent) => {
+                Some('.') if !seen_dot && (fraction_mode != FractionScanningMode::Exponent) => {
                     seen_dot = true;
                     self.read();
+                }
+
+                // Handle rational slash. Only when we are scanning the numerator.
+                Some('/') if (rational_mode == RationalScanningMode::Numerator) => {
+                    break;
                 }
 
                 // Scan over all valid digits.
@@ -1222,8 +1289,39 @@ impl<'a> StringScanner<'a> {
         }
 
         if seen_dot {
-            *is_fractional = true;
+            *not_integer = true;
         }
+    }
+
+    /// Try scanning a numeric `+inf.0` or `-nan.0` value. Returns true if such value has been
+    /// successfully scanned over. Otherwise returns false and does not modify the scanning state.
+    fn try_scan_number_infnan(&mut self) -> bool {
+        assert!(self.cur_is('+') || self.cur_is('-'));
+
+        if self.ahead_is("inf.0") {
+            for _ in 0.."+inf.0".len() { self.read(); }
+            return true;
+        }
+
+        if self.ahead_is("nan.0") {
+            for _ in 0.."+nan.0".len() { self.read(); }
+            return true;
+        }
+
+        return false;
+    }
+
+    /// Check whether the lookahead has a given ASCII prefix ignoring case.
+    fn ahead_is(&self, prefix: &str) -> bool {
+        use std::ascii::AsciiExt;
+
+        assert!(prefix.chars().all(|c| c.is_ascii() && c == c.to_ascii_lowercase()));
+
+        self.buf[self.pos..]
+            .chars()
+            .map(|c| c.to_ascii_lowercase())
+            .take(prefix.len())
+            .eq(prefix.chars())
     }
 }
 
@@ -1231,27 +1329,28 @@ impl<'a> StringScanner<'a> {
 // Utility definitions
 //
 
-/// Digit scanning modes of `scan_number_digits()`.
-#[derive(Eq, PartialEq)]
-enum DigitScanningMode {
-    /// We are scanning the value part of a number (before the exponent).
-    /// At most one decimal dot is expected here. Exponent markers terminate
-    /// the number.
+/// Specifies how to handle special characters of fractional numbers (dots and exponents)
+/// in `scan_number_digits()`.
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum FractionScanningMode {
+    /// We are scanning the value part of a number (before the exponent). At most one decimal dot
+    /// is expected here. Exponent markers terminate the number.
     Value,
 
-    /// We are scanning the exponent part of a number. Decimal dots and
-    /// exponent markers are invalid here.
+    /// We are scanning the exponent part of a number. Decimal dots and exponent markers are
+    /// invalid here.
     Exponent,
 }
 
-/// Result of `scan_number_infnan()`.
-#[derive(Eq, PartialEq)]
-enum InfNanResult {
-    /// We have seen a complete `inf.0` or `nan.0` string (possibly followed by non-delimiter).
-    InfNanComplete,
+/// Specifies how to handle special characters of rational numbers (slashes)
+/// in `scan_number_digits()`.
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum RationalScanningMode {
+    /// We are scanning a numerator of a number. Rational slash terminates the numerator.
+    Numerator,
 
-    /// We have seen an incomplete prefix of `inf.0` or `nan.0` (followed by anything).
-    InfNanIncomplete,
+    /// We are scanning a denominator of a rational number. A slash is treated as invalid.
+    Denominator,
 }
 
 /// Check if a character is a whitespace.
