@@ -1595,6 +1595,9 @@ fn identifiers_peculiar_explicit_sign_dot() {
         (" "                => Whitespace);
         ("+."               => Unrecognized),
                      (0, 2) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("+.i"              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
     }
 }
 
@@ -1646,6 +1649,9 @@ fn identifiers_peculiar_dot() {
         (" "                => Whitespace);
         (".@com"            => Unrecognized),
                      (0, 5) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        (".i"               => Unrecognized),
+                     (0, 2) => err_lexer_unrecognized;
     }
 }
 
@@ -1661,9 +1667,10 @@ fn recover_identifiers_peculiar_prefixed() {
                      (0, 1) => err_lexer_prefixed_identifier,
                      (0, 3) => err_lexer_unrecognized;
         (" "                => Whitespace);
-        ("#+."              => Number("#+.")),
+        ("#+."              => Unrecognized),
                      (0, 1) => err_lexer_invalid_number_prefix,
-                     (2, 3) => err_lexer_digits_missing;
+                     (0, 1) => err_lexer_prefixed_identifier,
+                     (0, 3) => err_lexer_unrecognized;
         (" "                => Whitespace);
         ("#/i"              => Unrecognized),
                      (0, 2) => err_lexer_invalid_number_prefix,

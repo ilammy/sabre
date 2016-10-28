@@ -1084,7 +1084,7 @@ impl<'a> StringScanner<'a> {
 
             // Case (3)
             if second == Some('.') {
-                return third.map_or(true, |c| !is_delimiter(c) && !is_digit(radix, c));
+                return third.map_or(true, |c| is_delimiter(c) || !is_digit(radix, c));
             }
 
             // Case (2) with exceptions
