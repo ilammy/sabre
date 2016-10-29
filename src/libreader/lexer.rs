@@ -925,6 +925,14 @@ impl<'a> StringScanner<'a> {
                     &mut not_integer);
             }
 
+            // If we stopped at a sign then this is a complex number in rectangular form and
+            // we've just scanned over of the real part of it. Leave the sign (for possible
+            // infnans) and scan the imaginary part.
+            Some('+') | Some('-') => {
+                self.scan_number_part(effective_radix, ComplexScanningMode::Imaginary,
+                    &mut not_integer);
+            }
+
             // Anything else is not really expected here. Skip to the checks below.
             _ => { }
         }
@@ -1137,10 +1145,11 @@ impl<'a> StringScanner<'a> {
         let mut infnan_denominator = false;
         let mut noninteger_numerator = false;
         let mut noninteger_denominator = false;
+        let mut terminal_i = false;
 
         let numerator_start = self.prev_pos;
         self.scan_number_value(radix, RationalScanningMode::Numerator, complex_mode,
-            &mut infnan_numerator, &mut noninteger_numerator);
+            &mut infnan_numerator, &mut noninteger_numerator, &mut terminal_i);
 
         let numerator_end = self.prev_pos;
 
@@ -1149,7 +1158,7 @@ impl<'a> StringScanner<'a> {
 
             let denominator_start = self.prev_pos;
             self.scan_number_value(radix, RationalScanningMode::Denominator, complex_mode,
-                &mut infnan_denominator, &mut noninteger_denominator);
+                &mut infnan_denominator, &mut noninteger_denominator, &mut terminal_i);
             let denominator_end = self.prev_pos;
 
             // Fractions must be exact, they cannot contain floating-point parts.
@@ -1174,18 +1183,25 @@ impl<'a> StringScanner<'a> {
         if noninteger_numerator || noninteger_denominator {
             *not_integer = true;
         }
+
+        // Imaginary parts of complex numbers must be terminated by an 'i'.
+        if complex_mode == ComplexScanningMode::Imaginary && !terminal_i {
+            self.diagnostic.report(DiagnosticKind::err_lexer_missing_i,
+                Span::new(self.prev_pos, self.prev_pos));
+        }
     }
 
     /// Scan a single numeric value consisting of an actual value part and an optional exponent.
     /// Sets `is_infnan` to true if the scanned value was /[+-]inf.0/ or /[+-]nan.0/.
     /// Sets `not_integer` to true if the number is fractional and/or has an exponent.
+    /// Sets `terminal_i` to true if the scanned (imaginary) value is terminated by an 'i'.
     fn scan_number_value(&mut self, radix: u8,
         rational_mode: RationalScanningMode, complex_mode: ComplexScanningMode,
-        is_infnan: &mut bool, not_integer: &mut bool)
+        is_infnan: &mut bool, not_integer: &mut bool, terminal_i: &mut bool)
     {
         // Skip over an optional sign.
         if self.cur_is('+') || self.cur_is('-') {
-            // Allow signs right after a fraction slash, but report them.
+            // Allow signs right after a rational slash, but report them.
             if rational_mode == RationalScanningMode::Denominator {
                 self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
                     Span::new(self.prev_pos, self.pos));
@@ -1196,31 +1212,52 @@ impl<'a> StringScanner<'a> {
             if self.try_scan_number_infnan() {
                 *is_infnan = true;
 
-                let suffix_start = self.prev_pos;
-                loop {
-                    match self.cur {
-                        Some('/') if rational_mode == RationalScanningMode::Numerator => { break; }
-                        Some('@') if complex_mode == ComplexScanningMode::Initial     => { break; }
-                        Some(c) if is_delimiter(c)                                    => { break; }
-                        None                                                          => { break; }
-                        Some(_) => { self.read(); }
-                    }
-                }
-                let suffix_end = self.prev_pos;
+                self.scan_infnan_suffix(radix, rational_mode);
 
-                if suffix_start != suffix_end {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_infnan_suffix,
-                        Span::new(suffix_start, suffix_end));
+                // Scan over a terminating 'i', reporting it if it's in non-final position.
+                if self.cur_is('i') || self.cur_is('I') {
+                    if self.peek_is('+') || self.peek_is('-') {
+                        self.diagnostic.report(DiagnosticKind::err_lexer_misplaced_i,
+                            Span::new(self.prev_pos, self.pos));
+                    } else {
+                        // Guaranteed by scan_infnan_suffix().
+                        assert!(self.peek().map_or(true, is_delimiter));
+                    }
+
+                    *terminal_i = true;
+                    self.read();
                 }
 
                 return;
             }
 
             self.read();
+
+            // Handle the special case of a sign immediately followed by an 'i' and a delimiter.
+            // This form is valid in rectangular form of complex numbers. However, treat 'i' as
+            // a regular invalid character in polar form.
+            if (complex_mode != ComplexScanningMode::Argument) &&
+                (self.cur_is('i') || self.cur_is('I'))
+            {
+                if self.peek().map_or(true, is_delimiter) {
+                    *terminal_i = true;
+                    self.read();
+                    return;
+                }
+
+                if self.peek_is('+') || self.peek_is('-') || self.peek_is('@') {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_misplaced_i,
+                        Span::new(self.prev_pos, self.pos));
+
+                    *terminal_i = true;
+                    self.read();
+                    return;
+                }
+            }
         }
 
         self.scan_number_digits(radix, FractionScanningMode::Value,
-            rational_mode, complex_mode, not_integer);
+            rational_mode, complex_mode, not_integer, terminal_i);
 
         if self.cur.map_or(false, is_exponent_marker) {
             *not_integer = true;
@@ -1232,21 +1269,24 @@ impl<'a> StringScanner<'a> {
             }
 
             self.scan_number_digits(radix, FractionScanningMode::Exponent,
-                rational_mode, complex_mode, not_integer);
+                rational_mode, complex_mode, not_integer, terminal_i);
         }
     }
 
     /// Scan significant digits of a number (including a decimal dot). The scanning mode determines
     /// what special characters are treated as terminators (otherwise they are scanned over just
-    /// like any other invalid character). Also sets `not_integer` to true if a decimal dot has
-    /// been scanned over.
+    /// like any other invalid character). Sets `not_integer` to true if a decimal dot has been
+    /// scanned over. Sets `terminal_i` to true if the digits terminate with an 'i' followed by
+    /// a delimiter, concluding the imaginary part of a complex number in rectangular form.
     fn scan_number_digits(&mut self, radix: u8,
         fraction_mode: FractionScanningMode,
         rational_mode: RationalScanningMode,
         complex_mode: ComplexScanningMode,
-        not_integer: &mut bool)
+        not_integer: &mut bool,
+        terminal_i: &mut bool)
     {
         let mut seen_dot = false;
+        let mut seen_i = false;
 
         let start = self.prev_pos;
 
@@ -1272,6 +1312,11 @@ impl<'a> StringScanner<'a> {
                     break;
                 }
 
+                // Handle rectangular form of complex numbers. Only once per number.
+                Some('+') | Some('-') if (complex_mode == ComplexScanningMode::Initial) => {
+                    break;
+                }
+
                 // Handle polar form of complex numbers. Only once per number.
                 Some('@') if (complex_mode == ComplexScanningMode::Initial) => {
                     break;
@@ -1280,6 +1325,31 @@ impl<'a> StringScanner<'a> {
                 // Scan over all valid digits.
                 Some(c) if is_digit(radix, c) => {
                     self.read();
+                }
+
+                // Stop scanning as soon as we see an 'i' followed by a delimiter. Do not treat
+                // this 'i' as special when scanning argument of a polar form (it is just another
+                // invalid character then).
+                Some('i') | Some('I')
+                    if (complex_mode != ComplexScanningMode::Argument) &&
+                        self.peek().map_or(true, is_delimiter) =>
+                {
+                    seen_i = true;
+                    break;
+                }
+
+                // Also stop when we see an 'i' followed by a sign. This probably means the user
+                // wanted to write the imaginary part of a rectangular form followed by the real
+                // part.
+                Some('i') | Some('I')
+                    if (complex_mode != ComplexScanningMode::Argument) &&
+                        (self.peek_is('+') || self.peek_is('-')) =>
+                {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_misplaced_i,
+                        Span::new(self.prev_pos, self.pos));
+
+                    seen_i = true;
+                    break;
                 }
 
                 // Stop scanning as soon as we encounter a delimiter.
@@ -1315,8 +1385,21 @@ impl<'a> StringScanner<'a> {
                 Span::new(start, end));
         }
 
+        // Read over the 'i' we've seen before. This is done here so that the test above does not
+        // include the 'i' into the digits part. The special cases '+i' and '-i' are handled by
+        // the caller (`scan_number_value()`) and should be never encountered here. However, we
+        // can still report missing digits when (start == end): e.g., "123/i".
+        if seen_i {
+            assert!(self.cur_is('i') || self.cur_is('I'));
+            self.read();
+        }
+
         if seen_dot {
             *not_integer = true;
+        }
+
+        if seen_i {
+            *terminal_i = true;
         }
     }
 
@@ -1349,6 +1432,58 @@ impl<'a> StringScanner<'a> {
             .map(|c| c.to_ascii_lowercase())
             .take(prefix.len())
             .eq(prefix.chars())
+    }
+
+    /// Scan over an (invalid) suffix of an `+inf.0` or `-nan.0` value.
+    fn scan_infnan_suffix(&mut self, radix: u8, rational_mode: RationalScanningMode) {
+        let suffix_start = self.prev_pos;
+        loop {
+            match self.cur {
+                // Stop scanning suffix on slash only if we haven't seen one yet.
+                Some('/') if rational_mode == RationalScanningMode::Numerator => { break; }
+
+                // Scan over exponent markers *and* their optional signs. Do not treat
+                // signs as starters of the imaginary part of a complex number.
+                Some(c) if (radix == 10) && is_exponent_marker(c) => {
+                    self.read();
+                    if self.cur_is('-') || self.cur_is('+') {
+                        self.read();
+                    }
+                }
+
+                // Stop scanning the suffix if a terminating 'i' is ahead.
+                Some('i') | Some('I') => {
+                    let delimiter_ahead = self.peek().map_or(true, is_delimiter);
+                    let sign_ahead = self.peek_is('+') || self.peek_is('-');
+
+                    // The 'i' is terminating if it is followed by a delimiter.
+                    // Or if it ends an (invalid) non-final imaginary part.
+                    if delimiter_ahead || sign_ahead {
+                        break;
+                    }
+
+                    // Otherwise treat this 'i' just like any other part of the suffix.
+                    self.read();
+                }
+
+                // Stop scanning the suffix if we see a starter of a complex part.
+                Some('+') | Some('-') => { break; }
+                Some('@')             => { break; }
+
+                // Also obviously stop scanning if we're faced with a delimiter.
+                Some(c) if is_delimiter(c) => { break; }
+                None                       => { break; }
+
+                // Scan over anything else.
+                Some(_) => { self.read(); }
+            }
+        }
+        let suffix_end = self.prev_pos;
+
+        if suffix_start != suffix_end {
+            self.diagnostic.report(DiagnosticKind::err_lexer_infnan_suffix,
+                Span::new(suffix_start, suffix_end));
+        }
     }
 }
 
@@ -1389,6 +1524,9 @@ enum ComplexScanningMode {
 
     /// We are scanning the argument of a complex number in polar form.
     Argument,
+
+    /// We are scanning the imaginary part of a complex number in rectangular form.
+    Imaginary,
 }
 
 /// Check if a character is a whitespace.

@@ -119,6 +119,12 @@ pub enum DiagnosticKind {
     /// Lexer has expected some number digits but there weren't any.
     err_lexer_digits_missing,
 
+    /// Lexer has expected an 'i' (for imaginary part) here but there weren't any.
+    err_lexer_missing_i,
+
+    /// Lexer did not expect an 'i' here but there is one.
+    err_lexer_misplaced_i,
+
     /// Lexer has scanned over unexpected suffix of an inf/nan literal.
     err_lexer_infnan_suffix,
 
