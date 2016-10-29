@@ -2351,6 +2351,231 @@ fn recover_numbers_complex_mixed_rectangular_and_polar() {
     }
 }
 
+#[test]
+fn recover_numbers_complex_garbage() {
+    check! {
+        ("12/3+4_haha!_i"   => Number("12/3+4_haha!_i")),
+                    (6,  7) => err_lexer_invalid_number_character,
+                    (7,  8) => err_lexer_invalid_number_character,
+                    (8,  9) => err_lexer_invalid_number_character,
+                    (9, 10) => err_lexer_invalid_number_character,
+                   (10, 11) => err_lexer_invalid_number_character,
+                   (11, 12) => err_lexer_invalid_number_character,
+                   (12, 13) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("12/3+4ihaha!"     => Number("12/3+4ihaha!")),
+                    (6,  7) => err_lexer_invalid_number_character,
+                    (7,  8) => err_lexer_invalid_number_character,
+                    (8,  9) => err_lexer_invalid_number_character,
+                    (9, 10) => err_lexer_invalid_number_character,
+                   (10, 11) => err_lexer_invalid_number_character,
+                   (11, 12) => err_lexer_invalid_number_character,
+                   (12, 12) => err_lexer_missing_i;
+        (" "                => Whitespace);
+        ("12/34ihaha!"      => Number("12/34ihaha!")),
+                    (5,  6) => err_lexer_invalid_number_character,
+                    (6,  7) => err_lexer_invalid_number_character,
+                    (7,  8) => err_lexer_invalid_number_character,
+                    (8,  9) => err_lexer_invalid_number_character,
+                    (9, 10) => err_lexer_invalid_number_character,
+                   (10, 11) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("12/3+4i+haha!"    => Number("12/3+4i+haha!")),
+                    (6,  7) => err_lexer_misplaced_i,
+                    (4,  7) => err_lexer_extra_complex_part,
+                    (8,  9) => err_lexer_invalid_number_character,
+                    (9, 10) => err_lexer_invalid_number_character,
+                   (10, 11) => err_lexer_invalid_number_character,
+                   (11, 12) => err_lexer_invalid_number_character,
+                   (12, 13) => err_lexer_invalid_number_character,
+                    (8, 13) => err_lexer_digits_missing,
+                   (13, 13) => err_lexer_missing_i;
+        (" "                => Whitespace);
+        ("12+inf.0ooops"    => Number("12+inf.0ooops")),
+                    (8, 13) => err_lexer_infnan_suffix,
+                   (13, 13) => err_lexer_missing_i;
+        (" "                => Whitespace);
+        ("34+NAN.0ihihi"    => Number("34+NAN.0ihihi")),
+                    (8, 12) => err_lexer_infnan_suffix;
+        (" "                => Whitespace);
+        ("+nan.0IHIHI+0"    => Number("+nan.0IHIHI+0")),
+                    (6, 10) => err_lexer_infnan_suffix,
+                   (10, 11) => err_lexer_misplaced_i,
+                   (13, 13) => err_lexer_missing_i;
+        (" "                => Whitespace);
+        ("56+Inf.0i-nAn.01234+inf.0" => Number("56+Inf.0i-nAn.01234+inf.0")),
+                     (8, 9) => err_lexer_misplaced_i,
+                     (2, 9) => err_lexer_extra_complex_part,
+                   (15, 19) => err_lexer_infnan_suffix,
+                    (9, 19) => err_lexer_extra_complex_part,
+                   (25, 25) => err_lexer_missing_i;
+        (" "                => Whitespace);
+        ("0-inf.0e+12i"     => Number("0-inf.0e+12i")),
+                    (7, 11) => err_lexer_infnan_suffix;
+        (" "                => Whitespace);
+        ("0-inf.0E+12+i"    => Number("0-inf.0E+12+i")),
+                    (7, 11) => err_lexer_infnan_suffix,
+                    (1, 11) => err_lexer_extra_complex_part;
+        (" "                => Whitespace);
+        ("0-inf.E+12+i"     => Number("0-inf.E+12+i")),
+                     (2, 3) => err_lexer_invalid_number_character,
+                     (3, 4) => err_lexer_invalid_number_character,
+                     (2, 4) => err_lexer_digits_missing,
+                     (5, 6) => err_lexer_invalid_number_character,
+                     (6, 7) => err_lexer_invalid_number_character,
+                     (7, 8) => err_lexer_invalid_number_character,
+                    (1, 10) => err_lexer_extra_complex_part;
+    }
+}
+
+#[test]
+fn recover_numbers_complex_invalid_exponents() {
+    check! {
+        ("1.+2e3i"          => Number("1.+2e3i"));
+        (" "                => Whitespace);
+        ("1.23e+4i"         => Number("1.23e+4i"));
+        (" "                => Whitespace);
+        ("1.23e4+5i"        => Number("1.23e4+5i"));
+        (" "                => Whitespace);
+        ("1.23e+4+5i"       => Number("1.23e+4+5i"));
+        (" "                => Whitespace);
+        ("1.23e+4.+5i"      => Number("1.23e+4.+5i")),
+                     (7, 8) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("1.23e+4/.+5i"     => Number("1.23e+4/.+5i")),
+                     (8, 9) => err_lexer_digits_missing,
+                     (0, 7) => err_lexer_noninteger_rational,
+                     (8, 9) => err_lexer_noninteger_rational;
+        (" "                => Whitespace);
+        ("1ei"              => Number("1ei")),
+                     (2, 2) => err_lexer_digits_missing;
+        (" "                => Whitespace);
+        ("1e+i"             => Number("1e+i")),
+                     (3, 3) => err_lexer_digits_missing;
+        (" "                => Whitespace);
+        ("1e++i"            => Number("1e++i")),
+                     (3, 4) => err_lexer_invalid_number_character,
+                     (4, 4) => err_lexer_digits_missing;
+        (" "                => Whitespace);
+        ("#x1e+i"           => Number("#x1e+i"));
+    }
+}
+
+#[test]
+fn recover_numbers_complex_separator_madness() {
+    check! {
+        ("+@i"              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("+@i1"             => Unrecognized),
+                     (0, 4) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("+i@"              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("+i@1"             => Unrecognized),
+                     (0, 4) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("1+@+i"            => Number("1+@+i")),
+                     (2, 2) => err_lexer_digits_missing,
+                     (1, 2) => err_lexer_extra_complex_part,
+                     (4, 5) => err_lexer_invalid_number_character,
+                     (4, 5) => err_lexer_digits_missing;
+        (" "                => Whitespace);
+        ("1+@+i2"           => Number("1+@+i2")),
+                     (2, 2) => err_lexer_digits_missing,
+                     (1, 2) => err_lexer_extra_complex_part,
+                     (4, 5) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("1+@i"             => Number("1+@i")),
+                     (2, 2) => err_lexer_digits_missing,
+                     (1, 2) => err_lexer_extra_complex_part,
+                     (3, 4) => err_lexer_invalid_number_character,
+                     (3, 4) => err_lexer_digits_missing;
+        (" "                => Whitespace);
+        ("1+@i+"            => Number("1+@i+")),
+                     (2, 2) => err_lexer_digits_missing,
+                     (1, 2) => err_lexer_extra_complex_part,
+                     (3, 4) => err_lexer_invalid_number_character,
+                     (3, 4) => err_lexer_digits_missing,
+                     (2, 4) => err_lexer_extra_complex_part,
+                     (5, 5) => err_lexer_digits_missing,
+                     (5, 5) => err_lexer_missing_i;
+        (" "                => Whitespace);
+        ("1+@i+2"           => Number("1+@i+2")),
+                     (2, 2) => err_lexer_digits_missing,
+                     (1, 2) => err_lexer_extra_complex_part,
+                     (3, 4) => err_lexer_invalid_number_character,
+                     (3, 4) => err_lexer_digits_missing,
+                     (2, 4) => err_lexer_extra_complex_part,
+                     (6, 6) => err_lexer_missing_i;
+        (" "                => Whitespace);
+        ("1+@i1"            => Number("1+@i1")),
+                     (2, 2) => err_lexer_digits_missing,
+                     (1, 2) => err_lexer_extra_complex_part,
+                     (3, 4) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("1+i@"             => Number("1+i@")),
+                     (2, 3) => err_lexer_misplaced_i,
+                     (1, 3) => err_lexer_extra_complex_part,
+                     (4, 4) => err_lexer_digits_missing;
+        (" "                => Whitespace);
+        ("1+i@1"            => Number("1+i@1")),
+                     (2, 3) => err_lexer_misplaced_i,
+                     (1, 3) => err_lexer_extra_complex_part;
+        (" "                => Whitespace);
+        ("1@+i"             => Number("1@+i")),
+                     (3, 4) => err_lexer_invalid_number_character,
+                     (3, 4) => err_lexer_digits_missing;
+        (" "                => Whitespace);
+        ("1@+i2"            => Number("1@+i2")),
+                     (3, 4) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("1@i+"             => Number("1@i+")),
+                     (2, 3) => err_lexer_invalid_number_character,
+                     (2, 3) => err_lexer_digits_missing,
+                     (1, 3) => err_lexer_extra_complex_part,
+                     (4, 4) => err_lexer_digits_missing,
+                     (4, 4) => err_lexer_missing_i;
+        (" "                => Whitespace);
+        ("1@i+2"            => Number("1@i+2")),
+                     (2, 3) => err_lexer_invalid_number_character,
+                     (2, 3) => err_lexer_digits_missing,
+                     (1, 3) => err_lexer_extra_complex_part,
+                     (5, 5) => err_lexer_missing_i;
+        (" "                => Whitespace);
+        ("1i+@"             => Number("1i+@")),
+                     (1, 2) => err_lexer_misplaced_i,
+                     (3, 3) => err_lexer_digits_missing,
+                     (2, 3) => err_lexer_extra_complex_part,
+                     (4, 4) => err_lexer_digits_missing;
+        (" "                => Whitespace);
+        ("1i+@2"            => Number("1i+@2")),
+                     (1, 2) => err_lexer_misplaced_i,
+                     (3, 3) => err_lexer_digits_missing,
+                     (2, 3) => err_lexer_extra_complex_part;
+        (" "                => Whitespace);
+        ("1i@+"             => Number("1i@+")),
+                     (1, 2) => err_lexer_invalid_number_character,
+                     (4, 4) => err_lexer_digits_missing;
+        (" "                => Whitespace);
+        ("1i@+2"            => Number("1i@+2")),
+                     (1, 2) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("@+i"              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("@+i1"             => Unrecognized),
+                     (0, 4) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("@i+"              => Unrecognized),
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("@i+1"             => Unrecognized),
+                     (0, 4) => err_lexer_unrecognized;
+    }
+}
+
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Peculiar identifiers
 
