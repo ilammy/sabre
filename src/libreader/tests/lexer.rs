@@ -1561,6 +1561,84 @@ fn recover_numbers_rational_ieee754_specials() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Numbers: complex
+
+#[test]
+fn numbers_complex_polar_integer() {
+    check! {
+        ("0@0"              => Number("0@0"));
+        (" "                => Whitespace);
+        ("+123@-456"        => Number("+123@-456"));
+        (" "                => Whitespace);
+        ("1@-0"             => Number("1@-0"));
+        (" "                => Whitespace);
+        ("+0@2"             => Number("+0@2"));
+        (" "                => Whitespace);
+        ("#xDEAD@BEEF"      => Number("#xDEAD@BEEF"));
+        (" "                => Whitespace);
+        ("#b1101@110101"    => Number("#b1101@110101"));
+        (" "                => Whitespace);
+        ("#I#O400@-755"     => Number("#I#O400@-755"));
+    }
+}
+
+#[test]
+fn numbers_complex_polar_float() {
+    check! {
+        ("1.2@3.4"          => Number("1.2@3.4"));
+        (" "                => Whitespace);
+        ("1.@.2"            => Number("1.@.2"));
+        (" "                => Whitespace);
+        (".3@4."            => Number(".3@4."));
+        (" "                => Whitespace);
+        ("+5.67e8@-9.f10"   => Number("+5.67e8@-9.f10"));
+        (" "                => Whitespace);
+        ("-0@-0e0"          => Number("-0@-0e0"));
+        (" "                => Whitespace);
+        ("1.e1@3"           => Number("1.e1@3"));
+    }
+}
+
+#[test]
+fn numbers_complex_polar_infnan() {
+    check! {
+        ("+inf.0@-nan.0"    => Number("+inf.0@-nan.0"));
+        (" "                => Whitespace);
+        ("#xDEAD@-inf.0"    => Number("#xDEAD@-inf.0"));
+        (" "                => Whitespace);
+        ("#E+NAN.0@0"       => Number("#E+NAN.0@0"));
+        (" "                => Whitespace);
+        ("-nAn.0@+iNF.0"    => Number("-nAn.0@+iNF.0"));
+    }
+}
+
+#[test]
+fn numbers_complex_polar_rational() {
+    check! {
+        ("1/2@3/4"          => Number("1/2@3/4"));
+        (" "                => Whitespace);
+        ("-12/3@+4/56"      => Number("-12/3@+4/56"));
+        (" "                => Whitespace);
+        ("0@-7/8"           => Number("0@-7/8"));
+        (" "                => Whitespace);
+        ("#b+1101/1@-1"     => Number("#b+1101/1@-1"));
+    }
+}
+
+#[test]
+fn numbers_complex_polar_altogether() {
+    check! {
+        ("1/2@-3.4e+56"     => Number("1/2@-3.4e+56"));
+        (" "                => Whitespace);
+        ("#x+inf.0@4/1"     => Number("#x+inf.0@4/1"));
+        (" "                => Whitespace);
+        ("3.4@-NAN.0"       => Number("3.4@-NAN.0"));
+        (" "                => Whitespace);
+        ("#i-5.e23@+7/8"    => Number("#i-5.e23@+7/8"));
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Peculiar identifiers
 
 #[test]

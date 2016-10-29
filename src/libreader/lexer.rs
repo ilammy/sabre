@@ -911,8 +911,25 @@ impl<'a> StringScanner<'a> {
             return self.scan_unrecognized(start);
         }
 
-        self.scan_number_part(effective_radix, &mut not_integer);
+        // Now scan the actual number value.
+        self.scan_number_part(effective_radix, ComplexScanningMode::Initial,
+            &mut not_integer);
 
+        match self.cur {
+            // If we stopped at an @ sign then this is a complex number in polar form and
+            // we've just scanned over the modulus. Skip the @ and scan the argument.
+            Some('@') => {
+                self.read();
+
+                self.scan_number_part(effective_radix, ComplexScanningMode::Argument,
+                    &mut not_integer);
+            }
+
+            // Anything else is not really expected here. Skip to the checks below.
+            _ => { }
+        }
+
+        // In the end we should have scanned over everything up to the next delimiter.
         assert!(self.cur.map_or(true, is_delimiter));
 
         let end = self.prev_pos;
@@ -1113,14 +1130,16 @@ impl<'a> StringScanner<'a> {
 
     /// Scan a real part of a number (an integer, a fractional, or a rational number).
     /// Sets `not_integer` to true if the number is fractional or has an exponent anywhere.
-    fn scan_number_part(&mut self, radix: u8, not_integer: &mut bool) {
+    fn scan_number_part(&mut self, radix: u8, complex_mode: ComplexScanningMode,
+        not_integer: &mut bool)
+    {
         let mut infnan_numerator = false;
         let mut infnan_denominator = false;
         let mut noninteger_numerator = false;
         let mut noninteger_denominator = false;
 
         let numerator_start = self.prev_pos;
-        self.scan_number_value(radix, RationalScanningMode::Numerator,
+        self.scan_number_value(radix, RationalScanningMode::Numerator, complex_mode,
             &mut infnan_numerator, &mut noninteger_numerator);
 
         let numerator_end = self.prev_pos;
@@ -1129,7 +1148,7 @@ impl<'a> StringScanner<'a> {
             self.read();
 
             let denominator_start = self.prev_pos;
-            self.scan_number_value(radix, RationalScanningMode::Denominator,
+            self.scan_number_value(radix, RationalScanningMode::Denominator, complex_mode,
                 &mut infnan_denominator, &mut noninteger_denominator);
             let denominator_end = self.prev_pos;
 
@@ -1160,7 +1179,8 @@ impl<'a> StringScanner<'a> {
     /// Scan a single numeric value consisting of an actual value part and an optional exponent.
     /// Sets `is_infnan` to true if the scanned value was /[+-]inf.0/ or /[+-]nan.0/.
     /// Sets `not_integer` to true if the number is fractional and/or has an exponent.
-    fn scan_number_value(&mut self, radix: u8, rational_mode: RationalScanningMode,
+    fn scan_number_value(&mut self, radix: u8,
+        rational_mode: RationalScanningMode, complex_mode: ComplexScanningMode,
         is_infnan: &mut bool, not_integer: &mut bool)
     {
         // Skip over an optional sign.
@@ -1180,6 +1200,7 @@ impl<'a> StringScanner<'a> {
                 loop {
                     match self.cur {
                         Some('/') if rational_mode == RationalScanningMode::Numerator => { break; }
+                        Some('@') if complex_mode == ComplexScanningMode::Initial     => { break; }
                         Some(c) if is_delimiter(c)                                    => { break; }
                         None                                                          => { break; }
                         Some(_) => { self.read(); }
@@ -1198,8 +1219,8 @@ impl<'a> StringScanner<'a> {
             self.read();
         }
 
-        self.scan_number_digits(radix, FractionScanningMode::Value, rational_mode,
-            not_integer);
+        self.scan_number_digits(radix, FractionScanningMode::Value,
+            rational_mode, complex_mode, not_integer);
 
         if self.cur.map_or(false, is_exponent_marker) {
             *not_integer = true;
@@ -1210,8 +1231,8 @@ impl<'a> StringScanner<'a> {
                 self.read();
             }
 
-            self.scan_number_digits(radix, FractionScanningMode::Exponent, rational_mode,
-                not_integer);
+            self.scan_number_digits(radix, FractionScanningMode::Exponent,
+                rational_mode, complex_mode, not_integer);
         }
     }
 
@@ -1222,6 +1243,7 @@ impl<'a> StringScanner<'a> {
     fn scan_number_digits(&mut self, radix: u8,
         fraction_mode: FractionScanningMode,
         rational_mode: RationalScanningMode,
+        complex_mode: ComplexScanningMode,
         not_integer: &mut bool)
     {
         let mut seen_dot = false;
@@ -1247,6 +1269,11 @@ impl<'a> StringScanner<'a> {
 
                 // Handle rational slash. Only when we are scanning the numerator.
                 Some('/') if (rational_mode == RationalScanningMode::Numerator) => {
+                    break;
+                }
+
+                // Handle polar form of complex numbers. Only once per number.
+                Some('@') if (complex_mode == ComplexScanningMode::Initial) => {
                     break;
                 }
 
@@ -1351,6 +1378,17 @@ enum RationalScanningMode {
 
     /// We are scanning a denominator of a rational number. A slash is treated as invalid.
     Denominator,
+}
+
+/// Specifies how to handle special characters of complex numbers (signs, @, i)
+/// in `scan_number_digits()`.
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum ComplexScanningMode {
+    /// We are scanning the initial part of a number.
+    Initial,
+
+    /// We are scanning the argument of a complex number in polar form.
+    Argument,
 }
 
 /// Check if a character is a whitespace.
