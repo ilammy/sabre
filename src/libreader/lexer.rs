@@ -915,30 +915,41 @@ impl<'a> StringScanner<'a> {
         self.scan_number_part(effective_radix, ComplexScanningMode::Initial,
             &mut not_integer);
 
-        match self.cur {
-            // If we stopped at an @ sign then this is a complex number in polar form and
-            // we've just scanned over the modulus. Skip the @ and scan the argument.
-            Some('@') => {
-                self.read();
+        // Scan possible (complex) parts of a number.
+        loop {
+            let part_start = self.prev_pos;
+            match self.cur {
+                // If we stopped at an @ sign then this is a complex number in polar form and
+                // we've just scanned over the modulus. Skip the @ and scan the argument.
+                Some('@') => {
+                    self.read();
 
-                self.scan_number_part(effective_radix, ComplexScanningMode::Argument,
-                    &mut not_integer);
+                    self.scan_number_part(effective_radix, ComplexScanningMode::Argument,
+                        &mut not_integer);
+                }
+
+                // If we stopped at a sign then this is a complex number in rectangular form and
+                // we've just scanned over of the real part of it. Leave the sign (for possible
+                // infnans) and scan the imaginary part.
+                Some('+') | Some('-') => {
+                    self.scan_number_part(effective_radix, ComplexScanningMode::Subsequent,
+                        &mut not_integer);
+                }
+
+                // Anything else should have been handled by `scan_number_part()`.
+                _ =>  { assert!(self.cur.map_or(true, is_delimiter)); }
             }
+            let part_end = self.prev_pos;
 
-            // If we stopped at a sign then this is a complex number in rectangular form and
-            // we've just scanned over of the real part of it. Leave the sign (for possible
-            // infnans) and scan the imaginary part.
-            Some('+') | Some('-') => {
-                self.scan_number_part(effective_radix, ComplexScanningMode::Imaginary,
-                    &mut not_integer);
+            // Break out of the loop as soon as we run into a delimiter.
+            if self.cur.map_or(true, is_delimiter) {
+                break;
+            } else {
+                // Drop a warning about every non-final part. Valid numbers contain at most two.
+                self.diagnostic.report(DiagnosticKind::err_lexer_extra_complex_part,
+                    Span::new(part_start, part_end));
             }
-
-            // Anything else is not really expected here. Skip to the checks below.
-            _ => { }
         }
-
-        // In the end we should have scanned over everything up to the next delimiter.
-        assert!(self.cur.map_or(true, is_delimiter));
 
         let end = self.prev_pos;
 
@@ -1184,8 +1195,12 @@ impl<'a> StringScanner<'a> {
             *not_integer = true;
         }
 
-        // Imaginary parts of complex numbers must be terminated by an 'i'.
-        if complex_mode == ComplexScanningMode::Imaginary && !terminal_i {
+        // There should be only one subsequent part (followed by a delimiter), and it should be
+        // imaginary (i.e., the digits should be followed by an 'i').
+        if complex_mode == ComplexScanningMode::Subsequent &&
+            self.cur.map_or(true, is_delimiter) &&
+            !terminal_i
+        {
             self.diagnostic.report(DiagnosticKind::err_lexer_missing_i,
                 Span::new(self.prev_pos, self.prev_pos));
         }
@@ -1294,10 +1309,25 @@ impl<'a> StringScanner<'a> {
             match self.cur {
                 // Handle exponent markers. Some of them overlap with hexadecimal digits,
                 // so we allow exponents only when digits from 0 to 9 are involved.
-                Some(c) if (radix == 10) && (fraction_mode != FractionScanningMode::Exponent)
-                    && is_exponent_marker(c) =>
-                {
-                    break;
+                Some(c) if (radix == 10) && is_exponent_marker(c) => {
+                    // If we are scanning the value part then it ends right here.
+                    if fraction_mode == FractionScanningMode::Value {
+                        break;
+                    }
+
+                    // Otherwise scan over the exponent marker along with the optional sign
+                    // after it. Do not treat this sign as a delimiter of rectangular form
+                    // of complex numbers. Just report this stuff as invalid characters.
+
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
+                        Span::new(self.prev_pos, self.pos));
+                    self.read();
+
+                    if self.cur_is('+') || self.cur_is('-') {
+                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
+                            Span::new(self.prev_pos, self.pos));
+                        self.read();
+                    }
                 }
 
                 // Handle decimal dot. Allow only one per number, treat extra ones as errors.
@@ -1312,13 +1342,13 @@ impl<'a> StringScanner<'a> {
                     break;
                 }
 
-                // Handle rectangular form of complex numbers. Only once per number.
-                Some('+') | Some('-') if (complex_mode == ComplexScanningMode::Initial) => {
+                // Handle rectangular form of complex numbers.
+                Some('+') | Some('-') => {
                     break;
                 }
 
-                // Handle polar form of complex numbers. Only once per number.
-                Some('@') if (complex_mode == ComplexScanningMode::Initial) => {
+                // Handle polar form of complex numbers.
+                Some('@') => {
                     break;
                 }
 
@@ -1525,8 +1555,9 @@ enum ComplexScanningMode {
     /// We are scanning the argument of a complex number in polar form.
     Argument,
 
-    /// We are scanning the imaginary part of a complex number in rectangular form.
-    Imaginary,
+    /// We are scanning the subsequent part of a complex number in rectangular form.
+    /// There should be only one subsequent part and it should end with an 'i'.
+    Subsequent,
 }
 
 /// Check if a character is a whitespace.

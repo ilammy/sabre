@@ -125,6 +125,9 @@ pub enum DiagnosticKind {
     /// Lexer did not expect an 'i' here but there is one.
     err_lexer_misplaced_i,
 
+    /// Lexer has scanned over an unxpected part of a complex number.
+    err_lexer_extra_complex_part,
+
     /// Lexer has scanned over unexpected suffix of an inf/nan literal.
     err_lexer_infnan_suffix,
 

@@ -1307,7 +1307,14 @@ fn recover_numbers_float_exponent_multiple_exponents() {
                      (5, 6) => err_lexer_invalid_number_character;
         (" "                => Whitespace);
         ("#x1e-2e3e+4"      => Number("#x1e-2e3e+4")),
-                    (4,  5) => err_lexer_invalid_number_character,
+                     (4, 9) => err_lexer_extra_complex_part,
+                   (11, 11) => err_lexer_missing_i;
+        (" "                => Whitespace);
+        ("1e+2E-4S+D"       => Number("1e+2E-4S+D")),
+                     (4, 5) => err_lexer_invalid_number_character,
+                     (5, 6) => err_lexer_invalid_number_character,
+                     (7, 8) => err_lexer_invalid_number_character,
+                     (8, 9) => err_lexer_invalid_number_character,
                     (9, 10) => err_lexer_invalid_number_character;
     }
 }
@@ -1856,20 +1863,25 @@ fn recover_numbers_complex_missing_i() {
 fn recover_numbers_complex_misplaced_i() {
     check! {
         ("2i+10"            => Number("2i+10")),
-                     (1, 2) => err_lexer_misplaced_i;
+                     (1, 2) => err_lexer_misplaced_i,
+                     (5, 5) => err_lexer_missing_i;
         (" "                => Whitespace);
         ("-4i+3.e10"        => Number("-4i+3.e10")),
-                     (2, 3) => err_lexer_misplaced_i;
+                     (2, 3) => err_lexer_misplaced_i,
+                     (9, 9) => err_lexer_missing_i;
         (" "                => Whitespace);
         ("+3.14e10i+5"      => Number("+3.14e10i+5")),
-                     (8, 9) => err_lexer_misplaced_i;
+                     (8, 9) => err_lexer_misplaced_i,
+                   (11, 11) => err_lexer_missing_i;
         (" "                => Whitespace);
         ("#o2/3i-0"         => Number("#o2/3i-0")),
-                     (5, 6) => err_lexer_misplaced_i;
+                     (5, 6) => err_lexer_misplaced_i,
+                     (8, 8) => err_lexer_missing_i;
         (" "                => Whitespace);
         ("123hi+4"          => Number("123hi+4")),
                      (3, 4) => err_lexer_invalid_number_character,
-                     (4, 5) => err_lexer_misplaced_i;
+                     (4, 5) => err_lexer_misplaced_i,
+                     (7, 7) => err_lexer_missing_i;
         (" "                => Whitespace);
         ("9irk+8"           => Number("9irk+8")),
                      (1, 2) => err_lexer_invalid_number_character,
@@ -1879,7 +1891,8 @@ fn recover_numbers_complex_misplaced_i() {
         (" "                => Whitespace);
         ("5ii-1"            => Number("5ii-1")),
                      (1, 2) => err_lexer_invalid_number_character,
-                     (2, 3) => err_lexer_misplaced_i;
+                     (2, 3) => err_lexer_misplaced_i,
+                     (5, 5) => err_lexer_missing_i;
     }
 }
 
@@ -1895,6 +1908,55 @@ fn recover_numbers_complex_missing_denominator() {
         ("#x-0/-nan.0"      => Number("#x-0/-nan.0")),
                      (5, 6) => err_lexer_invalid_number_character,
                     (5, 11) => err_lexer_infnan_rational;
+    }
+}
+
+#[test]
+fn recover_numbers_complex_multiple_exponents() {
+    check! {
+        ("+1e+2f+3+4i"      => Number("+1e+2f+3+4i")),
+                     (5, 6) => err_lexer_invalid_number_character,
+                     (6, 7) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("-5-6s-7-8d-9i"    => Number("-5-6s-7-8d-9i")),
+                     (2, 7) => err_lexer_extra_complex_part;
+        (" "                => Whitespace);
+        ("+1e-2+e-3+i"      => Number("+1e-2+e-3+i")),
+                     (6, 6) => err_lexer_digits_missing,
+                     (5, 9) => err_lexer_extra_complex_part;
+        (" "                => Whitespace);
+        ("+1e-2e-3+i"       => Number("+1e-2e-3+i")),
+                     (5, 6) => err_lexer_invalid_number_character,
+                     (6, 7) => err_lexer_invalid_number_character;
+    }
+}
+
+#[test]
+fn recover_numbers_complex_multiple_parts() {
+    check! {
+        ("1+2+3"            => Number("1+2+3")),
+                     (1, 3) => err_lexer_extra_complex_part,
+                     (5, 5) => err_lexer_missing_i;
+        (" "                => Whitespace);
+        ("1i+2i+3i"         => Number("1i+2i+3i")),
+                     (1, 2) => err_lexer_misplaced_i,
+                     (4, 5) => err_lexer_misplaced_i,
+                     (2, 5) => err_lexer_extra_complex_part;
+        (" "                => Whitespace);
+        ("1+2i+3i"          => Number("1+2i+3i")),
+                     (3, 4) => err_lexer_misplaced_i,
+                     (1, 4) => err_lexer_extra_complex_part;
+        (" "                => Whitespace);
+        ("1i+2i+3"          => Number("1i+2i+3")),
+                     (1, 2) => err_lexer_misplaced_i,
+                     (4, 5) => err_lexer_misplaced_i,
+                     (2, 5) => err_lexer_extra_complex_part,
+                     (7, 7) => err_lexer_missing_i;
+        (" "                => Whitespace);
+        ("1+2+3j+4i"        => Number("1+2+3j+4i")),
+                     (1, 3) => err_lexer_extra_complex_part,
+                     (5, 6) => err_lexer_invalid_number_character,
+                     (3, 6) => err_lexer_extra_complex_part;
     }
 }
 
@@ -2045,6 +2107,84 @@ fn recover_numbers_complex_polar_missing_denominator() {
         (" "                => Whitespace);
         ("+1@+2/"           => Number("+1@+2/")),
                      (6, 6) => err_lexer_digits_missing;
+    }
+}
+
+#[test]
+fn recover_numbers_complex_polar_multiple_exponents() {
+    check! {
+        ("+1e-2s+d3@-4f+5L+6" => Number("+1e-2s+d3@-4f+5L+6")),
+                     (5, 6) => err_lexer_invalid_number_character,
+                     (6, 7) => err_lexer_invalid_number_character,
+                     (7, 8) => err_lexer_invalid_number_character,
+                   (15, 16) => err_lexer_invalid_number_character,
+                   (16, 17) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("+1e-2s+4d@-4f+L5+6" => Number("+1e-2s+4d@-4f+L5+6")),
+                     (5, 6) => err_lexer_invalid_number_character,
+                     (6, 7) => err_lexer_invalid_number_character,
+                     (8, 9) => err_lexer_invalid_number_character,
+                   (14, 15) => err_lexer_invalid_number_character,
+                    (9, 16) => err_lexer_extra_complex_part,
+                   (18, 18) => err_lexer_missing_i;
+        (" "                => Whitespace);
+        ("1E2sD3@4F5l6"     => Number("1E2sD3@4F5l6")),
+                     (3, 4) => err_lexer_invalid_number_character,
+                     (4, 5) => err_lexer_invalid_number_character,
+                   (10, 11) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("+1e-2+s4d@-4f+L5+6" => Number("+1e-2+s4d@-4f+L5+6")),
+                     (6, 6) => err_lexer_digits_missing,
+                     (8, 9) => err_lexer_invalid_number_character,
+                     (5, 9) => err_lexer_extra_complex_part,
+                   (14, 15) => err_lexer_invalid_number_character,
+                    (9, 16) => err_lexer_extra_complex_part,
+                   (18, 18) => err_lexer_missing_i;
+    }
+}
+
+#[test]
+fn recover_numbers_complex_polar_multiple_parts() {
+    check! {
+        ("1@2@3"            => Number("1@2@3")),
+                     (1, 3) => err_lexer_extra_complex_part;
+        (" "                => Whitespace);
+        ("1i@2i@3i"         => Number("1i@2i@3i")),
+                     (1, 2) => err_lexer_invalid_number_character,
+                     (4, 5) => err_lexer_invalid_number_character,
+                     (2, 5) => err_lexer_extra_complex_part,
+                     (7, 8) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("1@2+3@4"          => Number("1@2+3@4")),
+                     (1, 3) => err_lexer_extra_complex_part,
+                     (3, 5) => err_lexer_extra_complex_part;
+        (" "                => Whitespace);
+        ("1@2+3i@+4i"       => Number("1@2+3i@+4i")),
+                     (1, 3) => err_lexer_extra_complex_part,
+                     (5, 6) => err_lexer_invalid_number_character,
+                     (3, 6) => err_lexer_extra_complex_part,
+                    (9, 10) => err_lexer_invalid_number_character;
+    }
+}
+
+#[test]
+fn recover_numbers_complex_mixed_rectangular_and_polar() {
+    check! {
+        ("1+2i@34+5i"       => Number("1+2i@34+5i")),
+                     (3, 4) => err_lexer_invalid_number_character,
+                     (1, 4) => err_lexer_extra_complex_part,
+                     (4, 7) => err_lexer_extra_complex_part;
+        (" "                => Whitespace);
+        ("1@2+3@4"          => Number("1@2+3@4")),
+                     (1, 3) => err_lexer_extra_complex_part,
+                     (3, 5) => err_lexer_extra_complex_part;
+        (" "                => Whitespace);
+        ("1i+2@3i+4"        => Number("1i+2@3i+4")),
+                     (1, 2) => err_lexer_misplaced_i,
+                     (2, 4) => err_lexer_extra_complex_part,
+                     (6, 7) => err_lexer_invalid_number_character,
+                     (4, 7) => err_lexer_extra_complex_part,
+                     (9, 9) => err_lexer_missing_i;
     }
 }
 
