@@ -1222,6 +1222,15 @@ impl<'a> StringScanner<'a> {
                     Span::new(self.prev_pos, self.pos));
             }
 
+            // Scan over any extra signs that may follow the first one if the user was sleeping
+            // and forgot to release the key. Do not treat them as a starter of imaginary part
+            // of a complex number.
+            while self.peek_is('-') || self.peek_is('+') {
+                self.read();
+                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
+                    Span::new(self.prev_pos, self.pos));
+            }
+
             // Handle IEEE 754 special values which must always have an explicit sign.
             // (Just "inf.0" is a valid identifier.)
             if self.try_scan_number_infnan() {
@@ -1246,6 +1255,8 @@ impl<'a> StringScanner<'a> {
                 return;
             }
 
+            // Read the sign at last.
+            assert!(self.cur_is('+') || self.cur_is('-'));
             self.read();
 
             // Handle the special case of a sign immediately followed by an 'i' and a delimiter.
@@ -1281,6 +1292,15 @@ impl<'a> StringScanner<'a> {
 
             if self.cur_is('+') || self.cur_is('-') {
                 self.read();
+
+                // Also scan over any extra signs that may follow the first one if the user
+                // was sleeping and forgot to release the key. Do not treat them as starters
+                // of a complex number part.
+                while self.cur_is('-') || self.cur_is('+') {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
+                        Span::new(self.prev_pos, self.pos));
+                    self.read();
+                }
             }
 
             self.scan_number_digits(radix, FractionScanningMode::Exponent,
