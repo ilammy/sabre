@@ -52,6 +52,9 @@ pub enum Token {
     /// Closing parenthesis: `)`, `]`, `}`.
     Close(ParenType),
 
+    /// Canonical boolean literal.
+    Boolean(bool),
+
     /// Character literal.
     Character(char),
 

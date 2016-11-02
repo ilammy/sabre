@@ -359,6 +359,9 @@ impl<'a> StringScanner<'a> {
             Some('u') | Some('U') => {
                 self.scan_bytevector_open()
             }
+            Some('t') | Some('T') | Some('f') | Some('F') => {
+                self.scan_boolean_literal()
+            }
             Some('b') | Some('B') | Some('o') | Some('O') | Some('d') | Some('D') |
             Some('x') | Some('X') | Some('i') | Some('I') | Some('e') | Some('E') => {
                 self.scan_number_literal()
@@ -374,6 +377,34 @@ impl<'a> StringScanner<'a> {
                 self.scan_number_literal()
             }
         }
+    }
+
+    /// Scan over a boolean literal `#f`, `#true`.
+    fn scan_boolean_literal(&mut self) -> Token {
+        assert!(self.cur_is('#'));
+
+        if self.ahead_is_exactly("t") {
+            for _ in 0.."#t".len() { self.read(); }
+            return Token::Boolean(true);
+        }
+
+        if self.ahead_is_exactly("f") {
+            for _ in 0.."#f".len() { self.read(); }
+            return Token::Boolean(false);
+        }
+
+        if self.ahead_is_exactly("true") {
+            for _ in 0.."#true".len() { self.read(); }
+            return Token::Boolean(true);
+        }
+
+        if self.ahead_is_exactly("false") {
+            for _ in 0.."#false".len() { self.read(); }
+            return Token::Boolean(false);
+        }
+
+        // Recover as `scan_hash_token()` would do.
+        return self.scan_number_literal();
     }
 
     /// Scan over a bytevector opener `#u8(`.
@@ -1482,6 +1513,18 @@ impl<'a> StringScanner<'a> {
             .map(|c| c.to_ascii_lowercase())
             .take(prefix.len())
             .eq(prefix.chars())
+    }
+
+    /// Check whether the lookahead has a given ASCII prefix ignoring case,
+    /// and a delimiter goes right after that.
+    fn ahead_is_exactly(&self, prefix: &str) -> bool {
+        if !self.ahead_is(prefix) {
+            return false;
+        }
+        return self.buf[self.pos..]
+                   .chars()
+                   .nth(prefix.len())
+                   .map_or(true, is_delimiter);
     }
 
     /// Scan over an (invalid) suffix of an `+inf.0` or `-nan.0` value.

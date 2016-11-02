@@ -43,6 +43,7 @@ macro_rules! token {
     { $pool:expr, OpenVector($ptype:ident) }        => { Token::OpenVector(ParenType::$ptype) };
     { $pool:expr, OpenBytevector($ptype:ident) }    => { Token::OpenBytevector(ParenType::$ptype) };
     { $pool:expr, Close($ptype:ident) }             => { Token::Close(ParenType::$ptype) };
+    { $pool:expr, Boolean($value:expr) }            => { Token::Boolean($value) };
     { $pool:expr, Character($value:expr) }          => { Token::Character($value) };
     { $pool:expr, String($value:expr) }             => { Token::String($pool.intern($value)) };
     { $pool:expr, Identifier($value:expr) }         => { Token::Identifier($pool.intern($value)) };
@@ -309,6 +310,68 @@ fn recover_open_bytevector() {
         ("#8"               => Number("#8")),
                     (0, 1)  => err_lexer_invalid_number_prefix;
         ("["                => Open(Bracket));
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Booleans
+
+#[test]
+fn boolean_short() {
+    check! {
+        ("#t"               => Boolean(true));
+        ("("                => Open(Parenthesis));
+        ("#f"               => Boolean(false));
+        (")"                => Close(Parenthesis));
+        ("#T"               => Boolean(true));
+        (" "                => Whitespace);
+        ("#F"               => Boolean(false));
+    }
+}
+
+#[test]
+fn boolean_long() {
+    check! {
+        ("#true"            => Boolean(true));
+        (","                => Comma);
+        ("#false"           => Boolean(false));
+        (";\n"              => Comment);
+        ("#TRUE"            => Boolean(true));
+        (" "                => Whitespace);
+        ("#FaLse"           => Boolean(false));
+    }
+}
+
+#[test]
+fn recover_boolean_garbage() {
+    check! {
+        ("#tr"              => Unrecognized),
+                     (0, 2) => err_lexer_invalid_number_prefix,
+                     (0, 2) => err_lexer_prefixed_identifier,
+                     (0, 3) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#truuuue"         => Unrecognized),
+                     (0, 2) => err_lexer_invalid_number_prefix,
+                     (0, 2) => err_lexer_prefixed_identifier,
+                     (0, 8) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#false!"          => Unrecognized),
+                     (0, 2) => err_lexer_invalid_number_prefix,
+                     (0, 2) => err_lexer_prefixed_identifier,
+                     (0, 7) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#t#f#t#f"         => Unrecognized),
+                     (0, 2) => err_lexer_invalid_number_prefix,
+                     (2, 4) => err_lexer_invalid_number_prefix,
+                     (4, 6) => err_lexer_invalid_number_prefix,
+                     (6, 8) => err_lexer_invalid_number_prefix,
+                     (0, 8) => err_lexer_prefixed_identifier,
+                     (0, 8) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#fal" /* EOF */   => Unrecognized),
+                     (0, 2) => err_lexer_invalid_number_prefix,
+                     (0, 2) => err_lexer_prefixed_identifier,
+                     (0, 4) => err_lexer_unrecognized;
     }
 }
 
