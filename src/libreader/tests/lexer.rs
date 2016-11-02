@@ -43,6 +43,8 @@ macro_rules! token {
     { $pool:expr, OpenVector($ptype:ident) }        => { Token::OpenVector(ParenType::$ptype) };
     { $pool:expr, OpenBytevector($ptype:ident) }    => { Token::OpenBytevector(ParenType::$ptype) };
     { $pool:expr, Close($ptype:ident) }             => { Token::Close(ParenType::$ptype) };
+    { $pool:expr, LabelMark($value:expr) }          => { Token::LabelMark($pool.intern($value)) };
+    { $pool:expr, LabelRef($value:expr) }           => { Token::LabelRef($pool.intern($value)) };
     { $pool:expr, Boolean($value:expr) }            => { Token::Boolean($value) };
     { $pool:expr, Character($value:expr) }          => { Token::Character($value) };
     { $pool:expr, String($value:expr) }             => { Token::String($pool.intern($value)) };
@@ -307,9 +309,108 @@ fn recover_open_bytevector() {
                     (0, 16) => err_lexer_unrecognized;
         ("("                => Open(Parenthesis));
         (" "                => Whitespace);
-        ("#8"               => Number("#8")),
-                    (0, 1)  => err_lexer_invalid_number_prefix;
+        ("#8"               => LabelMark("8")),
+                    (2, 2)  => err_lexer_missing_datum_label_terminator;
         ("["                => Open(Bracket));
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Datum labels
+
+#[test]
+fn label_mark() {
+    check! {
+        ("#1="              => LabelMark("1"));
+        (" "                => Whitespace);
+        ("#2345="           => LabelMark("2345"));
+        ("#78="             => LabelMark("78"));
+        ("("                => Open(Parenthesis));
+        ("#9="              => LabelMark("9"));
+        (" "                => Whitespace);
+        ("#0000000000="     => LabelMark("0000000000"));
+        ("#\\x"             => Character('x'));
+        (" "                => Whitespace);
+        ("#1="              => LabelMark("1"));
+    }
+}
+
+#[test]
+fn label_ref() {
+    check! {
+        ("#1#"              => LabelRef("1"));
+        (" "                => Whitespace);
+        ("#2#"              => LabelRef("2"));
+        ("#3#"              => LabelRef("3"));
+        ("#4="              => LabelMark("4"));
+        (" "                => Whitespace);
+        ("#0000000000#"     => LabelRef("0000000000"));
+        (","                => Comma);
+        ("#1#"              => LabelRef("1"));
+        (" "                => Whitespace);
+        ("#2#"              => LabelRef("2"));
+        ("|test|"           => Identifier("test"));
+    }
+}
+
+#[test]
+fn recover_label_invalid_characters() {
+    check! {
+        ("#agaga=#9#"       => Unrecognized),
+                     (0, 2) => err_lexer_invalid_number_prefix,
+                     (0, 2) => err_lexer_prefixed_identifier,
+                    (0, 10) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#1agagaga="       => LabelMark("1agagaga")),
+                     (2, 3) => err_lexer_invalid_number_character,
+                     (3, 4) => err_lexer_invalid_number_character,
+                     (4, 5) => err_lexer_invalid_number_character,
+                     (5, 6) => err_lexer_invalid_number_character,
+                     (6, 7) => err_lexer_invalid_number_character,
+                     (7, 8) => err_lexer_invalid_number_character,
+                     (8, 9) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("#123hello#"       => LabelRef("123hello")),
+                     (4, 5) => err_lexer_invalid_number_character,
+                     (5, 6) => err_lexer_invalid_number_character,
+                     (6, 7) => err_lexer_invalid_number_character,
+                     (7, 8) => err_lexer_invalid_number_character,
+                     (8, 9) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("#17.23e+14#"      => LabelRef("17.23e+14")),
+                     (3, 4) => err_lexer_invalid_number_character,
+                     (6, 7) => err_lexer_invalid_number_character,
+                     (7, 8) => err_lexer_invalid_number_character;
+        ("#14/7i="          => LabelMark("14/7i")),
+                     (3, 4) => err_lexer_invalid_number_character,
+                     (5, 6) => err_lexer_invalid_number_character;
+        ("#6@6#"            => LabelRef("6@6")),
+                     (2, 3) => err_lexer_invalid_number_character;
+        (" "                => Whitespace);
+        ("#+123#"           => Number("#+123#")),
+                     (0, 1) => err_lexer_invalid_number_prefix,
+                     (5, 6) => err_lexer_invalid_number_character;
+    }
+}
+
+#[test]
+fn recover_label_missing_terminators() {
+    check! {
+        ("#123"             => LabelMark("123")),
+                     (4, 4) => err_lexer_missing_datum_label_terminator;
+        (" "                => Whitespace);
+        ("#4#"              => LabelRef("4"));
+        ("5"                => Number("5"));
+        (" "                => Whitespace);
+        ("#678"             => LabelMark("678")),
+                     (4, 4) => err_lexer_missing_datum_label_terminator;
+        ("\"9\""            => String("9"));
+        ("#10="             => LabelMark("10"));
+        ("="                => Unrecognized),
+                     (0, 1) => err_lexer_unrecognized;
+        (" "                => Whitespace);
+        ("#5" /* EOF */     => LabelMark("5")),
+                     (2, 2) => err_lexer_missing_datum_label_terminator;
     }
 }
 
@@ -1016,8 +1117,8 @@ fn recover_numbers_integer_invalid_prefixes() {
                          (0, 1) => err_lexer_invalid_number_prefix,
                          (1, 2) => err_lexer_invalid_number_prefix;
         (" "                    => Whitespace);
-        ("#123"                 => Number("#123")),
-                         (0, 1) => err_lexer_invalid_number_prefix;
+        ("#123"                 => LabelMark("123")),
+                         (4, 4) => err_lexer_missing_datum_label_terminator;
         (" "                    => Whitespace);
         ("#+123"                => Number("#+123")),
                          (0, 1) => err_lexer_invalid_number_prefix;

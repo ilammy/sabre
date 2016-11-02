@@ -140,6 +140,9 @@ pub enum DiagnosticKind {
     /// Lexer has encountered a number prefix before what appears to be an identifier.
     err_lexer_prefixed_identifier,
 
+    /// Lexer has expected `=` or `#` to terminate a datum label here.
+    err_lexer_missing_datum_label_terminator,
+
     /// Lexer has encountered an escaped identifier without a closing vertical bar.
     fatal_lexer_unterminated_identifier,
 }

@@ -366,6 +366,9 @@ impl<'a> StringScanner<'a> {
             Some('x') | Some('X') | Some('i') | Some('I') | Some('e') | Some('E') => {
                 self.scan_number_literal()
             }
+            Some(c) if is_digit(10, c) => {
+                self.scan_datum_label()
+            }
             _ => {
                 // Okay, we've exhausted lexically valid continuations, now we start guessing.
                 //
@@ -593,6 +596,53 @@ impl<'a> StringScanner<'a> {
                 return Token::Character(REPLACEMENT_CHARACTER);
             }
         }
+    }
+
+    /// Scan a datum label `#123=` or `#456#` (both forms).
+    fn scan_datum_label(&mut self) -> Token {
+        assert!(self.cur_is('#'));
+        self.read();
+
+        let start = self.prev_pos;
+        loop {
+            match self.cur {
+                // Scan over valid digits.
+                Some(c) if is_digit(10, c) => { self.read(); }
+
+                // Stop at label terminators.
+                Some('#') | Some('=')      => { break; }
+
+                // Also stop if we see an explicit delimiter.
+                Some(c) if is_delimiter(c) => { break; }
+                None                       => { break; }
+
+                // Scan over and report everything else.
+                Some(_) => {
+                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
+                        Span::new(self.prev_pos, self.pos));
+                    self.read();
+                }
+            }
+        }
+        let end = self.prev_pos;
+
+        // This handles both valid marks and the recovery path. An extra datum label
+        // mark is less error-prone than a reference in case we did a wrong guess here.
+        let is_reference = self.cur_is('#');
+
+        // Scan over the terminator or report its absence.
+        if self.cur_is('#') || self.cur_is('=') {
+            self.read();
+        } else {
+            assert!(self.cur.map_or(true, is_delimiter));
+            self.diagnostic.report(DiagnosticKind::err_lexer_missing_datum_label_terminator,
+                Span::new(self.prev_pos, self.prev_pos));
+        }
+
+        let value = &self.buf[start..end];
+        let atom = self.pool.intern(value);
+
+        return if is_reference { Token::LabelRef(atom) } else { Token::LabelMark(atom) };
     }
 
     /// Scan a string literal. This method also expands any escape sequences and normalizes line

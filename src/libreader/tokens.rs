@@ -52,6 +52,12 @@ pub enum Token {
     /// Closing parenthesis: `)`, `]`, `}`.
     Close(ParenType),
 
+    /// Datum label mark.
+    LabelMark(Atom),
+
+    /// Datum label reference.
+    LabelRef(Atom),
+
     /// Canonical boolean literal.
     Boolean(bool),
 
