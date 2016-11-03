@@ -204,42 +204,22 @@ impl<'a> StringScanner<'a> {
             '0'...'9' => {
                 self.scan_number_literal()
             }
-            '.' => {
-                let start = self.prev_pos;
-                match self.peek() {
-                    Some(c) if is_delimiter(c) => {
-                        self.read();
-                        Token::Dot
-                    }
-                    None => {
-                        self.read();
-                        Token::Dot
-                    }
-                    Some(c) if is_digit(10, c) => {
-                        self.scan_number_literal()
-                    }
-                    _ => {
-                        self.scan_unrecognized(start)
-                    }
-                }
-            }
             '-' | '+' => {
-                let start = self.prev_pos;
-                match self.peek() {
-                    Some('.') | Some('i') | Some('I') | Some('n') | Some('N') => {
-                        self.scan_number_literal()
-                    }
-                    Some(c) if is_digit(10, c) => {
-                        self.scan_number_literal()
-                    }
-                    _ => {
-                        self.scan_unrecognized(start)
-                    }
+                self.scan_number_literal()
+            }
+            '.' => {
+                if self.peek().map_or(true, is_delimiter) {
+                    self.read();
+                    Token::Dot
+                } else {
+                    self.scan_number_literal()
                 }
             }
+
+            // Syntax of Scheme identifiers is *sooo* permissive that it makes
+            // pretty much sense to have them as a catch-all clause.
             _ => {
-                let start = self.prev_pos;
-                self.scan_unrecognized(start)
+                self.scan_identifier()
             }
         }
     }
@@ -866,6 +846,50 @@ impl<'a> StringScanner<'a> {
         }
     }
 
+    /// Scan over an identifier (non-escaped).
+    fn scan_identifier(&mut self) -> Token {
+        let start = self.prev_pos;
+        if !self.cur.map_or(true, is_delimiter) {
+            // The first characters of identifiers are a bit more restrictive. However, this
+            // method is also used to handle peculiar identifiers, so allow their starters too.
+            let regular_initial = is_identifier_initial(self.cur.unwrap());
+            let peculiar_initial = match self.cur.unwrap() {
+                '+' | '-' | '@' | '.' => true,
+                _ => false,
+            };
+
+            if !(regular_initial || peculiar_initial) {
+                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_identifier_character,
+                    Span::new(self.prev_pos, self.pos));
+            }
+
+            self.read();
+
+            loop {
+                match self.cur {
+                    // Scan over valid identifier constituents.
+                    Some(c) if is_identifier_subsequent(c) => { self.read(); }
+
+                    // Stop at the first delimiter.
+                    Some(c) if is_delimiter(c) => { break; }
+                    None                       => { break; }
+
+                    // Report and scan over anything else.
+                    Some(_) => {
+                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_identifier_character,
+                            Span::new(self.prev_pos, self.pos));
+                        self.read();
+                    }
+                }
+            }
+        }
+        let end = self.prev_pos;
+
+        let value = &self.buf[start..end];
+
+        return Token::Identifier(self.pool.intern(value));
+    }
+
     /// Scan an escaped identifier. This method also expands any escape sequences in the scanned
     /// identifier.
     fn scan_escaped_identifier(&mut self) -> Token {
@@ -988,8 +1012,7 @@ impl<'a> StringScanner<'a> {
                     Span::new(start, self.prev_pos));
             }
 
-            // TODO: return actual identifier
-            return self.scan_unrecognized(start);
+            return self.scan_identifier();
         }
 
         // Now scan the actual number value.
@@ -1700,6 +1723,30 @@ fn is_exponent_marker(c: char) -> bool {
         'e' | 'E' |
         // But it also allows to include these ones:
         's' | 'S' | 'd' | 'D' | 'f' | 'F' | 'l' | 'L' => true,
+        _ => false,
+    }
+}
+
+/// Check if a character is an initial of an identifer.
+fn is_identifier_initial(c: char) -> bool {
+    match c {
+        // <letter>
+        'a' ... 'z' | 'A' ... 'Z' |
+        // <special-initial>
+        '!' | '$' | '%' | '&' | '*' | '/' | ':' | '<' | '=' | '>' | '?' | '^' | '_' | '~' => true,
+        _ => false,
+    }
+}
+
+/// Check if a character is a subsequent of an identifer.
+fn is_identifier_subsequent(c: char) -> bool {
+    match c {
+        // <initial>
+        c if is_identifier_initial(c)   => true,
+        // <digit>
+        c if is_digit(10, c)            => true,
+        // <special-subsequent>
+        '+' | '-' | '.' | '@'           => true,
         _ => false,
     }
 }
