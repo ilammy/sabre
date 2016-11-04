@@ -81,6 +81,9 @@ pub struct StringScanner<'a> {
     /// Byte offset of the last character that was read (`cur`).
     prev_pos: usize,
 
+    /// Should we fold case of scanned identifiers and character names?
+    folding_case: bool,
+
     //
     // Diagnostic reporting
     //
@@ -107,6 +110,7 @@ impl<'a> StringScanner<'a> {
             buf: s,
             pool: pool,
             cur: None, pos: 0, prev_pos: 0,
+            folding_case: false,
             diagnostic: handler,
         };
         scanner.read();
@@ -204,42 +208,22 @@ impl<'a> StringScanner<'a> {
             '0'...'9' => {
                 self.scan_number_literal()
             }
-            '.' => {
-                let start = self.prev_pos;
-                match self.peek() {
-                    Some(c) if is_delimiter(c) => {
-                        self.read();
-                        Token::Dot
-                    }
-                    None => {
-                        self.read();
-                        Token::Dot
-                    }
-                    Some(c) if is_digit(10, c) => {
-                        self.scan_number_literal()
-                    }
-                    _ => {
-                        self.scan_unrecognized(start)
-                    }
-                }
-            }
             '-' | '+' => {
-                let start = self.prev_pos;
-                match self.peek() {
-                    Some('.') | Some('i') | Some('I') | Some('n') | Some('N') => {
-                        self.scan_number_literal()
-                    }
-                    Some(c) if is_digit(10, c) => {
-                        self.scan_number_literal()
-                    }
-                    _ => {
-                        self.scan_unrecognized(start)
-                    }
+                self.scan_number_literal()
+            }
+            '.' => {
+                if self.peek().map_or(true, is_delimiter) {
+                    self.read();
+                    Token::Dot
+                } else {
+                    self.scan_number_literal()
                 }
             }
+
+            // Syntax of Scheme identifiers is *sooo* permissive that it makes
+            // pretty much sense to have them as a catch-all clause.
             _ => {
-                let start = self.prev_pos;
-                self.scan_unrecognized(start)
+                self.scan_identifier()
             }
         }
     }
@@ -355,6 +339,9 @@ impl<'a> StringScanner<'a> {
             }
             Some('\\') => {
                 self.scan_character_literal()
+            }
+            Some('!') => {
+                self.scan_directive()
             }
             Some('u') | Some('U') => {
                 self.scan_bytevector_open()
@@ -579,8 +566,11 @@ impl<'a> StringScanner<'a> {
             return Token::Character(first_character);
         }
 
-        // Finally, handle named character literals. Note that they are always case-sensitive.
-        match name {
+        // Match character names case-insensitively if the user has requested #!fold-case before.
+        let name = if self.folding_case { fold_identifier_case(name) } else { name.to_owned() };
+
+        // Finally, handle named character literals.
+        match &name[..] {
             "alarm"     => { return Token::Character('\u{0007}'); }
             "escape"    => { return Token::Character('\u{0008}'); }
             "delete"    => { return Token::Character('\u{007F}'); }
@@ -866,6 +856,85 @@ impl<'a> StringScanner<'a> {
         }
     }
 
+    /// Scan over a directive.
+    fn scan_directive(&mut self) -> Token {
+        assert!(self.cur_is('#') && self.peek_is('!'));
+
+        let directive_start = self.prev_pos;
+        self.read();
+        self.read();
+
+        let name_start = self.prev_pos;
+        while !self.cur.map_or(true, is_delimiter) {
+            self.read();
+        }
+        let name_end = self.prev_pos;
+
+        // Directives are case-insensitive.
+        let value = fold_identifier_case(&self.buf[name_start..name_end]);
+
+        match &value[..] {
+            // Handle case-folding directives.
+            "fold-case"     => { self.folding_case = true; }
+            "no-fold-case"  => { self.folding_case = false; }
+
+            // Report anything else as unknown.
+            _ => {
+                self.diagnostic.report(DiagnosticKind::err_lexer_unknown_directive,
+                    Span::new(directive_start, name_end));
+            }
+        }
+
+        return Token::Directive(self.pool.intern_string(value));
+    }
+
+    /// Scan over an identifier (non-escaped).
+    fn scan_identifier(&mut self) -> Token {
+        let start = self.prev_pos;
+        if !self.cur.map_or(true, is_delimiter) {
+            // The first characters of identifiers are a bit more restrictive. However, this
+            // method is also used to handle peculiar identifiers, so allow their starters too.
+            let regular_initial = is_identifier_initial(self.cur.unwrap());
+            let peculiar_initial = match self.cur.unwrap() {
+                '+' | '-' | '@' | '.' => true,
+                _ => false,
+            };
+
+            if !(regular_initial || peculiar_initial) {
+                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_identifier_character,
+                    Span::new(self.prev_pos, self.pos));
+            }
+
+            self.read();
+
+            loop {
+                match self.cur {
+                    // Scan over valid identifier constituents.
+                    Some(c) if is_identifier_subsequent(c) => { self.read(); }
+
+                    // Stop at the first delimiter.
+                    Some(c) if is_delimiter(c) => { break; }
+                    None                       => { break; }
+
+                    // Report and scan over anything else.
+                    Some(_) => {
+                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_identifier_character,
+                            Span::new(self.prev_pos, self.pos));
+                        self.read();
+                    }
+                }
+            }
+        }
+        let end = self.prev_pos;
+
+        let value = &self.buf[start..end];
+
+        // Fold case in identifiers if the user has requested #!fold-case before.
+        let value = if self.folding_case { fold_identifier_case(value) } else { value.to_owned() };
+
+        return Token::Identifier(self.pool.intern_string(value));
+    }
+
     /// Scan an escaped identifier. This method also expands any escape sequences in the scanned
     /// identifier.
     fn scan_escaped_identifier(&mut self) -> Token {
@@ -907,6 +976,7 @@ impl<'a> StringScanner<'a> {
             }
         }
 
+        // Note that escaped identifiers are always case-sensitive.
         return Token::Identifier(self.pool.intern_string(value));
     }
 
@@ -988,8 +1058,7 @@ impl<'a> StringScanner<'a> {
                     Span::new(start, self.prev_pos));
             }
 
-            // TODO: return actual identifier
-            return self.scan_unrecognized(start);
+            return self.scan_identifier();
         }
 
         // Now scan the actual number value.
@@ -1704,6 +1773,30 @@ fn is_exponent_marker(c: char) -> bool {
     }
 }
 
+/// Check if a character is an initial of an identifer.
+fn is_identifier_initial(c: char) -> bool {
+    match c {
+        // <letter>
+        'a' ... 'z' | 'A' ... 'Z' |
+        // <special-initial>
+        '!' | '$' | '%' | '&' | '*' | '/' | ':' | '<' | '=' | '>' | '?' | '^' | '_' | '~' => true,
+        _ => false,
+    }
+}
+
+/// Check if a character is a subsequent of an identifer.
+fn is_identifier_subsequent(c: char) -> bool {
+    match c {
+        // <initial>
+        c if is_identifier_initial(c)   => true,
+        // <digit>
+        c if is_digit(10, c)            => true,
+        // <special-subsequent>
+        '+' | '-' | '.' | '@'           => true,
+        _ => false,
+    }
+}
+
 /// A replacement character used when we need to return a character, but don't have one.
 const REPLACEMENT_CHARACTER: char = '\u{FFFD}';
 
@@ -1732,4 +1825,14 @@ fn hex_value(c: char) -> u8 {
     ];
 
     return H[c as usize];
+}
+
+/// Apply case-folding to a directive or an identifier.
+///
+/// Note that this is _not_ a general case-folding procedure.
+fn fold_identifier_case(s: &str) -> String {
+    use std::ascii::AsciiExt;
+
+    // We support only ASCII now, so this will do:
+    return s.to_ascii_lowercase();
 }

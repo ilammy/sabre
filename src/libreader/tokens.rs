@@ -73,6 +73,9 @@ pub enum Token {
     /// Number literal.
     Number(Atom),
 
+    /// Directive to the reader.
+    Directive(Atom),
+
     /// Marker token denoting an invalid character sequences.
     Unrecognized,
 }
