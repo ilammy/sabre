@@ -336,6 +336,9 @@ impl<'a> StringScanner<'a> {
             Some('\\') => {
                 self.scan_character_literal()
             }
+            Some('!') => {
+                self.scan_directive()
+            }
             Some('u') | Some('U') => {
                 self.scan_bytevector_open()
             }
@@ -844,6 +847,37 @@ impl<'a> StringScanner<'a> {
 
             return first_char;
         }
+    }
+
+    /// Scan over a directive.
+    fn scan_directive(&mut self) -> Token {
+        assert!(self.cur_is('#') && self.peek_is('!'));
+
+        let directive_start = self.prev_pos;
+        self.read();
+        self.read();
+
+        let name_start = self.prev_pos;
+        while !self.cur.map_or(true, is_delimiter) {
+            self.read();
+        }
+        let name_end = self.prev_pos;
+
+        // Directives are case-insensitive.
+        let value = fold_identifier_case(&self.buf[name_start..name_end]);
+
+        match &value[..] {
+            "fold-case"     => { }
+            "no-fold-case"  => { }
+
+            // Report anything else as unknown.
+            _ => {
+                self.diagnostic.report(DiagnosticKind::err_lexer_unknown_directive,
+                    Span::new(directive_start, name_end));
+            }
+        }
+
+        return Token::Directive(self.pool.intern_string(value));
     }
 
     /// Scan over an identifier (non-escaped).
@@ -1779,4 +1813,14 @@ fn hex_value(c: char) -> u8 {
     ];
 
     return H[c as usize];
+}
+
+/// Apply case-folding to a directive or an identifier.
+///
+/// Note that this is _not_ a general case-folding procedure.
+fn fold_identifier_case(s: &str) -> String {
+    use std::ascii::AsciiExt;
+
+    // We support only ASCII now, so this will do:
+    return s.to_ascii_lowercase();
 }

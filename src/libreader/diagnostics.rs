@@ -146,6 +146,9 @@ pub enum DiagnosticKind {
     /// Lexer has scanned over a character that is not allowed in identifers.
     err_lexer_invalid_identifier_character,
 
+    /// Lexer has scanned over an unrecognized directive.
+    err_lexer_unknown_directive,
+
     /// Lexer has encountered an escaped identifier without a closing vertical bar.
     fatal_lexer_unterminated_identifier,
 }

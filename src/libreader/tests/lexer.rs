@@ -50,6 +50,7 @@ macro_rules! token {
     { $pool:expr, String($value:expr) }             => { Token::String($pool.intern($value)) };
     { $pool:expr, Identifier($value:expr) }         => { Token::Identifier($pool.intern($value)) };
     { $pool:expr, Number($value:expr) }             => { Token::Number($pool.intern($value)) };
+    { $pool:expr, Directive($value:expr) }          => { Token::Directive($pool.intern($value)) };
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -3099,6 +3100,57 @@ fn recover_identifiers_ascii_unprintable() {
         ("\u{10}\u{07}"     => Identifier("\u{10}\u{07}")),
                      (0, 1) => err_lexer_invalid_identifier_character,
                      (1, 2) => err_lexer_invalid_identifier_character;
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Directives
+
+#[test]
+fn directives_basic() {
+    check! {
+        ("#!fold-case"              => Directive("fold-case"));
+        (" "                        => Whitespace);
+        ("#!no-fold-case"           => Directive("no-fold-case"));
+        ("\t"                       => Whitespace);
+        ("#!FOLD-CASE"              => Directive("fold-case"));
+        ("||"                       => Identifier(""));
+        ("#!NO-FOLD-CASE"           => Directive("no-fold-case"));
+        (";\n"                      => Comment);
+        ("#!FoLd-CaSe"              => Directive("fold-case"));
+        ("("                        => Open(Parenthesis));
+        ("#!no-FOLD-caSE"           => Directive("no-fold-case"));
+        (")"                        => Close(Parenthesis));
+        ("#!fOLD-cASe"              => Directive("fold-case"));
+    }
+}
+
+#[test]
+fn recover_directives_invalid() {
+    check! {
+        ("#!fold"                   => Directive("fold")),
+                             (0, 6) => err_lexer_unknown_directive;
+        (" "                        => Whitespace);
+        ("#!f01d-c453"              => Directive("f01d-c453")),
+                            (0, 11) => err_lexer_unknown_directive;
+        (" "                        => Whitespace);
+        ("#!NO_MORE_BANANA"         => Directive("no_more_banana")),
+                            (0, 16) => err_lexer_unknown_directive;
+        ("\"test\""                 => String("test"));
+        ("#!no-fold-case-please"    => Directive("no-fold-case-please")),
+                            (0, 21) => err_lexer_unknown_directive;
+        (" "                        => Whitespace);
+        ("#!@#$%^&*"                => Directive("@#$%^&*")),
+                             (0, 9) => err_lexer_unknown_directive;
+        (" "                        => Whitespace);
+        ("#!#!#!!1!1"               => Directive("#!#!!1!1")),
+                            (0, 10) => err_lexer_unknown_directive;
+        (" "                        => Whitespace);
+        ("#!/bin/sh"                => Directive("/bin/sh")),
+                             (0, 9) => err_lexer_unknown_directive;
+        (" "                        => Whitespace);
+        ("#!\x01\x02\x03"           => Directive("\u{01}\u{02}\u{03}")),
+                             (0, 5) => err_lexer_unknown_directive;
     }
 }
 
