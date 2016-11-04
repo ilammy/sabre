@@ -3155,6 +3155,99 @@ fn recover_directives_invalid() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Case control: ASCII
+
+#[test]
+fn directives_case_control_ascii() {
+    check! {
+        ("Test"                     => Identifier("Test"));
+        (" "                        => Whitespace);
+        ("|Test|"                   => Identifier("Test"));
+        (" "                        => Whitespace);
+        ("\"tESt\""                 => String("tESt"));
+        (" "                        => Whitespace);
+        ("#xDEAD"                   => Number("#xDEAD"));
+        (" "                        => Whitespace);
+        ("+Inf.0"                   => Number("+Inf.0"));
+        (" "                        => Whitespace);
+        ("#\\R"                     => Character('R'));
+        (" "                        => Whitespace);
+        ("#\\x"                     => Character('x'));
+        (" "                        => Whitespace);
+        ("#\\newline"               => Character('\u{000A}'));
+        (" "                        => Whitespace);
+        ("#\\NEWLINE"               => Character('\u{FFFD}')),
+                             (0, 9) => err_lexer_unknown_character_name;
+        (" "                        => Whitespace);
+        ("#| Comment |#"            => Comment);
+        (" "                        => Whitespace);
+
+        ("#!FOLD-CASE"              => Directive("fold-case"));
+        ("\n"                       => Whitespace);
+
+        ("Test"                     => Identifier("test"));
+        (" "                        => Whitespace);
+        ("|Test|"                   => Identifier("Test"));
+        (" "                        => Whitespace);
+        ("\"tESt\""                 => String("tESt"));
+        (" "                        => Whitespace);
+        ("#xDEAD"                   => Number("#xDEAD"));
+        (" "                        => Whitespace);
+        ("+Inf.0"                   => Number("+Inf.0"));
+        (" "                        => Whitespace);
+        ("#\\R"                     => Character('R'));
+        (" "                        => Whitespace);
+        ("#\\x"                     => Character('x'));
+        (" "                        => Whitespace);
+        ("#\\newline"               => Character('\u{000A}'));
+        (" "                        => Whitespace);
+        ("#\\NEWLINE"               => Character('\u{000A}'));
+        (" "                        => Whitespace);
+        ("#| Comment |#"            => Comment);
+        (" "                        => Whitespace);
+
+        ("#!No-Fold-Case"           => Directive("no-fold-case"));
+        ("\n"                       => Whitespace);
+
+        ("Test"                     => Identifier("Test"));
+        (" "                        => Whitespace);
+        ("|Test|"                   => Identifier("Test"));
+        (" "                        => Whitespace);
+        ("\"tESt\""                 => String("tESt"));
+        (" "                        => Whitespace);
+        ("#xDEAD"                   => Number("#xDEAD"));
+        (" "                        => Whitespace);
+        ("+Inf.0"                   => Number("+Inf.0"));
+        (" "                        => Whitespace);
+        ("#\\R"                     => Character('R'));
+        (" "                        => Whitespace);
+        ("#\\x"                     => Character('x'));
+        (" "                        => Whitespace);
+        ("#\\newline"               => Character('\u{000A}'));
+        (" "                        => Whitespace);
+        ("#\\NEWLINE"               => Character('\u{FFFD}')),
+                             (0, 9) => err_lexer_unknown_character_name;
+        (" "                        => Whitespace);
+        ("#| Comment |#"            => Comment);
+        (" "                        => Whitespace);
+
+        ("#!NO-fold-case"           => Directive("no-fold-case"));
+        ("\n"                       => Whitespace);
+        ("#!FOLD-CASE"              => Directive("fold-case"));
+        ("\n"                       => Whitespace);
+        ("#!no-FOLD-case"           => Directive("no-fold-case"));
+        ("\n"                       => Whitespace);
+        ("#!no-fold-CASE"           => Directive("no-fold-case"));
+        ("\n"                       => Whitespace);
+        ("#!fold-case"              => Directive("fold-case"));
+        ("\n"                       => Whitespace);
+        ("; #!no-fold-case\n"       => Comment);
+
+        ("Test"                     => Identifier("test"));
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
 use std::cell::RefCell;

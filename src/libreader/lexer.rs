@@ -81,6 +81,9 @@ pub struct StringScanner<'a> {
     /// Byte offset of the last character that was read (`cur`).
     prev_pos: usize,
 
+    /// Should we fold case of scanned identifiers and character names?
+    folding_case: bool,
+
     //
     // Diagnostic reporting
     //
@@ -107,6 +110,7 @@ impl<'a> StringScanner<'a> {
             buf: s,
             pool: pool,
             cur: None, pos: 0, prev_pos: 0,
+            folding_case: false,
             diagnostic: handler,
         };
         scanner.read();
@@ -562,8 +566,11 @@ impl<'a> StringScanner<'a> {
             return Token::Character(first_character);
         }
 
-        // Finally, handle named character literals. Note that they are always case-sensitive.
-        match name {
+        // Match character names case-insensitively if the user has requested #!fold-case before.
+        let name = if self.folding_case { fold_identifier_case(name) } else { name.to_owned() };
+
+        // Finally, handle named character literals.
+        match &name[..] {
             "alarm"     => { return Token::Character('\u{0007}'); }
             "escape"    => { return Token::Character('\u{0008}'); }
             "delete"    => { return Token::Character('\u{007F}'); }
@@ -867,8 +874,9 @@ impl<'a> StringScanner<'a> {
         let value = fold_identifier_case(&self.buf[name_start..name_end]);
 
         match &value[..] {
-            "fold-case"     => { }
-            "no-fold-case"  => { }
+            // Handle case-folding directives.
+            "fold-case"     => { self.folding_case = true; }
+            "no-fold-case"  => { self.folding_case = false; }
 
             // Report anything else as unknown.
             _ => {
@@ -921,7 +929,10 @@ impl<'a> StringScanner<'a> {
 
         let value = &self.buf[start..end];
 
-        return Token::Identifier(self.pool.intern(value));
+        // Fold case in identifiers if the user has requested #!fold-case before.
+        let value = if self.folding_case { fold_identifier_case(value) } else { value.to_owned() };
+
+        return Token::Identifier(self.pool.intern_string(value));
     }
 
     /// Scan an escaped identifier. This method also expands any escape sequences in the scanned
@@ -965,6 +976,7 @@ impl<'a> StringScanner<'a> {
             }
         }
 
+        // Note that escaped identifiers are always case-sensitive.
         return Token::Identifier(self.pool.intern_string(value));
     }
 
