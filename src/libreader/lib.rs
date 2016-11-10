@@ -8,6 +8,8 @@
 //!
 //! This crate contains modules implementing basic syntax analysis of Scheme source code.
 
+extern crate unicode;
+
 pub mod diagnostics;
 pub mod intern_pool;
 pub mod lexer;

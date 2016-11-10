@@ -33,13 +33,21 @@ commandline.add_argument('--version',
     help='Full version of Unicode Standard to use (e.g., "9.0.0"). \
           Write "latest" to get the latest one (the default).')
 
+commandline.add_argument('--compare',
+    nargs=2,
+    metavar=('old', 'new'),
+    type=str,
+    help='Compare derived identifier sets for the given pair of standards. \
+          Report any changes and conflicts caused by migration between them.')
+
 commandline.add_argument('--output',
     nargs=1,
     metavar='what',
     type=str,
-    default=['tables'],
-    help='Output selection. Supported choices are "tables" and "conformance". \
-          If this option is not specified then "tables" is assumed.')
+    default=None,
+    help='Output selection. Supported choices are "tables", "conformance", \
+          and "none". If --output is omitted then "tables" is assumed. \
+          If --compare is specified then "none" is assumed by default.')
 
 commandline_args = commandline.parse_args()
 
@@ -742,6 +750,157 @@ def load_unicode_character_data(version):
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
+# Computing sets of characters allowed in Scheme identifiers
+#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+def compute_character_sets(ucd):
+    """Compute a tuple of ({initial}, {subsequent}) character sets."""
+
+    report_status('\nComputing character sets (%s)...' % ucd.version)
+
+    # R7RS defines the identifier character sets as follows:
+
+    initial    = set(ucd.general_category['Lu']     # uppercase letters
+               +     ucd.general_category['Ll']     # lowercase letters
+               +     ucd.general_category['Lt']     # titlecase letters
+               +     ucd.general_category['Lm']     # modifier letters
+               +     ucd.general_category['Lo']     # other letters
+               +     ucd.general_category['Nl']     # letter numbers
+               +     ucd.general_category['No']     # other numbers
+               +     ucd.general_category['Pd']     # dash punctuation
+               +     ucd.general_category['Pc']     # punctuation connectors
+               +     ucd.general_category['Po']     # other punctuation
+               +     ucd.general_category['Sc']     # currency symbols
+               +     ucd.general_category['Sm']     # mathematical symbols
+               +     ucd.general_category['Sk']     # symbol modifiers
+               +     ucd.general_category['So']     # other symbols
+               +     ucd.general_category['Co'])    # other private use characters
+
+    subsequent = set(ucd.general_category['Lu']     # uppercase letters
+               +     ucd.general_category['Ll']     # lowercase letters
+               +     ucd.general_category['Lt']     # titlecase letters
+               +     ucd.general_category['Lm']     # modifier letters
+               +     ucd.general_category['Lo']     # other letters
+               +     ucd.general_category['Mn']     # non-spacing combining modifiers
+               +     ucd.general_category['Mc']     # spacing combining modifiers
+               +     ucd.general_category['Me']     # enclosing modifiers
+               +     ucd.general_category['Nd']     # decimal digits
+               +     ucd.general_category['Nl']     # letter numbers
+               +     ucd.general_category['No']     # other numbers
+               +     ucd.general_category['Pd']     # dash punctuation
+               +     ucd.general_category['Pc']     # punctuation connectors
+               +     ucd.general_category['Po']     # other punctuation
+               +     ucd.general_category['Sc']     # currency symbols
+               +     ucd.general_category['Sm']     # mathematical symbols
+               +     ucd.general_category['Sk']     # symbol modifiers
+               +     ucd.general_category['So']     # other symbols
+               +     ucd.general_category['Co'])    # other private use characters
+
+    # Remove all Default_Ignorable_Code_Points as suggested by UAX #31, but allow ZWNJ and ZWJ
+    # characters as subsequents. This is required by R7RS and is suggested by UAX #31.
+
+    initial    = initial   .difference(ucd.default_ignorable_code_points)
+    subsequent = subsequent.difference(ucd.default_ignorable_code_points)
+    subsequent = subsequent.union([0x200C, 0x200D])
+
+    # Stability policy requires that once a sequence of characters is considered an identifier, it
+    # will be considered an identifier in all further versions of Unicode. A sequence can cease
+    # being valid when a character changes its general category. The stability is achieved by using
+    # 'grandfathered characters' to reinclude once-an-identifier-but-now-not characters into
+    # ID_{Start,Continue} sets. The standard explicitly defines two properties for this purpose:
+    # Other_ID_{Start,Continue}.
+
+    Other_ID_Start    = ucd.properties['Other_ID_Start']
+    Other_ID_Continue = ucd.properties['Other_ID_Continue']
+
+    # Unicode Annex #31 does not cover Scheme-specific characters, so we use the same approach
+    # for them by explicitly enumerating the additional sets. They are based on Unicode 9.0.0
+    # which was the current version at the time of Sabre's conception.
+
+    extra_initial     = []
+    extra_subsequent  = []
+
+    # Add all grandfathered characters to the identifier sets:
+
+    initial    = initial   .union(Other_ID_Start,    extra_initial)
+    subsequent = subsequent.union(Other_ID_Start,    extra_initial)
+    subsequent = subsequent.union(Other_ID_Continue, extra_subsequent)
+
+    # ASCII range is explicitly specified by R7RS:
+
+    ASCII_range = range(0x00, 0x80)
+
+    ASCII_intial = [
+        # <letter> ('A' ... 'Z')
+        0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4A, 0x4B, 0x4C, 0x4D, 0x4E, 0x4F,
+        0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x57, 0x58, 0x59, 0x5A,
+        # <letter> ('a' ... 'z')
+        0x61, 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69, 0x6A, 0x6B, 0x6C, 0x6D, 0x6E, 0x6F,
+        0x70, 0x71, 0x72, 0x73, 0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7A,
+        # <special-initial>
+        #  !     $     %     &     *     /     :     <     =     >     ?     ^     _     ~
+        0x21, 0x24, 0x25, 0x26, 0x2A, 0x2F, 0x3A, 0x3C, 0x3D, 0x3E, 0x3F, 0x5E, 0x5F, 0x7E,
+        # <pecualiar> (= <special-subsequent>, they can be in the first position)
+        #  +     -     .     @
+        0x2B, 0x2D, 0x2E, 0x40
+    ]
+
+    ASCII_subsequent = ASCII_intial + [
+        # <digit> ('0' ... '9')
+        0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0x38, 0x39
+    ]
+
+    initial    = initial   .difference(ASCII_range).union(ASCII_intial)
+    subsequent = subsequent.difference(ASCII_range).union(ASCII_subsequent)
+
+    # There is one final constraint on identifiers. Sabre normalizes identifiers into NFKC to remove
+    # visual ambiguity and reduce security risks (as noted in Unicode Annex #31). Given this, it is
+    # highly desirable that the allowed character sets are closed over NFKC transformation. That is,
+    # if X is a valid identifier of some kind, NFKC(X) should also be an identifier of the same kind
+
+    def closed_over_nfkc(ID_Start, ID_Continue):
+        XID_Start, XID_Continue = set(), set()
+
+        for c in ID_Continue:
+            n = nfkc(ucd, [c])
+            if set(n) <= ID_Continue:
+                XID_Continue.add(c)
+
+        for c in ID_Start:
+            n = nfkc(ucd, [c])
+            if (n[0] in ID_Start) and (set(n[1:]) <= XID_Continue):
+                XID_Start.add(c)
+
+        return XID_Start, XID_Continue
+
+    initial, subsequent = closed_over_nfkc(initial, subsequent)
+
+    report_status('Verifying character sets...')
+
+    # Now we do some self-checks to guarantee some properties of the character sets that the
+    # scanner is interesterd in.
+    #
+    # First of all, ensure that the sets are non-empty:
+
+    assert initial
+    assert subsequent
+
+    # Then confirm the intuitive notion of that the inital set is a subset of the subsequent set:
+
+    assert initial <= subsequent
+
+    # Make sure that ZWNJ and ZWJ are the only Default_Ignorable_Code_Points allowed in identifiers
+
+    assert set(ucd.default_ignorable_code_points) & initial    == set()
+    assert set(ucd.default_ignorable_code_points) & subsequent == set([0x200C, 0x200D])
+
+    report_status('Complete!')
+
+    return initial, subsequent
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
 # Optimizing data layout
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
@@ -975,10 +1134,11 @@ def ceil_power_of_two(n):
 #
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-def emit_unicode_tables(ucd):
+def emit_unicode_tables(ucd, cs):
     report_status('\nEmitting table data...')
     emit_header()
     emit_unicode_version(ucd.version)
+    emit_identifier_sets(cs)
     emit_character_properties(ucd)
     emit_composition_mappings(ucd)
     emit_decomposition_mappings(ucd)
@@ -1002,6 +1162,7 @@ def emit_header():
 //! This module contains automatically generated boring data tables which
 //! are used by human-written code for actual algorithm implementation.
 //!
+//! - *scheme_identifiers*: Scheme identifier sets
 //! - *character_properties*: Unicode character properties
 //! - *composition_mappings*: composition mappings for normalization
 //! - *decomposition_mappings*: decomposition mappings for normalization
@@ -1034,6 +1195,115 @@ def split_into_lines(seq, separator, indent, max_length):
     lines.append(indent + line)
 
     return '\n'.join(map(lambda s: s.rstrip(), lines))
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+# Printing identifier sets
+#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+def emit_identifier_sets(cs):
+    initial, subsequent = cs
+
+    report_status('\nPreparing identifier character sets...')
+
+    ascii_initial    = [c in initial    for c in xrange(128)]
+    ascii_subsequent = [c in subsequent for c in xrange(128)]
+
+    unicode_initial    = pack_character_ranges({c: True for c in initial})
+    unicode_subsequent = pack_character_ranges({c: True for c in subsequent})
+    unicode_initial    = [(c1, c2) for (c1, c2), r in unicode_initial    if r is not None]
+    unicode_subsequent = [(c1, c2) for (c1, c2), r in unicode_subsequent if r is not None]
+
+    size = (len(ascii_initial)      * 1
+         +  len(ascii_subsequent)   * 1
+         +  len(unicode_initial)    * 8
+         +  len(unicode_subsequent) * 8)
+
+    report_status("Done! Estimated size %d KB" % (size / 1024))
+
+    print_data("""
+/// Scheme identifier sets.
+///
+/// This module contains definitions of Scheme identifier sets.
+pub mod scheme_identifiers {
+    /// Check if a character is a valid initial character of an identifier.
+    pub fn is_initial(c: char) -> bool {
+        // Fast path for the common case of ASCII identifiers.
+        if c <= '\\x7F' {
+            ASCII_INITIAL[c as usize]
+        } else {
+            lookup(c, FULL_UNICODE_INITIAL)
+        }
+    }
+
+    /// Check if a character is a valid subsequent character of an identifier.
+    pub fn is_subsequent(c: char) -> bool {
+        // Fast path for the common case of ASCII identifiers.
+        if c <= '\\x7F' {
+            ASCII_SUBSEQUENT[c as usize]
+        } else {
+            lookup(c, FULL_UNICODE_SUBSEQUENT)
+        }
+    }
+
+    /// Slow path of `is_initial()` and `is_subsequent()` which performs binary search over
+    /// the full Unicode lookup table. Returns true if character is present in the mapping.
+    fn lookup(c: char, mapping: &[(char, char)]) -> bool {
+        use std::cmp::Ordering;
+
+        mapping.binary_search_by(|&(low, high)| {
+            if (low <= c) && (c <= high) {
+                Ordering::Equal
+            } else if high < c {
+                Ordering::Less
+            } else {
+                Ordering::Greater
+            }
+        }).is_ok()
+    }
+
+    /// Lookup table of initial mapping for ASCII.
+    const ASCII_INITIAL: &'static [bool; 128] = &[
+""")
+    emit_identifier_table_ascii(ascii_initial)
+    print_data("""
+    ];
+
+    /// Lookup table of subsequent mapping for ASCII.
+    const ASCII_SUBSEQUENT: &'static [bool; 128] = &[
+""")
+    emit_identifier_table_ascii(ascii_subsequent)
+    print_data("""
+    ];
+
+    /// Lookup table of initial mapping for full Unicode range.
+    const FULL_UNICODE_INITIAL: &'static [(char, char)] = &[
+""")
+    emit_identifier_table_unicode(unicode_initial)
+    print_data("""
+    ];
+
+    /// Lookup table of subsequent mapping for full Unicode range.
+    const FULL_UNICODE_SUBSEQUENT: &'static [(char, char)] = &[
+""")
+    emit_identifier_table_unicode(unicode_subsequent)
+    print_data("""
+    ];
+}
+""")
+
+def emit_identifier_table_ascii(mapping):
+    def render(yes):
+        return ' true' if yes else 'false'
+
+    print_data(split_into_lines(map(render, mapping), separator=',', indent=8, max_length=99))
+
+def emit_identifier_table_unicode(mapping):
+    def render(range):
+        return "('\\u{%04X}', '\\u{%04X}')" % range
+
+    print_data(split_into_lines(map(render, mapping), separator=',', indent=8, max_length=99))
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
@@ -1667,22 +1937,72 @@ def emit_trivial_tests(tests):
 latest_version = query_latest_unicode_version()
 report_status('Latest Unicode Standard version is "' + latest_version + '"')
 
+if commandline_args.compare:
+    # Comparing two identifier sets, producing no output
+    version_old, version_new = commandline_args.compare
+    if version_old == 'latest': version_old = latest_version
+    if version_new == 'latest': version_new = latest_version
+
+    report_status('')
+
+    if version_old == version_new:
+        report_status(('After careful examination I have found versions "%s" and "%s" to be equal.'
+                     + ' I am pretty sure they will produce equivalent identifier sets.')
+                     % (version_old, version_new))
+    else:
+        ucd_old = load_unicode_character_data(version_old)
+        ucd_new = load_unicode_character_data(version_new)
+
+        initial_old, subsequent_old = compute_character_sets(ucd_old)
+        initial_new, subsequent_new = compute_character_sets(ucd_new)
+
+        perfect_sets = True
+        for old, new, name in [(initial_old,    initial_new,    'initial'),
+                               (subsequent_old, subsequent_new, 'subsequent')]:
+            diff = old - new
+            if diff:
+                if perfect_sets:
+                    report_status('Some characters have changed their properties and need to be'
+                                + ' grandfathered in order to preserve identifier stability between'
+                                + ' versions.')
+                    perfect_sets = False
+
+                report_status('\nConsider adding these characters to %s:' % name)
+                for c in sorted(diff):
+                    report_status('  U+%04X %s' % (c, ucd_new.names.get(c, '')))
+
+        if perfect_sets:
+            report_status('\nAll character sets are fine!')
+
 # Checking output type
-output = commandline_args.output[0]
-if output not in ['tables', 'conformance']:
+output = commandline_args.output
+if output is None:
+    output = 'none' if commandline_args.compare else 'tables'
+else:
+    output = output[0]
+
+if output in ['tables', 'conformance']:
+    # Generating tables for a given version
+    if commandline_args.version == 'latest':
+        version = latest_version
+    else:
+        version = commandline_args.version[0]
+
+    report_status('')
+
+    ucd = load_unicode_character_data(version)
+
+    if output == 'tables':
+        cs = compute_character_sets(ucd)
+
+        emit_unicode_tables(ucd, cs)
+
+    if output == 'conformance':
+        emit_normalization_tests(ucd)
+
+elif output == 'none':
+    pass
+
+else:
     report_status("\nUnknown --output option: %s" % output)
     sys.exit(-1)
-
-# Generating tables for a given version
-if commandline_args.version == 'latest':
-    version = latest_version
-else:
-    version = commandline_args.version[0]
-
-ucd = load_unicode_character_data(version)
-
-if output == 'tables':
-    emit_unicode_tables(ucd)
-
-if output == 'conformance':
-    emit_normalization_tests(ucd)

@@ -892,15 +892,8 @@ impl<'a> StringScanner<'a> {
     fn scan_identifier(&mut self) -> Token {
         let start = self.prev_pos;
         if !self.cur.map_or(true, is_delimiter) {
-            // The first characters of identifiers are a bit more restrictive. However, this
-            // method is also used to handle peculiar identifiers, so allow their starters too.
-            let regular_initial = is_identifier_initial(self.cur.unwrap());
-            let peculiar_initial = match self.cur.unwrap() {
-                '+' | '-' | '@' | '.' => true,
-                _ => false,
-            };
-
-            if !(regular_initial || peculiar_initial) {
+            // The first characters of identifiers are a bit more restrictive.
+            if !is_identifier_initial(self.cur.unwrap()) {
                 self.diagnostic.report(DiagnosticKind::err_lexer_invalid_identifier_character,
                     Span::new(self.prev_pos, self.pos));
             }
@@ -1775,26 +1768,16 @@ fn is_exponent_marker(c: char) -> bool {
 
 /// Check if a character is an initial of an identifer.
 fn is_identifier_initial(c: char) -> bool {
-    match c {
-        // <letter>
-        'a' ... 'z' | 'A' ... 'Z' |
-        // <special-initial>
-        '!' | '$' | '%' | '&' | '*' | '/' | ':' | '<' | '=' | '>' | '?' | '^' | '_' | '~' => true,
-        _ => false,
-    }
+    use unicode::scheme_identifiers;
+
+    return scheme_identifiers::is_initial(c);
 }
 
 /// Check if a character is a subsequent of an identifer.
 fn is_identifier_subsequent(c: char) -> bool {
-    match c {
-        // <initial>
-        c if is_identifier_initial(c)   => true,
-        // <digit>
-        c if is_digit(10, c)            => true,
-        // <special-subsequent>
-        '+' | '-' | '.' | '@'           => true,
-        _ => false,
-    }
+    use unicode::scheme_identifiers;
+
+    return scheme_identifiers::is_subsequent(c);
 }
 
 /// A replacement character used when we need to return a character, but don't have one.

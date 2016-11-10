@@ -15,6 +15,7 @@
 mod tables;
 
 pub use tables::UNICODE_VERSION;
+pub use tables::scheme_identifiers;
 
 pub mod normalization;
 

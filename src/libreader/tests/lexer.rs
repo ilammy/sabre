@@ -3104,6 +3104,214 @@ fn recover_identifiers_ascii_unprintable() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Unicode identifiers
+
+#[test]
+fn identifiers_unicode_basic() {
+    check! {
+        // Lu
+        ("\u{041F}\u{0420}\u{041E}\u{0412}\u{0415}\u{0420}\u{041A}\u{0410}" => Identifier("\u{041F}\u{0420}\u{041E}\u{0412}\u{0415}\u{0420}\u{041A}\u{0410}"));
+        (" " => Whitespace);
+        ("\u{1D447}\u{1D438}\u{1D446}\u{1D447}" => Identifier("\u{1D447}\u{1D438}\u{1D446}\u{1D447}"));
+        (" " => Whitespace);
+        // Ll
+        ("\u{03B5}\u{03BE}\u{03AD}\u{03C4}\u{03B1}\u{03C3}\u{03B7}" => Identifier("\u{03B5}\u{03BE}\u{03AD}\u{03C4}\u{03B1}\u{03C3}\u{03B7}"));
+        (" " => Whitespace);
+        ("\u{1E936}\u{1E93E}\u{1E930}" => Identifier("\u{1E936}\u{1E93E}\u{1E930}"));
+        (" " => Whitespace);
+        // Lt
+        ("\u{01F2}\u{0061}" => Identifier("\u{01F2}\u{0061}"));
+        (" " => Whitespace);
+        ("\u{1FAA}" => Identifier("\u{1FAA}"));
+        (" " => Whitespace);
+        // Lm
+        ("\u{1D2E}\u{1D3C}\u{1D3C}\u{1D2E}\u{1D4E}\u{1D4B}" => Identifier("\u{1D2E}\u{1D3C}\u{1D3C}\u{1D2E}\u{1D4E}\u{1D4B}"));
+        (" " => Whitespace);
+        ("\u{A9CF}\u{16F93}" => Identifier("\u{A9CF}\u{16F93}"));
+        (" " => Whitespace);
+        // Lo
+        ("\u{0627}\u{062E}\u{062A}\u{0628}\u{0627}\u{0631}" => Identifier("\u{0627}\u{062E}\u{062A}\u{0628}\u{0627}\u{0631}"));
+        (" " => Whitespace);
+        ("\u{6E2C}\u{8A66}" => Identifier("\u{6E2C}\u{8A66}"));
+        (" " => Whitespace);
+        ("\u{16B29}\u{16B6C}\u{1458B}\u{13365}" => Identifier("\u{16B29}\u{16B6C}\u{1458B}\u{13365}"));
+        (" " => Whitespace);
+        // Mn (subsequent-only)
+        ("\u{0074}\u{0065}\u{0300}\u{0073}\u{0074}" => Identifier("\u{0074}\u{0065}\u{0300}\u{0073}\u{0074}"));
+        (" " => Whitespace);
+        ("\u{0078}\u{05BD}" => Identifier("\u{0078}\u{05BD}"));
+        (" " => Whitespace);
+        ("\u{58DE}\u{1E949}" => Identifier("\u{58DE}\u{1E949}"));
+        (" " => Whitespace);
+        // Mc (subsequent-only)
+        ("\u{0433}\u{16F54}" => Identifier("\u{0433}\u{16F54}"));
+        (" " => Whitespace);
+        ("\u{043E}\u{0C82}" => Identifier("\u{043E}\u{0C82}"));
+        (" " => Whitespace);
+        // Me (subsequent-only)
+        ("\u{0044}\u{20E3}\u{0065}\u{20E3}\u{0073}\u{20E3}\u{0075}\u{20E3}" => Identifier("\u{0044}\u{20E3}\u{0065}\u{20E3}\u{0073}\u{20E3}\u{0075}\u{20E3}"));
+        (" " => Whitespace);
+        // Nd (subsequent-only)
+        ("\u{0401}\u{07C0}\u{07C7}\u{09EE}\u{0BEB}\u{1811}\u{1D7F9}\u{1E954}" => Identifier("\u{0401}\u{07C0}\u{07C7}\u{09EE}\u{0BEB}\u{1811}\u{1D7F9}\u{1E954}"));
+        (" " => Whitespace);
+        // Nl
+        ("\u{2167}\u{216E}\u{2180}\u{1015B}\u{1242C}\u{3028}" => Identifier("\u{2167}\u{216E}\u{2180}\u{1015B}\u{1242C}\u{3028}"));
+        (" " => Whitespace);
+        // No
+        ("\u{0078}\u{00BC}" => Identifier("\u{0078}\u{00BC}"));
+        (" " => Whitespace);
+        ("\u{0BF0}\u{246C}\u{108FD}\u{10CFA}" => Identifier("\u{0BF0}\u{246C}\u{108FD}\u{10CFA}"));
+        (" " => Whitespace);
+        // Pd
+        ("\u{2014}\u{2012}\u{3030}\u{FF0D}" => Identifier("\u{2014}\u{2012}\u{3030}\u{FF0D}"));
+        (" " => Whitespace);
+        // Pc
+        ("\u{203F}\u{002E}\u{203F}" => Identifier("\u{203F}\u{002E}\u{203F}"));
+        (" " => Whitespace);
+        ("\u{FE34}\u{FE4F}\u{FE34}" => Identifier("\u{FE34}\u{FE4F}\u{FE34}"));
+        (" " => Whitespace);
+        // Po
+        ("\u{00B6}\u{00BF}\u{066A}\u{07F7}\u{0DF4}" => Identifier("\u{00B6}\u{00BF}\u{066A}\u{07F7}\u{0DF4}"));
+        (" " => Whitespace);
+        ("\u{1809}\u{2021}\u{2049}\u{2E2D}\u{A875}" => Identifier("\u{1809}\u{2021}\u{2049}\u{2E2D}\u{A875}"));
+        (" " => Whitespace);
+        ("\u{FE57}\u{FF20}\u{12470}\u{1DA87}" => Identifier("\u{FE57}\u{FF20}\u{12470}\u{1DA87}"));
+        (" " => Whitespace);
+        // Sc
+        ("\u{00A2}\u{20A5}\u{20A8}\u{20B8}" => Identifier("\u{00A2}\u{20A5}\u{20A8}\u{20B8}"));
+        (" " => Whitespace);
+        // Sm
+        ("\u{00D7}\u{21A3}\u{2203}\u{220F}\u{222D}" => Identifier("\u{00D7}\u{21A3}\u{2203}\u{220F}\u{222D}"));
+        (" " => Whitespace);
+        ("\u{229E}\u{25FF}\u{27F1}\u{2AF7}\u{1D6C1}" => Identifier("\u{229E}\u{25FF}\u{27F1}\u{2AF7}\u{1D6C1}"));
+        (" " => Whitespace);
+        // Sk
+        ("\u{005E}\u{02E5}\u{FBB2}\u{1F612}\u{1F3FB}" => Identifier("\u{005E}\u{02E5}\u{FBB2}\u{1F612}\u{1F3FB}"));
+        (" " => Whitespace);
+        // So
+        ("\u{00A9}\u{06DE}\u{0BF5}\u{0F16}" => Identifier("\u{00A9}\u{06DE}\u{0BF5}\u{0F16}"));
+        (" " => Whitespace);
+        ("\u{21B3}\u{2318}\u{23CF}\u{2414}\u{2541}" => Identifier("\u{21B3}\u{2318}\u{23CF}\u{2414}\u{2541}"));
+        (" " => Whitespace);
+        ("\u{259C}\u{267C}\u{2720}\u{2FA9}\u{336A}\u{FFFD}\u{1D21D}\u{1F0F2}" => Identifier("\u{259C}\u{267C}\u{2720}\u{2FA9}\u{336A}\u{FFFD}\u{1D21D}\u{1F0F2}"));
+        (" " => Whitespace);
+        // Co
+        ("\u{E000}\u{F000}\u{F8FF}" => Identifier("\u{E000}\u{F000}\u{F8FF}"));
+        (" " => Whitespace);
+        ("\u{F0000}\u{F5000}\u{FFFFD}" => Identifier("\u{F0000}\u{F5000}\u{FFFFD}"));
+        (" " => Whitespace);
+        ("\u{100000}\u{101234}\u{10FFFD}" => Identifier("\u{100000}\u{101234}\u{10FFFD}"));
+        (" " => Whitespace);
+        // ZWNJ, ZWJ (subsequent-only)
+        ("\u{05E2}\u{05B2}\u{05D5}\u{200C}\u{05B9}\u{05E0}\u{05B9}\u{05EA}" => Identifier("\u{05E2}\u{05B2}\u{05D5}\u{200C}\u{05B9}\u{05E0}\u{05B9}\u{05EA}"));
+        (" " => Whitespace);
+        ("\u{0915}\u{094D}\u{200D}\u{0937}" => Identifier("\u{0915}\u{094D}\u{200D}\u{0937}"));
+    }
+}
+
+#[test]
+fn identifiers_unicode_escaped() {
+    check! {
+        // Normal Unicode as in plain identifiers
+        ("|\u{0442}\u{043E}\u{0445}\u{043E}|" => Identifier("\u{0442}\u{043E}\u{0445}\u{043E}"));
+        (" " => Whitespace);
+        ("|\u{05DE}\u{05B4}\u{05D1}\u{05B0}\u{05D7}\u{05B8}\u{05DF}|" => Identifier("\u{05DE}\u{05B4}\u{05D1}\u{05B0}\u{05D7}\u{05B8}\u{05DF}"));
+        (" " => Whitespace);
+        // Anything is allowed and preserved as is
+        ("|\u{24A3}\u{24A0}\u{24A7}\u{24A7}\u{24AA}|" => Identifier("\u{24A3}\u{24A0}\u{24A7}\u{24A7}\u{24AA}"));
+        (" " => Whitespace);
+        ("|\u{0000}\u{10FFFF}\u{200D}\u{0099}\u{E0001}\u{E0071}\u{E007F}|" => Identifier("\u{0000}\u{10FFFF}\u{200D}\u{0099}\u{E0001}\u{E0071}\u{E007F}"));
+    }
+}
+
+#[test]
+fn recover_identifiers_unicode_restricted_initial() {
+    check! {
+        // Mn
+        ("\u{1772}\u{2D7F}" => Identifier("\u{1772}\u{2D7F}")),
+            (0, 3) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{1DA58}\u{1DA61}" => Identifier("\u{1DA58}\u{1DA61}")),
+            (0, 4) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{E01EE}" => Identifier("\u{E01EE}")),
+            (0, 4) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Mc
+        ("\u{0BC8}\u{0BCB}" => Identifier("\u{0BC8}\u{0BCB}")),
+            (0, 3) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Me
+        ("\u{20DD}\u{0039}" => Identifier("\u{20DD}\u{0039}")),
+            (0, 3) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Nd
+        ("\u{FF11}\u{FF12}\u{FF13}" => Identifier("\u{FF11}\u{FF12}\u{FF13}")),
+            (0, 3) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // ZWNJ, ZWJ
+        ("\u{200C}\u{0445}\u{0430}\u{200C}\u{002D}\u{0445}\u{0430}" => Identifier("\u{200C}\u{0445}\u{0430}\u{200C}\u{002D}\u{0445}\u{0430}")),
+            (0, 3) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{200D}\u{0C1A}\u{0C46}\u{0C21}\u{200D}\u{0C41}\u{200D}" => Identifier("\u{200D}\u{0C1A}\u{0C46}\u{0C21}\u{200D}\u{0C41}\u{200D}")),
+            (0, 3) => err_lexer_invalid_identifier_character;
+    }
+}
+
+#[test]
+fn recover_identifiers_unicode_unmapped() {
+    check! {
+        // Cc
+        ("\u{0000}\u{006E}\u{0069}\u{006C}" => Identifier("\u{0000}\u{006E}\u{0069}\u{006C}")),
+            (0, 1) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{10DB}\u{10EC}\u{0091}\u{10D5}\u{10D0}\u{10DC}\u{10D4}\u{0083}" => Identifier("\u{10DB}\u{10EC}\u{0091}\u{10D5}\u{10D0}\u{10DC}\u{10D4}\u{0083}")),
+            (6, 8) => err_lexer_invalid_identifier_character,
+            (20, 22) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Cf (except for ZWNJ, ZWJ)
+        ("\u{0440}\u{0430}\u{0437}\u{00AD}\u{043B}\u{043E}\u{043C}" => Identifier("\u{0440}\u{0430}\u{0437}\u{00AD}\u{043B}\u{043E}\u{043C}")),
+            (6, 8) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{0DC4}\u{180E}\u{0DBB}\u{0DD2}\u{0DAD}" => Identifier("\u{0DC4}\u{180E}\u{0DBB}\u{0DD2}\u{0DAD}")),
+            (3, 6) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{0079}\u{0065}\u{015F}\u{200B}\u{0069}\u{006C}" => Identifier("\u{0079}\u{0065}\u{015F}\u{200B}\u{0069}\u{006C}")),
+            (4, 7) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{200E}\u{0642}\u{0631}\u{0645}\u{0632}\u{206F}" => Identifier("\u{200E}\u{0642}\u{0631}\u{0645}\u{0632}\u{206F}")),
+            (0, 3) => err_lexer_invalid_identifier_character,
+            (11, 14) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Ps, Pe
+        ("\u{27E6}\u{03B1}\u{276F}" => Identifier("\u{27E6}\u{03B1}\u{276F}")),
+            (0, 3) => err_lexer_invalid_identifier_character,
+            (5, 8) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{201E}\u{178F}\u{2E23}" => Identifier("\u{201E}\u{178F}\u{2E23}")),
+            (0, 3) => err_lexer_invalid_identifier_character,
+            (6, 9) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Pi, Pf
+        ("\u{00AB}\u{50BE}\u{659C}\u{2E05}" => Identifier("\u{00AB}\u{50BE}\u{659C}\u{2E05}")),
+            (0, 2) => err_lexer_invalid_identifier_character,
+            (8, 11) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Zl
+        ("\u{26B5}\u{2028}\u{2F33}" => Identifier("\u{26B5}\u{2028}\u{2F33}")),
+            (3, 6) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Zp
+        ("\u{0430}\u{0431}\u{0437}\u{0430}\u{0446}\u{002E}\u{2029}" => Identifier("\u{0430}\u{0431}\u{0437}\u{0430}\u{0446}\u{002E}\u{2029}")),
+            (11, 14) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Zs
+        ("\u{0073}\u{0070}\u{0061}\u{2000}\u{0063}\u{0065}" => Identifier("\u{0073}\u{0070}\u{0061}\u{2000}\u{0063}\u{0065}")),
+            (3, 6) => err_lexer_invalid_identifier_character;
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Directives
 
 #[test]

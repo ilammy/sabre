@@ -6,3 +6,6 @@ authors = ["ilammy <a.lozovsky@gmail.com>"]
 [lib]
 name = "reader"
 path = "lib.rs"
+
+[dependencies]
+libunicode = { path = "../libunicode", version = "0.1.0" }
