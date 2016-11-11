@@ -566,8 +566,9 @@ impl<'a> StringScanner<'a> {
             return Token::Character(first_character);
         }
 
-        // Match character names case-insensitively if the user has requested #!fold-case before.
-        let name = if self.folding_case { fold_identifier_case(name) } else { name.to_owned() };
+        // Normalize character names before matching (this is important mostly for the case when
+        // #!fold-case is in effect).
+        let name = self.normalize_identifer(name);
 
         // Finally, handle named character literals.
         match &name[..] {
@@ -870,8 +871,8 @@ impl<'a> StringScanner<'a> {
         }
         let name_end = self.prev_pos;
 
-        // Directives are case-insensitive.
-        let value = fold_identifier_case(&self.buf[name_start..name_end]);
+        // Directives are matched as case-insensitive identifiers.
+        let value = normalize_case_insensitive_identifier(&self.buf[name_start..name_end]);
 
         match &value[..] {
             // Handle case-folding directives.
@@ -922,8 +923,15 @@ impl<'a> StringScanner<'a> {
 
         let value = &self.buf[start..end];
 
-        // Fold case in identifiers if the user has requested #!fold-case before.
-        let value = if self.folding_case { fold_identifier_case(value) } else { value.to_owned() };
+        // Normalize identifier spelling and handle `#!fold-case` mode.
+        let value = self.normalize_identifer(value);
+
+        // Warn the user if the identifier can be parsed as a number after normalization, maybe
+        // they intended to write a number, but, for example, their editor used fullwidth digits.
+        if looks_like_number_prefix(&value, 10) {
+            self.diagnostic.report(DiagnosticKind::warn_lexer_identifier_looks_like_number,
+                Span::new(start, end));
+        }
 
         return Token::Identifier(self.pool.intern_string(value));
     }
@@ -969,7 +977,8 @@ impl<'a> StringScanner<'a> {
             }
         }
 
-        // Note that escaped identifiers are always case-sensitive.
+        // Note that escaped identifiers are always verbatim. They are case-sensitive and they are
+        // not normalized in any way.
         return Token::Identifier(self.pool.intern_string(value));
     }
 
@@ -1212,82 +1221,7 @@ impl<'a> StringScanner<'a> {
 
     /// Check whether we were fooled and there is a peculiar identifier ahead instead of a number.
     fn peculiar_identifier_ahead(&self, radix: u8) -> bool {
-        // Now, the whole notion of peculiar identifiers is abominable. That's what you get when
-        // you make identifier syntax as permissive as it is in Scheme. Well, whatever. This is
-        // just another hysterical raisin to deal with.
-        //
-        // Here is the formal grammar of peculiar identifiers from R7RS:
-        //
-        //     <peculiar-identifier> ::= <explicit-sign>                                    (1)
-        //                            |  <explicit-sign>  <sign-subsequent> <subsequent>*   (2)
-        //                            |  <explicit-sign> . <dot-subsequent> <subsequent>*   (3)
-        //                            |                  . <dot-subsequent> <subsequent>*   (4)
-        //
-        //     <explicit-sign> ::= + | -
-        //
-        //     <sign-subsequent> ::= <initial> | <explicit-sign> | @
-        //
-        //     <dot-subsequent> ::= <sign-subsequent> | .
-        //
-        // where <subsequent> can be thought of as effectively anything except for <delimiter>,
-        // and <initial> is <subsequent> minus decimal digits and [+-.@]
-        //
-        // And there is an exception: +i, -i, +inf.0, -inf.0, +nan.0, -nan.0 (case-insensitive)
-        // are parsed as numbers, not peculiar identifiers. Note that they must match exactly.
-        //
-        // One wacky point about these exceptions, which is not immediately obvious from the
-        // formal grammar and R7RS commentary, is whether a string like "+inf.0+40000monkeys"
-        // is a valid peculiar identifer, or an invalid number literal, or something else.
-        //
-        // This could be a peculiar identifier as it matches its grammar and does not match
-        // the grammar of numbers. However, there is another rule that says that an identifier
-        // cannot have a valid number as its prefix, and in our case we have this "+inf.0".
-        // So we should treat this string as ungrammatical and we can report anything we want.
-        // But that rule also invalidates all identifiers starting with "+i", just this one
-        // special letter. Which is obviously dumb.
-        //
-        // Thus we take the following stance on this issue: if we see /[+-](inf|nan).0/i
-        // as a prefix then this is *not* a peculiar identifier. Otherwise it is, except
-        // for the exact case /[+-]i[:delimiter:]/i which is a number.
-
-        let first  = self.cur;
-        let second = self.peek();
-        let third  = self.peekpeek();
-
-        // Cases (1), (2), (3)
-        if first == Some('+') || first == Some('-') {
-            // Case (1)
-            if second.map_or(true, is_delimiter) {
-                return true;
-            }
-
-            // Case (3)
-            if second == Some('.') {
-                return third.map_or(true, |c| is_delimiter(c) || !is_digit(radix, c));
-            }
-
-            // Case (2) with exceptions
-            if second.map_or(true, |c| !is_digit(radix, c)) {
-                if self.ahead_is("inf.0") || self.ahead_is("nan.0") {
-                    return false;
-                }
-                if self.ahead_is("i") && third.map_or(true, is_delimiter) {
-                    return false;
-                }
-                return true;
-            }
-
-            // Anything starting with a sign followed by a digit must be a number.
-            return false;
-        }
-
-        // Case (4)
-        if first == Some('.') {
-            return second.map_or(true, |c| !is_delimiter(c) && !is_digit(radix, c));
-        }
-
-        // Anything starting with a digit must be a number.
-        return first.map_or(true, |c| !is_digit(radix, c));
+        !looks_like_number_prefix(&self.buf[self.prev_pos..], radix)
     }
 
     /// Scan a real part of a number (an integer, a fractional, or a rational number).
@@ -1616,27 +1550,13 @@ impl<'a> StringScanner<'a> {
 
     /// Check whether the lookahead has a given ASCII prefix ignoring case.
     fn ahead_is(&self, prefix: &str) -> bool {
-        use std::ascii::AsciiExt;
-
-        assert!(prefix.chars().all(|c| c.is_ascii() && c == c.to_ascii_lowercase()));
-
-        self.buf[self.pos..]
-            .chars()
-            .map(|c| c.to_ascii_lowercase())
-            .take(prefix.len())
-            .eq(prefix.chars())
+        has_ascii_prefix_ci(&self.buf[self.pos..], prefix)
     }
 
     /// Check whether the lookahead has a given ASCII prefix ignoring case,
     /// and a delimiter goes right after that.
     fn ahead_is_exactly(&self, prefix: &str) -> bool {
-        if !self.ahead_is(prefix) {
-            return false;
-        }
-        return self.buf[self.pos..]
-                   .chars()
-                   .nth(prefix.len())
-                   .map_or(true, is_delimiter);
+        has_ascii_prefix_ci_exact(&self.buf[self.pos..], prefix)
     }
 
     /// Scan over an (invalid) suffix of an `+inf.0` or `-nan.0` value.
@@ -1688,6 +1608,25 @@ impl<'a> StringScanner<'a> {
         if suffix_start != suffix_end {
             self.diagnostic.report(DiagnosticKind::err_lexer_infnan_suffix,
                 Span::new(suffix_start, suffix_end));
+        }
+    }
+
+    /// Normalize an identifier name.
+    ///
+    /// We normalize textual identifier names to NFKC (compatibility composition) in order to
+    /// fold any visual ambiguities resulting from very permissive identifier syntax. We also
+    /// remove any Default_Ignorable_Code_Points.
+    ///
+    /// When `#!fold-case` is in effect we apply NFKC_Casefold transformation which simultaneously
+    /// folds case, normalizes text to NFKC, and removes Default_Ignorable_Code_Points.
+    ///
+    /// As noted in the discussion of SRFI 52, NFKC is not an ideal transformation, but it is
+    /// a standardized best practice, so we go with it.
+    fn normalize_identifer(&self, s: &str) -> String {
+        if self.folding_case {
+            normalize_case_insensitive_identifier(s)
+        } else {
+            normalize_case_sensitive_identifier(s)
         }
     }
 }
@@ -1783,6 +1722,12 @@ fn is_identifier_subsequent(c: char) -> bool {
 /// A replacement character used when we need to return a character, but don't have one.
 const REPLACEMENT_CHARACTER: char = '\u{FFFD}';
 
+/// U+200C ZERO WIDTH NON-JOINER
+const ZERO_WIDTH_NON_JOINER: char = '\u{200C}';
+
+/// U+200D ZERO WIDTH JOINER
+const ZERO_WIDTH_JOINER: char = '\u{200D}';
+
 /// Check whether `c` is a valid digit of base `base`.
 fn is_digit(base: u8, c: char) -> bool {
     match base {
@@ -1810,6 +1755,25 @@ fn hex_value(c: char) -> u8 {
     return H[c as usize];
 }
 
+/// Normalize a string as a case-sensitive identifier.
+fn normalize_case_sensitive_identifier(s: &str) -> String {
+    use unicode::normalization;
+
+    let normalized = normalization::nfkc(s);
+
+    // Scheme identifier syntax permits only ZWNJ and ZWJ to occur in valid identifiers,
+    // so we remove only these (and do not need a table of Default_Ignorable_Code_Points).
+    normalized.chars()
+              .filter(|&c| !(c == ZERO_WIDTH_NON_JOINER || c == ZERO_WIDTH_JOINER))
+              .collect()
+}
+
+/// Normalize a string as a case-insensitive identifier.
+fn normalize_case_insensitive_identifier(s: &str) -> String {
+    // TODO: use NFKC_casefold instead of this
+    fold_identifier_case(&normalize_case_sensitive_identifier(s))
+}
+
 /// Apply case-folding to a directive or an identifier.
 ///
 /// Note that this is _not_ a general case-folding procedure.
@@ -1818,4 +1782,111 @@ fn fold_identifier_case(s: &str) -> String {
 
     // We support only ASCII now, so this will do:
     return s.to_ascii_lowercase();
+}
+
+/// Check whether a string should be parsed as a number or it can be glanced off as an identifier
+/// (possibly peculiar one). Returns true if it is a number.
+fn looks_like_number_prefix(s: &str, radix: u8) -> bool {
+    // Now, the whole notion of peculiar identifiers is abominable. That's what you get when
+    // you make identifier syntax as permissive as it is in Scheme. Well, whatever. This is
+    // just another hysterical raisin to deal with.
+    //
+    // Here is the formal grammar of peculiar identifiers from R7RS:
+    //
+    //     <peculiar-identifier> ::= <explicit-sign>                                    (1)
+    //                            |  <explicit-sign>  <sign-subsequent> <subsequent>*   (2)
+    //                            |  <explicit-sign> . <dot-subsequent> <subsequent>*   (3)
+    //                            |                  . <dot-subsequent> <subsequent>*   (4)
+    //
+    //     <explicit-sign> ::= + | -
+    //
+    //     <sign-subsequent> ::= <initial> | <explicit-sign> | @
+    //
+    //     <dot-subsequent> ::= <sign-subsequent> | .
+    //
+    // where <subsequent> can be thought of as effectively anything except for <delimiter>,
+    // and <initial> is <subsequent> minus decimal digits and [+-.@]
+    //
+    // And there is an exception: +i, -i, +inf.0, -inf.0, +nan.0, -nan.0 (case-insensitive)
+    // are parsed as numbers, not peculiar identifiers. Note that they must match exactly.
+    //
+    // One wacky point about these exceptions, which is not immediately obvious from the
+    // formal grammar and R7RS commentary, is whether a string like "+inf.0+40000monkeys"
+    // is a valid peculiar identifer, or an invalid number literal, or something else.
+    //
+    // This could be a peculiar identifier as it matches its grammar and does not match
+    // the grammar of numbers. However, there is another rule that says that an identifier
+    // cannot have a valid number as its prefix, and in our case we have this "+inf.0".
+    // So we should treat this string as ungrammatical and we can report anything we want.
+    // But that rule also invalidates all identifiers starting with "+i", just this one
+    // special letter. Which is obviously dumb.
+    //
+    // Thus we take the following stance on this issue: if we see /[+-](inf|nan).0/i
+    // as a prefix then this is *not* a peculiar identifier. Otherwise it is, except
+    // for the exact case /[+-]i[:delimiter:]/i which is a number.
+
+    let first  = s.chars().nth(0);
+    let second = s.chars().nth(1);
+    let third  = s.chars().nth(2);
+
+    // Cases (1), (2), (3)
+    if first == Some('+') || first == Some('-') {
+        // Case (1)
+        if second.map_or(true, is_delimiter) {
+            return false;
+        }
+
+        // Case (3)
+        if second == Some('.') {
+            return third.map_or(false, |c| !is_delimiter(c) && is_digit(radix, c));
+        }
+
+        // Case (2) with exceptions
+        if second.map_or(true, |c| !is_digit(radix, c)) {
+            let after_sign = &s[1..];
+            if has_ascii_prefix_ci(after_sign, "inf.0") {
+                return true;
+            }
+            if has_ascii_prefix_ci(after_sign, "nan.0") {
+                return true;
+            }
+            if has_ascii_prefix_ci_exact(after_sign, "i") {
+                return true;
+            }
+            return false;
+        }
+
+        // Anything starting with a sign followed by a digit must be a number.
+        return true;
+    }
+
+    // Case (4)
+    if first == Some('.') {
+        return second.map_or(false, |c| is_delimiter(c) || is_digit(radix, c));
+    }
+
+    // Anything starting with a digit must be a number.
+    return first.map_or(false, |c| is_digit(radix, c));
+}
+
+/// Return true if `s` has a given ASCII prefix ignoring case.
+fn has_ascii_prefix_ci(s: &str, prefix: &str) -> bool {
+    use std::ascii::AsciiExt;
+
+    assert!(prefix.chars().all(|c| c.is_ascii() && c == c.to_ascii_lowercase()));
+
+    s.chars()
+     .map(|c| c.to_ascii_lowercase())
+     .take(prefix.len())
+     .eq(prefix.chars())
+}
+
+/// Return true if `s` has a given ASCII prefix ignoring case, and a delimiter after it.
+fn has_ascii_prefix_ci_exact(s: &str, prefix: &str) -> bool {
+    if !has_ascii_prefix_ci(s, prefix) {
+        return false;
+    }
+    return s.chars()
+            .nth(prefix.len())
+            .map_or(true, is_delimiter);
 }
