@@ -277,6 +277,28 @@ def parse_quick_check_props(data):
 
     return props
 
+def parse_nfkc_casefold(data):
+    """Extract NFKC_Casefold mapping from DerivedNormalizationProps.txt"""
+    mapping = {}
+
+    for line in data.split('\n'):
+        if not line or line.startswith('#'):
+            continue
+
+        row = line.split('#')[0].split(';')
+        kind = row[1].strip()
+
+        if kind != 'NFKC_CF':
+            continue
+
+        codepoints = parse_codepoint_range(row[0])
+        folded_form = map(lambda s: int(s, 16), row[2].strip().split())
+
+        for c in codepoints:
+            mapping[c] = folded_form
+
+    return mapping
+
 def parse_codepoint_range(cp_range):
     """Covert codepoint range format used in UCD into a list of codepoints"""
     parts = cp_range.strip().split('..')
@@ -625,6 +647,7 @@ def prepare_unicode_character_data(version):
      normalization_tests_trivial] = parse_normalization_tests(NormalizationTest, assigned_codepoints)
     default_ignorable_code_points = parse_default_ignorable_code_points(DerivedCoreProperties)
     quick_check = parse_quick_check_props(DerivedNormalizationProps)
+    nfkc_casefold = parse_nfkc_casefold(DerivedNormalizationProps)
 
     report_status('Precomputing derived properties...')
 
@@ -644,6 +667,7 @@ def prepare_unicode_character_data(version):
     ucd.primary_composites            = compute_primary_composites(ucd)
 
     ucd.general_category = general_category
+    ucd.nfkc_casefold    = nfkc_casefold
     ucd.quick_check      = quick_check
     ucd.properties       = properties
     ucd.version          = version
@@ -693,6 +717,7 @@ def ucd_to_json(ucd):
     json['canonical_combining_class']        = [(c, ccc) for c, ccc in ucd.canonical_combining_class.iteritems()]
     json['names']                            = [(c, name) for c, name in ucd.names.iteritems()]
 
+    json['nfkc_casefold']                    = [[c] + d for c, d in ucd.nfkc_casefold.iteritems()]
     json['compatibility_decompositions']     = [[c] + d for c, d in ucd.compatibility_decompositions.iteritems()]
     json['canonical_decompositions']         = [[c] + d for c, d in ucd.canonical_decompositions.iteritems()]
     json['jamo_decompositions']              = [[c] + d for c, d in ucd.jamo_decompositions.iteritems()]
@@ -721,6 +746,7 @@ def json_to_ucd(json):
     ucd.canonical_combining_class            = {c: ccc for c, ccc in json['canonical_combining_class']}
     ucd.names                                = {c: name for c, name in json['names']}
 
+    ucd.nfkc_casefold                        = {d[0]: d[1:] for d in json['nfkc_casefold']}
     ucd.compatibility_decompositions         = {d[0]: d[1:] for d in json['compatibility_decompositions']}
     ucd.canonical_decompositions             = {d[0]: d[1:] for d in json['canonical_decompositions']}
     ucd.jamo_decompositions                  = {d[0]: d[1:] for d in json['jamo_decompositions']}
@@ -1143,6 +1169,7 @@ def emit_unicode_tables(ucd, cs):
     emit_composition_mappings(ucd)
     emit_decomposition_mappings(ucd)
     emit_quick_check(ucd)
+    emit_case_mappings(ucd)
     report_status('\nDone emitting!')
 
 def emit_header():
@@ -1164,6 +1191,7 @@ def emit_header():
 //!
 //! - *scheme_identifiers*: Scheme identifier sets
 //! - *character_properties*: Unicode character properties
+//! - *case_mappings*: case mappings for casing algorithms
 //! - *composition_mappings*: composition mappings for normalization
 //! - *decomposition_mappings*: decomposition mappings for normalization
 //! - *quick_check*: Quick_Check exclusion tables for normalization
@@ -1176,23 +1204,24 @@ def emit_unicode_version(version):
 pub const UNICODE_VERSION: (u8, u8, u8) = (%d, %d, %d);
 """ % (major, minor, patch))
 
-def split_into_lines(seq, separator, indent, max_length):
+def split_into_lines(seq, separator, indent, max_length, terminator=''):
     """Intersperse a sequence of substrings with given separator and split the result into lines
     of given maximum length, indenting them with given amount of spaces.
     """
     max_length -= indent
     indent = ' ' * indent
+    filler = ' ' if separator else ''
 
     lines = []
     line = ""
     for s in seq:
         new_line = line + s + separator
         if len(new_line) < max_length:
-            line = new_line + ' '
+            line = new_line + filler
         else:
-            lines.append(indent + line)
-            line = s + separator + ' '
-    lines.append(indent + line)
+            lines.append(indent + line + terminator)
+            line = s + separator + filler
+    lines.append(indent + line + terminator)
 
     return '\n'.join(map(lambda s: s.rstrip(), lines))
 
@@ -1809,6 +1838,148 @@ def emit_quick_check_values(values):
         return '%2d' % value
 
     print_data(split_into_lines(map(render, values), separator=',', indent=8, max_length=99))
+
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+#
+# Printing case mappings
+#
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
+def emit_case_mappings(ucd):
+    print_data("""
+/// Unicode case mappings.
+///
+/// This module contains definitions of various case mappings of Unicode characters. They are
+/// mostly used for default case algorithms. See [Unicode Standard Annex #44][UAX-44] for precise
+/// description of the mappings.
+///
+/// [UAX-44]: http://www.unicode.org/reports/tr44/
+pub mod case_mappings {
+""")
+    emit_nfkc_casefold(ucd)
+    print_data("""\
+}
+""")
+
+def emit_nfkc_casefold(ucd):
+    report_status('\nPreparing NFKC_Casefold data...')
+
+    raw_casefold = [ucd.nfkc_casefold.get(c, None) for c in xrange(0x110000)]
+    packed_casefold, character_data = pack_nfkc_casefold_mapping(raw_casefold)
+
+    report_status('Optimizing NFKC_Casefold trie...')
+
+    trie, size = construct_optimized_trie(packed_casefold, value_size=4, initial_suffix_guess=7)
+    size += utf8_len(character_data)
+
+    report_status("Done! Suffix %d, estimated size %d KB" % (trie.suffix, size / 1024))
+
+    print_data("""
+    /// Get NFKC_Casefold mapping for a character.
+    ///
+    /// This is a derived mapping used in _toNFKC_Casefold()_ transformation. It can be either
+    /// Some string (possibly empty) if the mapping is nontrivial. Otherwise it is None, which
+    /// means that the character maps to itself.
+    pub fn nfkc_casefold(c: char) -> Option<&'static str> {
+        let c = c as u32;
+
+        let prefix = (c >> NFKC_CASEFOLD_SUFFIX) as usize;
+        let offset = (c & ((1 << NFKC_CASEFOLD_SUFFIX) - 1)) as usize;
+        let base   = NFKC_CASEFOLD_OFFSETS[prefix] as usize;
+
+        let (start, end) = NFKC_CASEFOLD_SLICES[base + offset];
+
+        if (start == 1) && (end == 0) {
+            return None;
+        }
+
+        return Some(&NFKC_CASEFOLD_CHARS[(start as usize)..(end as usize)]);
+    }
+
+    /// Length of trie suffix.
+    const NFKC_CASEFOLD_SUFFIX: u8 = %d;
+
+    /// Lookup table of offsets.
+    const NFKC_CASEFOLD_OFFSETS: &'static [u16] = &[
+""" % trie.suffix)
+    emit_nfkc_casefold_offsets(trie.offsets)
+    print_data("""
+    ];
+
+    /// Lookup table of slices.
+    const NFKC_CASEFOLD_SLICES: &'static [(u16, u16)] = &[
+""")
+    emit_nfkc_casefold_slices(trie.values)
+    print_data("""
+    ];
+
+    /// Actual case-folded character data blob.
+    const NFKC_CASEFOLD_CHARS: &'static str = "\\
+""")
+    emit_nfkc_casefold_chars(character_data)
+    print_data("""
+    ";
+""")
+
+def utf8_len(chars):
+    """Compute length in bytes of a UTF-8 encoding of a string."""
+    def utf8_bytes(c):
+        if  (0x0000 <= c) and (c <= 0x007F):   return 1
+        if  (0x0080 <= c) and (c <= 0x07FF):   return 2
+        if  (0x0800 <= c) and (c <= 0xD7FF):   return 3
+        if  (0xC000 <= c) and (c <= 0xFFFF):   return 3
+        if (0x10000 <= c) and (c <= 0x10FFFF): return 4
+        raise RuntimeError('Invalid Unicode scalar value 0x%x' % c)
+
+    return sum(map(utf8_bytes, chars))
+
+def pack_nfkc_casefold_mapping(mapping):
+    """Deduplicate linear NFKC_Casefold mappings."""
+
+    decompositions = {None: (1, 0), (): (0, 0)}
+    characters = []
+
+    # We can't use simple variables here because of Python scoping rules, hence this PHP style
+    stats = {'total': 0, 'packed': 0}
+
+    def add_decomposition(decomposition):
+        if decomposition is not None:
+            decomposition = tuple(decomposition)
+
+            if decomposition not in decompositions:
+                start = utf8_len(characters)
+                end = start + utf8_len(decomposition)
+                decompositions[decomposition] = start, end
+                characters.extend(decomposition)
+                stats['packed'] += 1
+
+            stats['total'] += 1
+
+        return decompositions[decomposition]
+
+    new_mapping = map(lambda d: add_decomposition(d), mapping)
+
+    report_status("\ttotal mappings: %d, packed: %d" % (stats['total'], stats['packed']))
+
+    return new_mapping, characters
+
+def emit_nfkc_casefold_offsets(offsets):
+    def render(offset):
+        return '%5d' % offset
+
+    print_data(split_into_lines(map(render, offsets), separator=',', indent=6, max_length=99))
+
+def emit_nfkc_casefold_slices(slices):
+    def render(slice):
+        return '(%5d, %5d)' % slice
+
+    print_data(split_into_lines(map(render, slices), separator=',', indent=8, max_length=99))
+
+def emit_nfkc_casefold_chars(chars):
+    def render_charcc(c):
+        return "\\u{%04X}" % c
+
+    print_data(split_into_lines(map(render_charcc, chars), separator='', terminator='\\', indent=8, max_length=99))
 
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 #
