@@ -3457,6 +3457,69 @@ fn directives_case_control_ascii() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Case control: Unicode
+
+#[test]
+fn directives_case_control_unicode() {
+    check! {
+        ("\u{0411}\u{043B}\u{041E}\u{043D}\u{0414}\u{0438}"                     => Identifier("\u{0411}\u{043B}\u{041E}\u{043D}\u{0414}\u{0438}"));
+        (" "                                                                    => Whitespace);
+        ("|\u{0054}\u{0065}\u{FB06}|"                                           => Identifier("\u{0054}\u{0065}\u{FB06}"));
+        (" "                                                                    => Whitespace);
+        ("\"\u{0111}\u{006F}\u{0302}\u{0300}\u{0053}\u{0055}\u{031B}\u{0301}\"" => String("\u{0111}\u{006F}\u{0302}\u{0300}\u{0053}\u{0055}\u{031B}\u{0301}"));
+        (" "                                                                    => Whitespace);
+        ("#x\u{1D56F}\u{1D570}\u{1D56C}\u{1D56F}"                               => Identifier("DEAD")),
+                                                                         (0, 2) => err_lexer_prefixed_identifier;
+        (" "                                                                    => Whitespace);
+        ("#\\\u{2126}"                                                          => Character('\u{2126}'));
+        (" "                                                                    => Whitespace);
+        ("#\\\u{1D697}\u{1D68E}\u{1D6A0}\u{1D695}\u{1D692}\u{1D697}\u{1D68E}"   => Character('\u{000A}'));
+        (" "                                                                    => Whitespace);
+        ("#\\\u{1D4DD}\u{1D4D4}\u{1D4E6}\u{1D4DB}\u{1D4D8}\u{1D4DD}\u{1D4D4}"   => Character('\u{FFFD}')),
+                                                                        (0, 30) => err_lexer_unknown_character_name;
+        (" "                                                                    => Whitespace);
+
+        ("#!fold-case"                                                          => Directive("fold-case"));
+        ("\n"                                                                   => Whitespace);
+
+        ("\u{0411}\u{043B}\u{041E}\u{043D}\u{0414}\u{0438}"                     => Identifier("\u{0431}\u{043B}\u{043E}\u{043D}\u{0434}\u{0438}"));
+        (" "                                                                    => Whitespace);
+        ("|\u{0054}\u{0065}\u{FB06}|"                                           => Identifier("\u{0054}\u{0065}\u{FB06}"));
+        (" "                                                                    => Whitespace);
+        ("\"\u{0111}\u{006F}\u{0302}\u{0300}\u{0053}\u{0055}\u{031B}\u{0301}\"" => String("\u{0111}\u{006F}\u{0302}\u{0300}\u{0053}\u{0055}\u{031B}\u{0301}"));
+        (" "                                                                    => Whitespace);
+        ("#x\u{1D56F}\u{1D570}\u{1D56C}\u{1D56F}"                               => Identifier("dead")),
+                                                                         (0, 2) => err_lexer_prefixed_identifier;
+        (" "                                                                    => Whitespace);
+        ("#\\\u{2126}"                                                          => Character('\u{2126}'));
+        (" "                                                                    => Whitespace);
+        ("#\\\u{1D697}\u{1D68E}\u{1D6A0}\u{1D695}\u{1D692}\u{1D697}\u{1D68E}"   => Character('\u{000A}'));
+        (" "                                                                    => Whitespace);
+        ("#\\\u{1D4DD}\u{1D4D4}\u{1D4E6}\u{1D4DB}\u{1D4D8}\u{1D4DD}\u{1D4D4}"   => Character('\u{000A}'));
+        (" "                                                                    => Whitespace);
+
+        ("#!no-fold-case"                                                       => Directive("no-fold-case"));
+        ("\n"                                                                   => Whitespace);
+
+        ("\u{0411}\u{043B}\u{041E}\u{043D}\u{0414}\u{0438}"                     => Identifier("\u{0411}\u{043B}\u{041E}\u{043D}\u{0414}\u{0438}"));
+        (" "                                                                    => Whitespace);
+        ("|\u{0054}\u{0065}\u{FB06}|"                                           => Identifier("\u{0054}\u{0065}\u{FB06}"));
+        (" "                                                                    => Whitespace);
+        ("\"\u{0111}\u{006F}\u{0302}\u{0300}\u{0053}\u{0055}\u{031B}\u{0301}\"" => String("\u{0111}\u{006F}\u{0302}\u{0300}\u{0053}\u{0055}\u{031B}\u{0301}"));
+        (" "                                                                    => Whitespace);
+        ("#x\u{1D56F}\u{1D570}\u{1D56C}\u{1D56F}"                               => Identifier("DEAD")),
+                                                                         (0, 2) => err_lexer_prefixed_identifier;
+        (" "                                                                    => Whitespace);
+        ("#\\\u{2126}"                                                          => Character('\u{2126}'));
+        (" "                                                                    => Whitespace);
+        ("#\\\u{1D697}\u{1D68E}\u{1D6A0}\u{1D695}\u{1D692}\u{1D697}\u{1D68E}"   => Character('\u{000A}'));
+        (" "                                                                    => Whitespace);
+        ("#\\\u{1D4DD}\u{1D4D4}\u{1D4E6}\u{1D4DB}\u{1D4D8}\u{1D4DD}\u{1D4D4}"   => Character('\u{FFFD}')),
+                                                                        (0, 30) => err_lexer_unknown_character_name;
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Unicode normalization
 
 #[test]
@@ -3527,7 +3590,7 @@ fn normalization_directives() {
         (" " => Whitespace);
 
         // This normalizes into a different string if NFC, NFD, or NFKD are used:
-        ("#!\u{01C4}\u{03D4}\u{1E9B}\u{FBA5}\u{FEFA}" => Directive("\u{0064}\u{017D}\u{03AB}\u{1E61}\u{06C0}\u{0644}\u{0625}")),
+        ("#!\u{01C4}\u{03D4}\u{1E9B}\u{FBA5}\u{FEFA}" => Directive("\u{0064}\u{017E}\u{03CB}\u{1E61}\u{06C0}\u{0644}\u{0625}")),
             (0, 15) => err_lexer_unknown_directive;
         (" " => Whitespace);
 

@@ -1770,18 +1770,9 @@ fn normalize_case_sensitive_identifier(s: &str) -> String {
 
 /// Normalize a string as a case-insensitive identifier.
 fn normalize_case_insensitive_identifier(s: &str) -> String {
-    // TODO: use NFKC_casefold instead of this
-    fold_identifier_case(&normalize_case_sensitive_identifier(s))
-}
+    use unicode::case_algorithms;
 
-/// Apply case-folding to a directive or an identifier.
-///
-/// Note that this is _not_ a general case-folding procedure.
-fn fold_identifier_case(s: &str) -> String {
-    use std::ascii::AsciiExt;
-
-    // We support only ASCII now, so this will do:
-    return s.to_ascii_lowercase();
+    case_algorithms::to_nfkc_casefold(s)
 }
 
 /// Check whether a string should be parsed as a number or it can be glanced off as an identifier
