@@ -2,6 +2,7 @@
 name = "libunicode"
 version = "0.1.0"
 authors = ["ilammy <a.lozovsky@gmail.com>"]
+license = "MIT/Apache-2.0"
 
 [lib]
 name = "unicode"

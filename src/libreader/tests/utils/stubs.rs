@@ -1,8 +1,9 @@
-// Copyright (c) 2016, ilammy
+// Copyright (c) 2016, Sabre developers
 //
-// Licensed under MIT license (see LICENSE file in the root directory).
-// This file may be copied, distributed, and modified only in accordance
-// with the terms specified by this license.
+// Licensed under the Apache License, Version 2.0 (see LICENSE.Apache in the
+// root directory) or MIT license (see LICENSE.MIT in the root directory),
+// at your option. This file may be copied, distributed, and modified only
+// in accordance with the terms specified by the chosen license.
 
 //! Stub interface implementations.
 
