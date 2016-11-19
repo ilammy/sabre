@@ -3,3 +3,7 @@ language: rust
 branches:
   except:
     - /^wip\/.*$/
+
+script:
+- cargo test --verbose --manifest-path=src/libunicode/Cargo.toml
+- cargo test --verbose --manifest-path=src/libreader/Cargo.toml
