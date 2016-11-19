@@ -64,12 +64,6 @@ pub trait Reporter {
 #[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum DiagnosticKind {
-    /// Lexer has encountered an invalid sequence of characters with unrecognized meaning.
-    err_lexer_unrecognized,
-
-    /// Lexer has recovered from an invalid spelling of bytevector opener `#u8(`.
-    err_lexer_invalid_bytevector,
-
     /// Lexer has encountered a block comment without matching termination token.
     fatal_lexer_unterminated_comment,
 

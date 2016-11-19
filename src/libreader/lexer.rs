@@ -240,21 +240,6 @@ impl<'a> StringScanner<'a> {
         return Token::Whitespace;
     }
 
-    /// Scan over an unrecognized sequence of characters.
-    fn scan_unrecognized(&mut self, start: usize) -> Token {
-        while !self.at_eof() {
-            if is_delimiter(self.cur.unwrap()) {
-                break;
-            }
-            self.read();
-        }
-        let end = self.prev_pos;
-
-        self.diagnostic.report(DiagnosticKind::err_lexer_unrecognized, Span::new(start, end));
-
-        return Token::Unrecognized;
-    }
-
     /// Scan a line comment starting with `;`.
     fn scan_line_comment(&mut self) -> Token {
         assert!(self.cur_is(';'));
@@ -399,69 +384,25 @@ impl<'a> StringScanner<'a> {
 
     /// Scan over a bytevector opener `#u8(`.
     fn scan_bytevector_open(&mut self) -> Token {
-        let start = self.prev_pos;
         assert!(self.cur_is('#'));
-        self.read();
-        assert!(self.cur_is('u') || self.cur_is('U'));
-        self.read();
 
-        // Try the happy path first.
-        if self.cur_is('8') {
-            match self.peek() {
-                Some('(') => {
-                    self.read();
-                    self.read();
-                    return Token::OpenBytevector(ParenType::Parenthesis);
-                }
-                Some('[') => {
-                    self.read();
-                    self.read();
-                    return Token::OpenBytevector(ParenType::Bracket);
-                }
-                Some('{') => {
-                    self.read();
-                    self.read();
-                    return Token::OpenBytevector(ParenType::Brace);
-                }
-                // Otherwise skip to recovery slow path.
-                _ => { }
-            }
+        if self.ahead_is("u8(") {
+            for _ in 0.."#u8(".len() { self.read(); }
+            return Token::OpenBytevector(ParenType::Parenthesis);
         }
 
-        // We've seen `#u` or maybe `#u8` at this point. All we need now is a parenthesis.
-        // This would allow us to conclude that this is a bytevector opener with a typo.
-        // Allow from zero to two decimal digits between `u` and the parenthesis, on the
-        // assumption that the user has typed slightly less or more than needed. Anything
-        // else is a clear violation of syntax so we bail out to the nearest delimiter.
-        for _ in 0..3 {
-            match self.cur {
-                Some('0') | Some('1') | Some('2') | Some('3') | Some('4') |
-                Some('5') | Some('6') | Some('7') | Some('8') | Some('9') => {
-                    self.read();
-                }
-                Some('(') => {
-                    self.read();
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_bytevector,
-                        Span::new(start, self.prev_pos));
-                    return Token::OpenBytevector(ParenType::Parenthesis);
-                }
-                Some('[') => {
-                    self.read();
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_bytevector,
-                        Span::new(start, self.prev_pos));
-                    return Token::OpenBytevector(ParenType::Bracket);
-                }
-                Some('{') => {
-                    self.read();
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_bytevector,
-                        Span::new(start, self.prev_pos));
-                    return Token::OpenBytevector(ParenType::Brace);
-                }
-                _ => { break; }
-            }
+        if self.ahead_is("u8[") {
+            for _ in 0.."#u8[".len() { self.read(); }
+            return Token::OpenBytevector(ParenType::Bracket);
         }
 
-        return self.scan_unrecognized(start);
+        if self.ahead_is("u8{") {
+            for _ in 0.."#u8{".len() { self.read(); }
+            return Token::OpenBytevector(ParenType::Brace);
+        }
+
+        // Recover as `scan_hash_token()` would do.
+        return self.scan_number_literal();
     }
 
     /// Scan a character literal (`#\\!`, `#\\x000F`, `#\\return`).
