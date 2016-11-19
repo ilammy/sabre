@@ -1,19 +1,26 @@
-Copyright (c) 2016, ilammy
+*Sabre* is dual-licensed under Apache Software License 2.0 (see LICENSE.Apache)
+and MIT License (see LICENSE.MIT). This means that you as a user can choose to
+be granted rights for this software as provided by any one of these licenses.
 
-Permission is hereby granted, free of charge, to any person obtaining a
-copy of this software and associated documentation files (the "Software"),
-to deal in the Software without restriction, including without limitation
-the rights to use, copy, modify, merge, publish, distribute, sublicense,
-and/or sell copies of the Software, and to permit persons to whom the
-Software is furnished to do so, subject to the following conditions:
+The main reason for choosing this strategy is to be compatible with majority
+of Rust projects which use MIT/Apache-2.0 licensing. They, in turn, use it
+mainly to enjoy ASL's patent protection and MIT's compatibility with GPL.
 
-The above copyright notice and this permission notice shall be included
-in all copies or substantial portions of the Software.
+For contributors this means that you must license your contributions under the
+same dual license. You do not need to sign any contributor license agreement,
+put sign-offs in your commit messages, or litter the boilerplate comments with
+your copyright lines. By intentionally submitting any contribution you:
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
+  1) agree to license the contribution under the terms specified above,
+
+  2) confirm that you have legal authority to do so,
+
+  3) retain any rights that you have for the contribution,
+
+  4) do not acquire any additional obilgations (such as providing support)
+     connected to the contribution,
+
+  5) agree to permanently record the authorship of the intellectual
+     property in Git history of the project.
+
+You may use the wording "not a contribution" to explicitly disclaim the above.
