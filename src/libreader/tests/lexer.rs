@@ -3104,6 +3104,218 @@ fn recover_identifiers_ascii_unprintable() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Unicode identifiers
+
+#[test]
+#[cfg(feature = "unicode")]
+fn identifiers_unicode_basic() {
+    check! {
+        // Lu
+        ("\u{041F}\u{0420}\u{041E}\u{0412}\u{0415}\u{0420}\u{041A}\u{0410}" => Identifier("\u{041F}\u{0420}\u{041E}\u{0412}\u{0415}\u{0420}\u{041A}\u{0410}"));
+        (" " => Whitespace);
+        ("\u{1D447}\u{1D438}\u{1D446}\u{1D447}" => Identifier("\u{0054}\u{0045}\u{0053}\u{0054}"));
+        (" " => Whitespace);
+        // Ll
+        ("\u{03B5}\u{03BE}\u{03AD}\u{03C4}\u{03B1}\u{03C3}\u{03B7}" => Identifier("\u{03B5}\u{03BE}\u{03AD}\u{03C4}\u{03B1}\u{03C3}\u{03B7}"));
+        (" " => Whitespace);
+        ("\u{1E936}\u{1E93E}\u{1E930}" => Identifier("\u{1E936}\u{1E93E}\u{1E930}"));
+        (" " => Whitespace);
+        // Lt
+        ("\u{01F2}\u{0061}" => Identifier("\u{0044}\u{007A}\u{0061}"));
+        (" " => Whitespace);
+        ("\u{1FAA}" => Identifier("\u{1FAA}"));
+        (" " => Whitespace);
+        // Lm
+        ("\u{1D2E}\u{1D3C}\u{1D3C}\u{1D2E}\u{1D4E}\u{1D4B}" => Identifier("\u{0042}\u{004F}\u{004F}\u{0042}\u{1D4E}\u{025B}"));
+        (" " => Whitespace);
+        ("\u{A9CF}\u{16F93}" => Identifier("\u{A9CF}\u{16F93}"));
+        (" " => Whitespace);
+        // Lo
+        ("\u{0627}\u{062E}\u{062A}\u{0628}\u{0627}\u{0631}" => Identifier("\u{0627}\u{062E}\u{062A}\u{0628}\u{0627}\u{0631}"));
+        (" " => Whitespace);
+        ("\u{6E2C}\u{8A66}" => Identifier("\u{6E2C}\u{8A66}"));
+        (" " => Whitespace);
+        ("\u{16B29}\u{16B6C}\u{1458B}\u{13365}" => Identifier("\u{16B29}\u{16B6C}\u{1458B}\u{13365}"));
+        (" " => Whitespace);
+        // Mn (subsequent-only)
+        ("\u{0074}\u{0065}\u{0300}\u{0073}\u{0074}" => Identifier("\u{0074}\u{00E8}\u{0073}\u{0074}"));
+        (" " => Whitespace);
+        ("\u{0078}\u{05BD}" => Identifier("\u{0078}\u{05BD}"));
+        (" " => Whitespace);
+        ("\u{58DE}\u{1E949}" => Identifier("\u{58DE}\u{1E949}"));
+        (" " => Whitespace);
+        // Mc (subsequent-only)
+        ("\u{0433}\u{16F54}" => Identifier("\u{0433}\u{16F54}"));
+        (" " => Whitespace);
+        ("\u{043E}\u{0C82}" => Identifier("\u{043E}\u{0C82}"));
+        (" " => Whitespace);
+        // Me (subsequent-only)
+        ("\u{0044}\u{20E3}\u{0065}\u{20E3}\u{0073}\u{20E3}\u{0075}\u{20E3}" => Identifier("\u{0044}\u{20E3}\u{0065}\u{20E3}\u{0073}\u{20E3}\u{0075}\u{20E3}"));
+        (" " => Whitespace);
+        // Nd (subsequent-only)
+        ("\u{0401}\u{07C0}\u{07C7}\u{09EE}\u{0BEB}\u{1811}\u{1D7F9}\u{1E954}" => Identifier("\u{0401}\u{07C0}\u{07C7}\u{09EE}\u{0BEB}\u{1811}\u{0033}\u{1E954}"));
+        (" " => Whitespace);
+        // Nl
+        ("\u{2167}\u{216E}\u{2180}\u{1015B}\u{1242C}\u{3028}" => Identifier("\u{0056}\u{0049}\u{0049}\u{0049}\u{0044}\u{2180}\u{1015B}\u{1242C}\u{3028}"));
+        (" " => Whitespace);
+        // No
+        ("\u{0078}\u{00BC}" => Identifier("\u{0078}\u{0031}\u{2044}\u{0034}"));
+        (" " => Whitespace);
+        ("\u{0BF0}\u{246C}\u{108FD}\u{10CFA}" => Identifier("\u{0BF0}\u{0031}\u{0033}\u{108FD}\u{10CFA}"));
+        (" " => Whitespace);
+        // Pd
+        ("\u{2014}\u{2012}\u{3030}\u{FF0D}" => Identifier("\u{2014}\u{2012}\u{3030}\u{002D}"));
+        (" " => Whitespace);
+        // Pc
+        ("\u{203F}\u{002E}\u{203F}" => Identifier("\u{203F}\u{002E}\u{203F}"));
+        (" " => Whitespace);
+        ("\u{FE34}\u{FE4F}\u{FE34}" => Identifier("\u{005F}\u{005F}\u{005F}"));
+        (" " => Whitespace);
+        // Po
+        ("\u{00B6}\u{00BF}\u{066A}\u{07F7}\u{0DF4}" => Identifier("\u{00B6}\u{00BF}\u{066A}\u{07F7}\u{0DF4}"));
+        (" " => Whitespace);
+        ("\u{1809}\u{2021}\u{2049}\u{2E2D}\u{A875}" => Identifier("\u{1809}\u{2021}\u{0021}\u{003F}\u{2E2D}\u{A875}"));
+        (" " => Whitespace);
+        ("\u{FE57}\u{FF20}\u{12470}\u{1DA87}" => Identifier("\u{0021}\u{0040}\u{12470}\u{1DA87}"));
+        (" " => Whitespace);
+        // Sc
+        ("\u{00A2}\u{20A5}\u{20A8}\u{20B8}" => Identifier("\u{00A2}\u{20A5}\u{0052}\u{0073}\u{20B8}"));
+        (" " => Whitespace);
+        // Sm
+        ("\u{00D7}\u{21A3}\u{2203}\u{220F}\u{222D}" => Identifier("\u{00D7}\u{21A3}\u{2203}\u{220F}\u{222B}\u{222B}\u{222B}"));
+        (" " => Whitespace);
+        ("\u{229E}\u{25FF}\u{27F1}\u{2AF7}\u{1D6C1}" => Identifier("\u{229E}\u{25FF}\u{27F1}\u{2AF7}\u{2207}"));
+        (" " => Whitespace);
+        // Sk
+        ("\u{005E}\u{02E5}\u{FBB2}\u{1F612}\u{1F3FB}" => Identifier("\u{005E}\u{02E5}\u{FBB2}\u{1F612}\u{1F3FB}"));
+        (" " => Whitespace);
+        // So
+        ("\u{00A9}\u{06DE}\u{0BF5}\u{0F16}" => Identifier("\u{00A9}\u{06DE}\u{0BF5}\u{0F16}"));
+        (" " => Whitespace);
+        ("\u{21B3}\u{2318}\u{23CF}\u{2414}\u{2541}" => Identifier("\u{21B3}\u{2318}\u{23CF}\u{2414}\u{2541}"));
+        (" " => Whitespace);
+        ("\u{259C}\u{267C}\u{2720}\u{2FA9}\u{336A}\u{FFFD}\u{1D21D}\u{1F0F2}" => Identifier("\u{259C}\u{267C}\u{2720}\u{961C}\u{0031}\u{0038}\u{70B9}\u{FFFD}\u{1D21D}\u{1F0F2}"));
+        (" " => Whitespace);
+        // Co
+        ("\u{E000}\u{F000}\u{F8FF}" => Identifier("\u{E000}\u{F000}\u{F8FF}"));
+        (" " => Whitespace);
+        ("\u{F0000}\u{F5000}\u{FFFFD}" => Identifier("\u{F0000}\u{F5000}\u{FFFFD}"));
+        (" " => Whitespace);
+        ("\u{100000}\u{101234}\u{10FFFD}" => Identifier("\u{100000}\u{101234}\u{10FFFD}"));
+        (" " => Whitespace);
+        // ZWNJ, ZWJ (subsequent-only)
+        ("\u{05E2}\u{05B2}\u{05D5}\u{200C}\u{05B9}\u{05E0}\u{05B9}\u{05EA}" => Identifier("\u{05E2}\u{05B2}\u{05D5}\u{05B9}\u{05E0}\u{05B9}\u{05EA}"));
+        (" " => Whitespace);
+        ("\u{0915}\u{094D}\u{200D}\u{0937}" => Identifier("\u{0915}\u{094D}\u{0937}"));
+    }
+}
+
+#[test]
+fn identifiers_unicode_escaped() {
+    check! {
+        // Normal Unicode as in plain identifiers
+        ("|\u{0442}\u{043E}\u{0445}\u{043E}|" => Identifier("\u{0442}\u{043E}\u{0445}\u{043E}"));
+        (" " => Whitespace);
+        ("|\u{05DE}\u{05B4}\u{05D1}\u{05B0}\u{05D7}\u{05B8}\u{05DF}|" => Identifier("\u{05DE}\u{05B4}\u{05D1}\u{05B0}\u{05D7}\u{05B8}\u{05DF}"));
+        (" " => Whitespace);
+        // Anything is allowed and preserved as is
+        ("|\u{24A3}\u{24A0}\u{24A7}\u{24A7}\u{24AA}|" => Identifier("\u{24A3}\u{24A0}\u{24A7}\u{24A7}\u{24AA}"));
+        (" " => Whitespace);
+        ("|\u{0000}\u{10FFFF}\u{200D}\u{0099}\u{E0001}\u{E0071}\u{E007F}|" => Identifier("\u{0000}\u{10FFFF}\u{200D}\u{0099}\u{E0001}\u{E0071}\u{E007F}"));
+    }
+}
+
+#[test]
+#[cfg(feature = "unicode")]
+fn recover_identifiers_unicode_restricted_initial() {
+    check! {
+        // Mn
+        ("\u{1772}\u{2D7F}" => Identifier("\u{1772}\u{2D7F}")),
+            (0, 3) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{1DA58}\u{1DA61}" => Identifier("\u{1DA58}\u{1DA61}")),
+            (0, 4) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{E01EE}" => Identifier("\u{E01EE}")),
+            (0, 4) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Mc
+        ("\u{0BC8}\u{0BCB}" => Identifier("\u{0BC8}\u{0BCB}")),
+            (0, 3) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Me
+        ("\u{20DD}\u{0039}" => Identifier("\u{20DD}\u{0039}")),
+            (0, 3) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Nd
+        ("\u{FF11}\u{FF12}\u{FF13}" => Identifier("\u{0031}\u{0032}\u{0033}")),
+            (0, 3) => err_lexer_invalid_identifier_character,
+            (0, 9) => warn_lexer_identifier_looks_like_number;
+        (" " => Whitespace);
+        // ZWNJ, ZWJ
+        ("\u{200C}\u{0445}\u{0430}\u{200C}\u{002D}\u{0445}\u{0430}" => Identifier("\u{0445}\u{0430}\u{002D}\u{0445}\u{0430}")),
+            (0, 3) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{200D}\u{0C1A}\u{0C46}\u{0C21}\u{200D}\u{0C41}\u{200D}" => Identifier("\u{0C1A}\u{0C46}\u{0C21}\u{0C41}")),
+            (0, 3) => err_lexer_invalid_identifier_character;
+    }
+}
+
+#[test]
+#[cfg(feature = "unicode")]
+fn recover_identifiers_unicode_unmapped() {
+    check! {
+        // Cc
+        ("\u{0000}\u{006E}\u{0069}\u{006C}" => Identifier("\u{0000}\u{006E}\u{0069}\u{006C}")),
+            (0, 1) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{10DB}\u{10EC}\u{0091}\u{10D5}\u{10D0}\u{10DC}\u{10D4}\u{0083}" => Identifier("\u{10DB}\u{10EC}\u{0091}\u{10D5}\u{10D0}\u{10DC}\u{10D4}\u{0083}")),
+            (6, 8) => err_lexer_invalid_identifier_character,
+            (20, 22) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Cf (except for ZWNJ, ZWJ)
+        ("\u{0440}\u{0430}\u{0437}\u{00AD}\u{043B}\u{043E}\u{043C}" => Identifier("\u{0440}\u{0430}\u{0437}\u{00AD}\u{043B}\u{043E}\u{043C}")),
+            (6, 8) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{0DC4}\u{180E}\u{0DBB}\u{0DD2}\u{0DAD}" => Identifier("\u{0DC4}\u{180E}\u{0DBB}\u{0DD2}\u{0DAD}")),
+            (3, 6) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{0079}\u{0065}\u{015F}\u{200B}\u{0069}\u{006C}" => Identifier("\u{0079}\u{0065}\u{015F}\u{200B}\u{0069}\u{006C}")),
+            (4, 7) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{200E}\u{0642}\u{0631}\u{0645}\u{0632}\u{206F}" => Identifier("\u{200E}\u{0642}\u{0631}\u{0645}\u{0632}\u{206F}")),
+            (0, 3) => err_lexer_invalid_identifier_character,
+            (11, 14) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Ps, Pe
+        ("\u{27E6}\u{03B1}\u{276F}" => Identifier("\u{27E6}\u{03B1}\u{276F}")),
+            (0, 3) => err_lexer_invalid_identifier_character,
+            (5, 8) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        ("\u{201E}\u{178F}\u{2E23}" => Identifier("\u{201E}\u{178F}\u{2E23}")),
+            (0, 3) => err_lexer_invalid_identifier_character,
+            (6, 9) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Pi, Pf
+        ("\u{00AB}\u{50BE}\u{659C}\u{2E05}" => Identifier("\u{00AB}\u{50BE}\u{659C}\u{2E05}")),
+            (0, 2) => err_lexer_invalid_identifier_character,
+            (8, 11) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Zl
+        ("\u{26B5}\u{2028}\u{2F33}" => Identifier("\u{26B5}\u{2028}\u{5E7A}")),
+            (3, 6) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Zp
+        ("\u{0430}\u{0431}\u{0437}\u{0430}\u{0446}\u{002E}\u{2029}" => Identifier("\u{0430}\u{0431}\u{0437}\u{0430}\u{0446}\u{002E}\u{2029}")),
+            (11, 14) => err_lexer_invalid_identifier_character;
+        (" " => Whitespace);
+        // Zs
+        ("\u{0073}\u{0070}\u{0061}\u{2000}\u{0063}\u{0065}" => Identifier("\u{0073}\u{0070}\u{0061}\u{0020}\u{0063}\u{0065}")),
+            (3, 6) => err_lexer_invalid_identifier_character;
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Directives
 
 #[test]
@@ -3244,6 +3456,448 @@ fn directives_case_control_ascii() {
         ("; #!no-fold-case\n"       => Comment);
 
         ("Test"                     => Identifier("test"));
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Case control: Unicode
+
+#[test]
+#[cfg(feature = "unicode")]
+fn directives_case_control_unicode() {
+    check! {
+        ("\u{0411}\u{043B}\u{041E}\u{043D}\u{0414}\u{0438}"                     => Identifier("\u{0411}\u{043B}\u{041E}\u{043D}\u{0414}\u{0438}"));
+        (" "                                                                    => Whitespace);
+        ("|\u{0054}\u{0065}\u{FB06}|"                                           => Identifier("\u{0054}\u{0065}\u{FB06}"));
+        (" "                                                                    => Whitespace);
+        ("\"\u{0111}\u{006F}\u{0302}\u{0300}\u{0053}\u{0055}\u{031B}\u{0301}\"" => String("\u{0111}\u{006F}\u{0302}\u{0300}\u{0053}\u{0055}\u{031B}\u{0301}"));
+        (" "                                                                    => Whitespace);
+        ("#x\u{1D56F}\u{1D570}\u{1D56C}\u{1D56F}"                               => Identifier("DEAD")),
+                                                                         (0, 2) => err_lexer_prefixed_identifier;
+        (" "                                                                    => Whitespace);
+        ("#\\\u{2126}"                                                          => Character('\u{2126}'));
+        (" "                                                                    => Whitespace);
+        ("#\\\u{1D697}\u{1D68E}\u{1D6A0}\u{1D695}\u{1D692}\u{1D697}\u{1D68E}"   => Character('\u{000A}'));
+        (" "                                                                    => Whitespace);
+        ("#\\\u{1D4DD}\u{1D4D4}\u{1D4E6}\u{1D4DB}\u{1D4D8}\u{1D4DD}\u{1D4D4}"   => Character('\u{FFFD}')),
+                                                                        (0, 30) => err_lexer_unknown_character_name;
+        (" "                                                                    => Whitespace);
+
+        ("#!fold-case"                                                          => Directive("fold-case"));
+        ("\n"                                                                   => Whitespace);
+
+        ("\u{0411}\u{043B}\u{041E}\u{043D}\u{0414}\u{0438}"                     => Identifier("\u{0431}\u{043B}\u{043E}\u{043D}\u{0434}\u{0438}"));
+        (" "                                                                    => Whitespace);
+        ("|\u{0054}\u{0065}\u{FB06}|"                                           => Identifier("\u{0054}\u{0065}\u{FB06}"));
+        (" "                                                                    => Whitespace);
+        ("\"\u{0111}\u{006F}\u{0302}\u{0300}\u{0053}\u{0055}\u{031B}\u{0301}\"" => String("\u{0111}\u{006F}\u{0302}\u{0300}\u{0053}\u{0055}\u{031B}\u{0301}"));
+        (" "                                                                    => Whitespace);
+        ("#x\u{1D56F}\u{1D570}\u{1D56C}\u{1D56F}"                               => Identifier("dead")),
+                                                                         (0, 2) => err_lexer_prefixed_identifier;
+        (" "                                                                    => Whitespace);
+        ("#\\\u{2126}"                                                          => Character('\u{2126}'));
+        (" "                                                                    => Whitespace);
+        ("#\\\u{1D697}\u{1D68E}\u{1D6A0}\u{1D695}\u{1D692}\u{1D697}\u{1D68E}"   => Character('\u{000A}'));
+        (" "                                                                    => Whitespace);
+        ("#\\\u{1D4DD}\u{1D4D4}\u{1D4E6}\u{1D4DB}\u{1D4D8}\u{1D4DD}\u{1D4D4}"   => Character('\u{000A}'));
+        (" "                                                                    => Whitespace);
+
+        ("#!no-fold-case"                                                       => Directive("no-fold-case"));
+        ("\n"                                                                   => Whitespace);
+
+        ("\u{0411}\u{043B}\u{041E}\u{043D}\u{0414}\u{0438}"                     => Identifier("\u{0411}\u{043B}\u{041E}\u{043D}\u{0414}\u{0438}"));
+        (" "                                                                    => Whitespace);
+        ("|\u{0054}\u{0065}\u{FB06}|"                                           => Identifier("\u{0054}\u{0065}\u{FB06}"));
+        (" "                                                                    => Whitespace);
+        ("\"\u{0111}\u{006F}\u{0302}\u{0300}\u{0053}\u{0055}\u{031B}\u{0301}\"" => String("\u{0111}\u{006F}\u{0302}\u{0300}\u{0053}\u{0055}\u{031B}\u{0301}"));
+        (" "                                                                    => Whitespace);
+        ("#x\u{1D56F}\u{1D570}\u{1D56C}\u{1D56F}"                               => Identifier("DEAD")),
+                                                                         (0, 2) => err_lexer_prefixed_identifier;
+        (" "                                                                    => Whitespace);
+        ("#\\\u{2126}"                                                          => Character('\u{2126}'));
+        (" "                                                                    => Whitespace);
+        ("#\\\u{1D697}\u{1D68E}\u{1D6A0}\u{1D695}\u{1D692}\u{1D697}\u{1D68E}"   => Character('\u{000A}'));
+        (" "                                                                    => Whitespace);
+        ("#\\\u{1D4DD}\u{1D4D4}\u{1D4E6}\u{1D4DB}\u{1D4D8}\u{1D4DD}\u{1D4D4}"   => Character('\u{FFFD}')),
+                                                                        (0, 30) => err_lexer_unknown_character_name;
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Unicode normalization
+
+#[test]
+#[cfg(feature = "unicode")]
+fn normalization_characters_explicit() {
+    // Explicit characters are not normalized in any way.
+    check! {
+        // All these characters normalize into something different:
+        ("#\\\u{2000}"                  => Character('\u{2000}'));
+        (" "                            => Whitespace);
+        ("#\\\u{095D}"                  => Character('\u{095D}'));
+        (" "                            => Whitespace);
+        ("#\\\u{1E9B}"                  => Character('\u{1E9B}'));
+        (" "                            => Whitespace);
+        ("#\\\u{2126}"                  => Character('\u{2126}'));
+        (" "                            => Whitespace);
+        ("#\\\u{1EBF}"                  => Character('\u{1EBF}'));
+        (" "                            => Whitespace);
+
+        // Unicode escapes are not normalized as well:
+        ("#\\x2000"                     => Character('\u{2000}'));
+        (" "                            => Whitespace);
+        ("#\\x095D"                     => Character('\u{095D}'));
+        (" "                            => Whitespace);
+        ("#\\x1E9B"                     => Character('\u{1E9B}'));
+        (" "                            => Whitespace);
+        ("#\\x2126"                     => Character('\u{2126}'));
+        (" "                            => Whitespace);
+        ("#\\x1EBF"                     => Character('\u{1EBF}'));
+        (" "                            => Whitespace);
+
+        // Canonical equivalence is *not* observed:
+        ("#\\\u{0065}\u{0301}\u{0302}"  => Character('\u{FFFD}')),
+                                 (0, 7) => err_lexer_unknown_character_name;
+        (" "                            => Whitespace);
+        ("#\\\u{0438}\u{0306}"          => Character('\u{FFFD}')),
+                                 (0, 6) => err_lexer_unknown_character_name;
+    }
+}
+
+#[test]
+#[cfg(feature = "unicode")]
+fn normalization_characters_named() {
+    // Character names are normalized as case-sensitive identifiers.
+    check! {
+        // They are NFKC-normalized:
+        ("#\\\u{02B3}\u{1D49}turn"      => Character('\u{000D}'));
+        (" "                            => Whitespace);
+
+        // ZWNJ and ZWJ are ignored:
+        ("#\\nu\u{200C}ll"              => Character('\u{0000}'));
+        (" "                            => Whitespace);
+
+        // Names are still case-sensitive by default:
+        ("#\\\u{24C9}\u{24B6}\u{24B7}"  => Character('\u{FFFD}')),
+                                (0, 11) => err_lexer_unknown_character_name;
+        (" "                            => Whitespace);
+        ("#!fold-case"                  => Directive("fold-case"));
+        (" "                            => Whitespace);
+        ("#\\\u{24C9}\u{24B6}\u{24B7}"  => Character('\u{0009}'));
+    }
+}
+
+#[test]
+#[cfg(feature = "unicode")]
+fn normalization_directives() {
+    // Directive names are normalized as case-insensitive identifiers.
+    check! {
+        // They are NFKC-normalized and case-folded:
+        ("#!\u{1D571}\u{1D594}\u{1D591}\u{1D589}\u{200C}\u{002D}\u{1D56E}\u{1D586}\u{1D598}\u{1D58A}" => Directive("fold-case"));
+        (" " => Whitespace);
+
+        // This normalizes into a different string if NFC, NFD, or NFKD are used:
+        ("#!\u{01C4}\u{03D4}\u{1E9B}\u{FBA5}\u{FEFA}" => Directive("\u{0064}\u{017E}\u{03CB}\u{1E61}\u{06C0}\u{0644}\u{0625}")),
+            (0, 15) => err_lexer_unknown_directive;
+        (" " => Whitespace);
+
+        // This string has combining marks in non-canonical order:
+        ("#!A\u{1DCE}\u{0327}\u{0334}\u{1DF5}\u{0333}" => Directive("a\u{0334}\u{0327}\u{1DCE}\u{0333}\u{1DF5}")),
+            (0, 15) => err_lexer_unknown_directive;
+    }
+}
+
+#[test]
+#[cfg(feature = "unicode")]
+fn normalization_identifiers_plain() {
+    // Plain identifiers are NFKC-normalized.
+    check! {
+        // This normalizes into a different string if NFC, NFD, or NFKD are used:
+        ("\u{01C4}\u{03D4}\u{1E9B}\u{FBA5}\u{FEFA}" => Identifier("\u{0044}\u{017D}\u{03AB}\u{1E61}\u{06C0}\u{0644}\u{0625}"));
+        (" " => Whitespace);
+
+        // This string has combining marks in non-canonical order:
+        ("A\u{1DCE}\u{0327}\u{0334}\u{1DF5}\u{0333}" => Identifier("A\u{0334}\u{0327}\u{1DCE}\u{0333}\u{1DF5}"));
+    }
+}
+
+#[test]
+#[cfg(feature = "unicode")]
+fn normalization_identifiers_escaped() {
+    // Escaped identifiers are never normalized (just like strings).
+    check! {
+        // Regular strings that normalize into different strings:
+        ("|\u{2000}|"                       => Identifier("\u{2000}"));
+        (" "                                => Whitespace);
+        ("|\u{095D}\u{095E}\u{095F}|"       => Identifier("\u{095D}\u{095E}\u{095F}"));
+        (" "                                => Whitespace);
+        ("|\u{1E9B}|"                       => Identifier("\u{1E9B}"));
+        (" "                                => Whitespace);
+        ("|\u{2126}|"                       => Identifier("\u{2126}"));
+        (" "                                => Whitespace);
+        ("|\u{1EBF}|"                       => Identifier("\u{1EBF}"));
+        (" "                                => Whitespace);
+        ("|\u{0064}\u{0301}\u{0302}|"       => Identifier("\u{0064}\u{0301}\u{0302}"));
+        (" "                                => Whitespace);
+        ("|\u{0064}\u{0302}\u{0301}|"       => Identifier("\u{0064}\u{0302}\u{0301}"));
+        (" "                                => Whitespace);
+
+        // Unicode escapes are also not normalized:
+        ("|\\x2000;|"                       => Identifier("\u{2000}"));
+        (" "                                => Whitespace);
+        ("|\\x095D;\\x095E;\\x095F;|"       => Identifier("\u{095D}\u{095E}\u{095F}"));
+        (" "                                => Whitespace);
+        ("|\\x1E9B;|"                       => Identifier("\u{1E9B}"));
+        (" "                                => Whitespace);
+        ("|\\x2126;|"                       => Identifier("\u{2126}"));
+        (" "                                => Whitespace);
+        ("|\\x1EBF;|"                       => Identifier("\u{1EBF}"));
+        (" "                                => Whitespace);
+        ("|\\x0064;\\x0301;\\x0302;|"       => Identifier("\u{0064}\u{0301}\u{0302}"));
+        (" "                                => Whitespace);
+        ("|\\x0064;\\x0302;\\x0301;|"       => Identifier("\u{0064}\u{0302}\u{0301}"));
+    }
+}
+
+#[test]
+#[cfg(feature = "unicode")]
+fn normalization_labels() {
+    // Labels are not normalized in any way.
+    check! {
+        ("#\u{FF11}\u{FF12}\u{FF13}="   => Identifier("23=")),
+                                 (0, 4) => err_lexer_invalid_number_prefix,
+                                 (0, 4) => err_lexer_prefixed_identifier,
+                                 (4, 7) => err_lexer_invalid_identifier_character,
+                                (4, 11) => warn_lexer_identifier_looks_like_number;
+        (" "                            => Whitespace);
+        ("#1\u{FF12}\u{FF13}="          => LabelMark("1\u{FF12}\u{FF13}")),
+                                 (2, 5) => err_lexer_invalid_number_character,
+                                 (5, 8) => err_lexer_invalid_number_character;
+    }
+}
+
+#[test]
+#[cfg(feature = "unicode")]
+fn normalization_numbers() {
+    // Numbers are not normalized in any way.
+    check! {
+        ("123\u{FF14}5"                 => Number("123\u{FF14}5")),
+                                 (3, 6) => err_lexer_invalid_number_character;
+        (" "                            => Whitespace);
+        ("\u{FF11}\u{FF12}\u{FF13}"     => Identifier("123")),
+                                 (0, 3) => err_lexer_invalid_identifier_character,
+                                 (0, 9) => warn_lexer_identifier_looks_like_number;
+        (" "                            => Whitespace);
+        ("3\u{FF0E}14"                  => Number("3\u{FF0E}14")),
+                                 (1, 4) => err_lexer_invalid_number_character;
+        (" "                            => Whitespace);
+        ("1.0\u{1D41E}+20"              => Number("1.0\u{1D41E}+20")),
+                                 (3, 7) => err_lexer_invalid_number_character,
+                               (10, 10) => err_lexer_missing_i;
+        (" "                            => Whitespace);
+        ("1.0\u{212E}+20"               => Number("1.0\u{212E}+20")),
+                                 (3, 6) => err_lexer_invalid_number_character,
+                                 (9, 9) => err_lexer_missing_i;
+        (" "                            => Whitespace);
+        ("1\u{207A}2i"                  => Number("1\u{207A}2i")),
+                                 (1, 4) => err_lexer_invalid_number_character;
+        (" "                            => Whitespace);
+        ("5\u{FE6B}6"                   => Number("5\u{FE6B}6")),
+                                 (1, 4) => err_lexer_invalid_number_character;
+        (" "                            => Whitespace);
+        ("5\u{FE6B}-6"                  => Number("5\u{FE6B}-6")),
+                                 (1, 4) => err_lexer_invalid_number_character,
+                                 (6, 6) => err_lexer_missing_i;
+        (" "                            => Whitespace);
+        ("-79\u{2170}"                  => Number("-79\u{2170}")),
+                                 (3, 6) => err_lexer_invalid_number_character;
+        (" "                            => Whitespace);
+        ("+1-2\u{2170}"                 => Number("+1-2\u{2170}")),
+                                 (4, 7) => err_lexer_invalid_number_character,
+                                 (7, 7) => err_lexer_missing_i;
+        (" "                            => Whitespace);
+        ("3+4\u{1D4BE}"                 => Number("3+4\u{1D4BE}")),
+                                 (3, 7) => err_lexer_invalid_number_character,
+                                 (7, 7) => err_lexer_missing_i;
+        (" "                            => Whitespace);
+        ("5-67\u{2111}"                 => Number("5-67\u{2111}")),
+                                 (4, 7) => err_lexer_invalid_number_character,
+                                 (7, 7) => err_lexer_missing_i;
+        (" "                            => Whitespace);
+        ("+\u{1D7CF}\u{1D7D0}\u{1D7D1}" => Identifier("+123")),
+                                (0, 13) => warn_lexer_identifier_looks_like_number;
+        (" "                            => Whitespace);
+        ("+\u{1D697}a\u{1D67D}.0"       => Identifier("+naN.0")),
+                                (0, 12) => warn_lexer_identifier_looks_like_number;
+        (" "                            => Whitespace);
+        ("-\u{00BD}"                    => Identifier("-1\u{2044}2")),
+                                 (0, 3) => warn_lexer_identifier_looks_like_number;
+        (" "                            => Whitespace);
+        ("\u{00BD}"                     => Identifier("1\u{2044}2")),
+                                 (0, 2) => err_lexer_invalid_identifier_character,
+                                 (0, 2) => warn_lexer_identifier_looks_like_number;
+        (" "                            => Whitespace);
+        ("\u{FF0E}123"                  => Identifier(".123")),
+                                 (0, 6) => warn_lexer_identifier_looks_like_number;
+        (" "                            => Whitespace);
+        ("\u{FF0D}\u{2139}"             => Identifier("-i")),
+                                 (0, 6) => warn_lexer_identifier_looks_like_number;
+    }
+}
+
+#[test]
+#[cfg(feature = "unicode")]
+fn normalization_strings() {
+    // Strings are not normalized in any way.
+    check! {
+        // Regular strings that normalize into different strings:
+        ("\"\u{2000}\""                     => String("\u{2000}"));
+        (" "                                => Whitespace);
+        ("\"\u{095D}\u{095E}\u{095F}\""     => String("\u{095D}\u{095E}\u{095F}"));
+        (" "                                => Whitespace);
+        ("\"\u{1E9B}\""                     => String("\u{1E9B}"));
+        (" "                                => Whitespace);
+        ("\"\u{2126}\""                     => String("\u{2126}"));
+        (" "                                => Whitespace);
+        ("\"\u{1EBF}\""                     => String("\u{1EBF}"));
+        (" "                                => Whitespace);
+        ("\"\u{0064}\u{0301}\u{0302}\""     => String("\u{0064}\u{0301}\u{0302}"));
+        (" "                                => Whitespace);
+        ("\"\u{0064}\u{0302}\u{0301}\""     => String("\u{0064}\u{0302}\u{0301}"));
+        (" "                                => Whitespace);
+
+        // Unicode escapes are also not normalized:
+        ("\"\\x2000;\""                     => String("\u{2000}"));
+        (" "                                => Whitespace);
+        ("\"\\x095D;\\x095E;\\x095F;\""     => String("\u{095D}\u{095E}\u{095F}"));
+        (" "                                => Whitespace);
+        ("\"\\x1E9B;\""                     => String("\u{1E9B}"));
+        (" "                                => Whitespace);
+        ("\"\\x2126;\""                     => String("\u{2126}"));
+        (" "                                => Whitespace);
+        ("\"\\x1EBF;\""                     => String("\u{1EBF}"));
+        (" "                                => Whitespace);
+        ("\"\\x0064;\\x0301;\\x0302;\""     => String("\u{0064}\u{0301}\u{0302}"));
+        (" "                                => Whitespace);
+        ("\"\\x0064;\\x0302;\\x0301;\""     => String("\u{0064}\u{0302}\u{0301}"));
+    }
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Disabled Unicode
+
+#[test]
+#[cfg(not(feature = "unicode"))]
+fn no_unicode_identifiers_non_ascii_invalid_in_plain() {
+    check! {
+        ("\u{01C5}\u{0207}\u{005F}\u{0442}\u{0435}\u{0441}\u{0442}"     => Identifier("\u{01C5}\u{0207}\u{005F}\u{0442}\u{0435}\u{0441}\u{0442}")),
+                                                                 (0, 2) => err_lexer_invalid_identifier_character,
+                                                                 (2, 4) => err_lexer_invalid_identifier_character,
+                                                                 (5, 7) => err_lexer_invalid_identifier_character,
+                                                                 (7, 9) => err_lexer_invalid_identifier_character,
+                                                                (9, 11) => err_lexer_invalid_identifier_character,
+                                                               (11, 13) => err_lexer_invalid_identifier_character;
+        (" "                                                            => Whitespace);
+        ("\u{0915}\u{094D}\u{200D}\u{0937}"                             => Identifier("\u{0915}\u{094D}\u{200D}\u{0937}")),
+                                                                 (0, 3) => err_lexer_invalid_identifier_character,
+                                                                 (3, 6) => err_lexer_invalid_identifier_character,
+                                                                 (6, 9) => err_lexer_invalid_identifier_character,
+                                                                (9, 12) => err_lexer_invalid_identifier_character;
+        (" "                                                            => Whitespace);
+        ("\u{1D59B}\u{1D586}\u{1D591}\u{1D58E}\u{1D589}"                => Identifier("\u{1D59B}\u{1D586}\u{1D591}\u{1D58E}\u{1D589}")),
+                                                                 (0, 4) => err_lexer_invalid_identifier_character,
+                                                                 (4, 8) => err_lexer_invalid_identifier_character,
+                                                                (8, 12) => err_lexer_invalid_identifier_character,
+                                                               (12, 16) => err_lexer_invalid_identifier_character,
+                                                               (16, 20) => err_lexer_invalid_identifier_character;
+    }
+}
+
+#[test]
+#[cfg(not(feature = "unicode"))]
+fn no_unicode_identifiers_non_ascii_okay_in_escaped() {
+    check! {
+        ("|\u{01C5}\u{0207}\u{005F}\u{0442}\u{0435}\u{0441}\u{0442}|"   => Identifier("\u{01C5}\u{0207}\u{005F}\u{0442}\u{0435}\u{0441}\u{0442}"));
+        (" "                                                            => Whitespace);
+        ("|\u{0915}\u{094D}\u{200D}\u{0937}|"                           => Identifier("\u{0915}\u{094D}\u{200D}\u{0937}"));
+        (" "                                                            => Whitespace);
+        ("|\u{1D59B}\u{1D586}\\x1D591;\u{1D58E}\u{1D589}|"              => Identifier("\u{1D59B}\u{1D586}\u{1D591}\u{1D58E}\u{1D589}"));
+    }
+}
+
+#[test]
+#[cfg(not(feature = "unicode"))]
+fn no_unicode_characters_non_ascii_okay() {
+    check! {
+        ("#\\\u{03BB}"  => Character('\u{03BB}'));
+        (" "            => Whitespace);
+        ("#\\x03BB"     => Character('\u{03BB}'));
+    }
+}
+
+#[test]
+#[cfg(not(feature = "unicode"))]
+fn no_unicode_characters_no_normalization() {
+    check! {
+        ("#\\\u{1106}\u{1169}\u{11A8}"  => Character('\u{FFFD}')),
+                                (0, 11) => err_lexer_unknown_character_name;
+        (" "                            => Whitespace);
+        ("#\\new\u{2000C}line"          => Character('\u{FFFD}')),
+                                (0, 13) => err_lexer_unknown_character_name;
+    }
+}
+
+#[test]
+#[cfg(not(feature = "unicode"))]
+fn no_unicode_strings_non_ascii_okay() {
+    check! {
+        ("\"\u{FF8A}\u{FF91}\u{FF7D}\u{FF80}\u{FF70}\"" => String("\u{FF8A}\u{FF91}\u{FF7D}\u{FF80}\u{FF70}"));
+        (" "                                            => Whitespace);
+        ("\"\\xFF8A;\\xFF91;\\xFF7D;\\xFF80;\\xFF70;\"" => String("\u{FF8A}\u{FF91}\u{FF7D}\u{FF80}\u{FF70}"));
+    }
+}
+
+#[test]
+#[cfg(not(feature = "unicode"))]
+fn no_unicode_strings_no_normalization() {
+    check! {
+        ("\"\u{01C4}\u{03D4}\u{1E9B}\u{FBA5}\u{FEFA}\"" => String("\u{01C4}\u{03D4}\u{1E9B}\u{FBA5}\u{FEFA}"));
+    }
+}
+
+#[test]
+#[cfg(not(feature = "unicode"))]
+fn no_unicode_directives_no_normalization() {
+    check! {
+        ("#!\u{1D571}\u{1D594}\u{1D591}\u{1D589}\u{200C}\u{002D}\u{1D56E}\u{1D586}\u{1D598}\u{1D58A}" => Directive("\u{1D571}\u{1D594}\u{1D591}\u{1D589}\u{200C}\u{002D}\u{1D56E}\u{1D586}\u{1D598}\u{1D58A}")),
+            (0, 38) => err_lexer_unknown_directive;
+    }
+}
+
+#[test]
+#[cfg(not(feature = "unicode"))]
+fn no_unicode_labels_no_normalization() {
+    check! {
+        ("#1\u{FF12}\u{FF13}="  => LabelMark("1\u{FF12}\u{FF13}")),
+            (2, 5) => err_lexer_invalid_number_character,
+            (5, 8) => err_lexer_invalid_number_character;
+    }
+}
+
+#[test]
+#[cfg(not(feature = "unicode"))]
+fn no_unicode_numbers_no_normalization() {
+    check! {
+        ("123\u{FF14}5"                 => Number("123\u{FF14}5")),
+                                 (3, 6) => err_lexer_invalid_number_character;
+        (" "                            => Whitespace);
+        ("\u{FF11}\u{FF12}\u{FF13}"     => Identifier("\u{FF11}\u{FF12}\u{FF13}")),
+                                 (0, 3) => err_lexer_invalid_identifier_character,
+                                 (3, 6) => err_lexer_invalid_identifier_character,
+                                 (6, 9) => err_lexer_invalid_identifier_character;
+        (" "                            => Whitespace);
+        ("3\u{FF0E}14"                  => Number("3\u{FF0E}14")),
+                                 (1, 4) => err_lexer_invalid_number_character;
     }
 }
 
@@ -3451,6 +4105,12 @@ fn pretty_print_token(token: &ScannedToken, pool: &InternPool) -> String {
         }
         Token::Number(value) => {
             format!("Number({:?})", pool.get(value))
+        }
+        Token::Identifier(value) => {
+            format!("Identifier({:?})", pool.get(value))
+        }
+        Token::Directive(value) => {
+            format!("Directive({:?})", pool.get(value))
         }
         _ => format!("{:?}", token.tok)
     }
