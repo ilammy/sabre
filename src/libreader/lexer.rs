@@ -1706,6 +1706,36 @@ fn is_exponent_marker(c: char) -> bool {
 }
 
 /// Check if a character is an initial of an identifer.
+#[cfg(not(feature = "unicode"))]
+fn is_identifier_initial(c: char) -> bool {
+    match c {
+        // <letter>
+        'A'...'Z' | 'a'...'z' => true,
+        // <special-initial>
+        '!' | '$' | '%' | '&' | '*' | '/' | ':' |
+        '<' | '=' | '>' | '?' | '^' | '_' | '~' => true,
+        // <pecualiar> (= <special-subsequent>, they can be in the first position)
+        '+' | '-' | '.' | '@' => true,
+        // anything else is not allowed to start identifiers
+        _ => false,
+    }
+}
+
+/// Check if a character is a subsequent of an identifer.
+#[cfg(not(feature = "unicode"))]
+fn is_identifier_subsequent(c: char) -> bool {
+    match c {
+        // <initial>
+        c if is_identifier_initial(c) => true,
+        // <digit>
+        '0'...'9' => true,
+        // anything else is not allowed to be used in identifiers
+        _ => false,
+    }
+}
+
+/// Check if a character is an initial of an identifer.
+#[cfg(feature = "unicode")]
 fn is_identifier_initial(c: char) -> bool {
     use unicode::scheme_identifiers;
 
@@ -1713,6 +1743,7 @@ fn is_identifier_initial(c: char) -> bool {
 }
 
 /// Check if a character is a subsequent of an identifer.
+#[cfg(feature = "unicode")]
 fn is_identifier_subsequent(c: char) -> bool {
     use unicode::scheme_identifiers;
 
@@ -1721,12 +1752,6 @@ fn is_identifier_subsequent(c: char) -> bool {
 
 /// A replacement character used when we need to return a character, but don't have one.
 const REPLACEMENT_CHARACTER: char = '\u{FFFD}';
-
-/// U+200C ZERO WIDTH NON-JOINER
-const ZERO_WIDTH_NON_JOINER: char = '\u{200C}';
-
-/// U+200D ZERO WIDTH JOINER
-const ZERO_WIDTH_JOINER: char = '\u{200D}';
 
 /// Check whether `c` is a valid digit of base `base`.
 fn is_digit(base: u8, c: char) -> bool {
@@ -1756,8 +1781,26 @@ fn hex_value(c: char) -> u8 {
 }
 
 /// Normalize a string as a case-sensitive identifier.
+#[cfg(not(feature = "unicode"))]
+fn normalize_case_sensitive_identifier(s: &str) -> String {
+    s.to_owned()
+}
+
+/// Normalize a string as a case-insensitive identifier.
+#[cfg(not(feature = "unicode"))]
+fn normalize_case_insensitive_identifier(s: &str) -> String {
+    use std::ascii::AsciiExt;
+
+    s.to_ascii_lowercase()
+}
+
+/// Normalize a string as a case-sensitive identifier.
+#[cfg(feature = "unicode")]
 fn normalize_case_sensitive_identifier(s: &str) -> String {
     use unicode::normalization;
+
+    const ZERO_WIDTH_NON_JOINER: char = '\u{200C}';
+    const ZERO_WIDTH_JOINER: char = '\u{200D}';
 
     let normalized = normalization::nfkc(s);
 
@@ -1769,6 +1812,7 @@ fn normalize_case_sensitive_identifier(s: &str) -> String {
 }
 
 /// Normalize a string as a case-insensitive identifier.
+#[cfg(feature = "unicode")]
 fn normalize_case_insensitive_identifier(s: &str) -> String {
     use unicode::case_algorithms;
 
