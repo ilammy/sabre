@@ -57,19 +57,19 @@ macro_rules! token {
 // Smoke test of test harness
 
 #[test]
-fn empty_string() {
+fn smoke_test_empty_string() {
     check! { }
 }
 
 #[test]
-fn whitespace() {
+fn smoke_test_whitespace() {
     check! {
         ("   \t\t\r\n  \t \t\n" => Whitespace);
     }
 }
 
 #[test]
-fn garbage() {
+fn smoke_test_garbage() {
     check! {
         ("\x01\x02\x03\x04" => Identifier("\x01\x02\x03\x04")),
             (0, 1) => err_lexer_invalid_identifier_character,
@@ -168,7 +168,7 @@ fn sexpr_comments() {
 // Fixed-syntax tokens
 
 #[test]
-fn quotations() {
+fn fixed_tokens_quotations() {
     check! {
         ("'"    => Quote);
         ("`"    => Backquote);
@@ -194,7 +194,7 @@ fn quotations() {
 }
 
 #[test]
-fn parentheses() {
+fn fixed_tokens_parentheses() {
     check! {
         ("("    => Open(Parenthesis));
         (")"    => Close(Parenthesis));
@@ -217,7 +217,7 @@ fn parentheses() {
 }
 
 #[test]
-fn brackets_and_braces() {
+fn fixed_tokens_brackets_and_braces() {
     check! {
         ("["    => Open(Bracket));
         ("]"    => Close(Bracket));
@@ -236,7 +236,7 @@ fn brackets_and_braces() {
 }
 
 #[test]
-fn recover_open_vector() {
+fn recover_fixed_tokens_open_vector() {
     check! {
         ("#ahaha-oh-wow"    => Identifier("haha-oh-wow")),
                     (0, 2)  => err_lexer_invalid_number_prefix,
@@ -283,7 +283,7 @@ fn recover_open_vector() {
 }
 
 #[test]
-fn recover_open_bytevector() {
+fn recover_fixed_tokens_open_bytevector() {
     check! {
         ("#u"               => Identifier("")),
                      (0, 2) => err_lexer_invalid_number_prefix,
@@ -618,7 +618,7 @@ fn characters_whitespace_eof_special() {
 }
 
 #[test]
-fn recover_character_no_separator() {
+fn recover_characters_no_separator() {
     check! {
         ("#\\t#\\e#\\s#\\t" => Character('\u{FFFD}')),
                     (0, 12) => err_lexer_unknown_character_name;
@@ -662,7 +662,7 @@ fn recover_character_no_separator() {
 }
 
 #[test]
-fn recover_character_names() {
+fn recover_characters_names() {
     check! {
         ("#\\Space"                         => Character('\u{FFFD}')),
                                      (0, 7) => err_lexer_unknown_character_name;

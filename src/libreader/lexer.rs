@@ -132,11 +132,6 @@ impl<'a> StringScanner<'a> {
         self.buf[self.pos..].chars().nth(0)
     }
 
-    /// Peeek the character after the next one without updating anything.
-    fn peekpeek(&self) -> Option<char> {
-        self.buf[self.pos..].chars().nth(1)
-    }
-
     /// Check whether current character (`cur`) is `c`.
     fn cur_is(&self, c: char) -> bool {
         self.cur == Some(c)
@@ -358,23 +353,19 @@ impl<'a> StringScanner<'a> {
     fn scan_boolean_literal(&mut self) -> Token {
         assert!(self.cur_is('#'));
 
-        if self.ahead_is_exactly("t") {
-            for _ in 0.."#t".len() { self.read(); }
+        if self.try_scan_exactly("#t") {
             return Token::Boolean(true);
         }
 
-        if self.ahead_is_exactly("f") {
-            for _ in 0.."#f".len() { self.read(); }
+        if self.try_scan_exactly("#f") {
             return Token::Boolean(false);
         }
 
-        if self.ahead_is_exactly("true") {
-            for _ in 0.."#true".len() { self.read(); }
+        if self.try_scan_exactly("#true") {
             return Token::Boolean(true);
         }
 
-        if self.ahead_is_exactly("false") {
-            for _ in 0.."#false".len() { self.read(); }
+        if self.try_scan_exactly("#false") {
             return Token::Boolean(false);
         }
 
@@ -386,18 +377,15 @@ impl<'a> StringScanner<'a> {
     fn scan_bytevector_open(&mut self) -> Token {
         assert!(self.cur_is('#'));
 
-        if self.ahead_is("u8(") {
-            for _ in 0.."#u8(".len() { self.read(); }
+        if self.try_scan("#u8(") {
             return Token::OpenBytevector(ParenType::Parenthesis);
         }
 
-        if self.ahead_is("u8[") {
-            for _ in 0.."#u8[".len() { self.read(); }
+        if self.try_scan("#u8[") {
             return Token::OpenBytevector(ParenType::Bracket);
         }
 
-        if self.ahead_is("u8{") {
-            for _ in 0.."#u8{".len() { self.read(); }
+        if self.try_scan("#u8{") {
             return Token::OpenBytevector(ParenType::Brace);
         }
 
@@ -435,7 +423,7 @@ impl<'a> StringScanner<'a> {
             self.read();
 
             // ...a literal `x` or `X` if the following character is a delimiter.
-            if self.at_eof() || is_delimiter(self.cur.unwrap()) {
+            if self.cur.map_or(true, is_delimiter) {
                 return Token::Character(first_character);
             }
 
@@ -448,7 +436,7 @@ impl<'a> StringScanner<'a> {
             loop {
                 // If we run into a delimiter or out of characters then we are done. Check the
                 // resulting code point value for correctness and return it.
-                if self.at_eof() || is_delimiter(self.cur.unwrap()) {
+                if self.cur.map_or(true, is_delimiter) {
                     if let Some(c) = char::from_u32(value) {
                         return Token::Character(c);
                     } else {
@@ -490,17 +478,17 @@ impl<'a> StringScanner<'a> {
         // we have a named literal. Identifier syntax in Scheme is *very* liberal, so the cases
         // where the difference should matter are lexically invalid anyway.
 
-        while !self.at_eof() {
-            if is_delimiter(self.cur.unwrap()) {
-                break;
+        loop {
+            match self.cur {
+                Some(c) if is_delimiter(c) => { break; }
+                None                       => { break; }
+                Some(_) => { self.read(); }
             }
-            self.read();
         }
 
         let name_end = self.prev_pos;
 
-        // This is safe as read() keeps the indices inside the string and at code unit boundaries.
-        let name = unsafe { self.buf.slice_unchecked(name_start, name_end) };
+        let name = &self.buf[name_start..name_end];
 
         // A fancy O(1) way to check if the string has only one known character in it.
         if name.len() == first_character.len_utf8() {
@@ -737,7 +725,7 @@ impl<'a> StringScanner<'a> {
         self.read();
 
         // Handle the happy path first. A proper Unicode escape matches /\\[xX][0-9A-Fa-f]+;/.
-        if self.cur.is_some() && is_digit(16, self.cur.unwrap()) {
+        if self.cur.map_or(false, |c| is_digit(16, c)) {
             let mut value: u32 = 0;
 
             loop {
@@ -1476,28 +1464,36 @@ impl<'a> StringScanner<'a> {
     fn try_scan_number_infnan(&mut self) -> bool {
         assert!(self.cur_is('+') || self.cur_is('-'));
 
-        if self.ahead_is("inf.0") {
-            for _ in 0.."+inf.0".len() { self.read(); }
+        if self.try_scan("+inf.0") || self.try_scan("-inf.0") {
             return true;
         }
 
-        if self.ahead_is("nan.0") {
-            for _ in 0.."+nan.0".len() { self.read(); }
+        if self.try_scan("+nan.0") || self.try_scan("-nan.0") {
             return true;
         }
 
         return false;
     }
 
-    /// Check whether the lookahead has a given ASCII prefix ignoring case.
-    fn ahead_is(&self, prefix: &str) -> bool {
-        has_ascii_prefix_ci(&self.buf[self.pos..], prefix)
+    /// If the current string remainder starts with a given prefix (case-insensitive, ASCII-only),
+    /// then scan over it and return true. Otherwise do not modify scanning state and return false.
+    fn try_scan(&mut self, prefix: &str) -> bool {
+        if has_ascii_prefix_ci(&self.buf[self.prev_pos..], prefix) {
+            for _ in 0..prefix.len() { self.read(); }
+            return true;
+        }
+        return false;
     }
 
-    /// Check whether the lookahead has a given ASCII prefix ignoring case,
-    /// and a delimiter goes right after that.
-    fn ahead_is_exactly(&self, prefix: &str) -> bool {
-        has_ascii_prefix_ci_exact(&self.buf[self.pos..], prefix)
+    /// If the current string remainder starts with a given prefix (case-insensitive, ASCII-only),
+    /// and a delimiter is present after the prefix, then scan over it and return true. Otherwise
+    /// do not modify scanning state and return false.
+    fn try_scan_exactly(&mut self, prefix: &str) -> bool {
+        if has_ascii_prefix_ci_exact(&self.buf[self.prev_pos..], prefix) {
+            for _ in 0..prefix.len() { self.read(); }
+            return true;
+        }
+        return false;
     }
 
     /// Scan over an (invalid) suffix of an `+inf.0` or `-nan.0` value.
