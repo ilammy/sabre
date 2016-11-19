@@ -1,0 +1,3 @@
+# Cached data for Unicode table generation
+/unicode-*.txt
+/unicode-*.json
