@@ -9,6 +9,8 @@
 //!
 //! Here be testing utilities.
 
+extern crate reader;
+
 pub mod build;
 pub mod diff;
 pub mod pretty_tree;
