@@ -18,9 +18,10 @@
 //! write an explicit comparator anyway.
 
 use std::fmt;
-use utils::diff::sequence;
-use utils::tree::{TreeNode};
-use utils::pretty_tree::{DisplayTreeNode};
+
+use diff::sequence;
+use tree::{TreeNode};
+use pretty_tree::{DisplayTreeNode};
 
 /// Result of tree node comparison.
 #[derive(Debug, PartialEq)]
@@ -179,8 +180,8 @@ mod tests {
     use super::*;
     use std::fmt;
     use std::ops::Index;
-    use utils::tree::{TreeNode};
-    use utils::pretty_tree::{self, DisplayTreeNode};
+    use tree::{TreeNode};
+    use pretty_tree::{self, DisplayTreeNode};
 
     #[derive(Debug, Eq)]
     struct Tree<T> {

@@ -14,3 +14,6 @@ path = "lib.rs"
 
 [dependencies]
 libunicode = { path = "../libunicode", version = "0.1.0", optional = true }
+
+[dev-dependencies]
+utils = { path = "tests/utils", version = "0.1.0" }

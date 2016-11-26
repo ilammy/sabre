@@ -7,7 +7,10 @@
 
 //! Test utilities.
 //!
-//! Here be testing utilities.
+//! Here we put various data structures and functions that prove to be useful for testing
+//! the `reader` crate.
+
+extern crate reader;
 
 pub mod diff;
 pub mod pretty_tree;

@@ -36,7 +36,8 @@
 //! newlines into just `\n`.
 
 use std::fmt;
-use utils::tree::{TreeNode};
+
+use tree::{TreeNode};
 
 /// Formatting trait for trees.
 ///
@@ -137,7 +138,7 @@ fn write_with_prefix<T>(root: &T, output: &mut fmt::Write, format: &Fn(&T) -> St
 mod tests {
     use super::*;
     use std::fmt;
-    use utils::tree::TreeNode;
+    use tree::TreeNode;
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Example tree implementation
