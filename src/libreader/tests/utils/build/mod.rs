@@ -5,16 +5,8 @@
 // at your option. This file may be copied, distributed, and modified only
 // in accordance with the terms specified by the chosen license.
 
-//! Scheme reader.
+//! Building stuff.
 //!
-//! This crate contains modules implementing basic syntax analysis of Scheme source code.
-
-#[cfg(feature = "unicode")]
-extern crate unicode;
+//! Various code for building entities.
 
 pub mod datum;
-pub mod diagnostics;
-pub mod intern_pool;
-pub mod lexer;
-pub mod parser;
-pub mod tokens;

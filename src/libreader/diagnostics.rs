@@ -63,7 +63,7 @@ pub trait Reporter {
 
 /// Kinds of repoted diagnostics.
 #[allow(non_camel_case_types)]
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum DiagnosticKind {
     /// Lexer has encountered a block comment without matching termination token.
     fatal_lexer_unterminated_comment,
