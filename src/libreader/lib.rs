@@ -12,6 +12,7 @@
 #[cfg(feature = "unicode")]
 extern crate unicode;
 
+pub mod datum;
 pub mod diagnostics;
 pub mod intern_pool;
 pub mod lexer;

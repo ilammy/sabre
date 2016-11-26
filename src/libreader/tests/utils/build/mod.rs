@@ -5,12 +5,8 @@
 // at your option. This file may be copied, distributed, and modified only
 // in accordance with the terms specified by the chosen license.
 
-//! Test utilities.
+//! Building stuff.
 //!
-//! Here be testing utilities.
+//! Various code for building entities.
 
-pub mod build;
-pub mod diff;
-pub mod pretty_tree;
-pub mod stubs;
-pub mod tree;
+pub mod datum;
