@@ -6,6 +6,11 @@
 // in accordance with the terms specified by the chosen license.
 
 //! Diffing sequences.
+//!
+//! This module provides a function [`diff()`](fn.diff.html) to compute linear diffs in sequences
+//! represented with slices. The elements are compared using the standard trait `PartialEq`.
+//! If you need a different comparison then you can use [`diff_with()`](fn.diff_with.html) which
+//! accepts an arbitrary comparator.
 
 /// Result of sequence element comparison.
 #[derive(Debug, PartialEq)]
@@ -24,8 +29,10 @@ pub enum Diff<'a, T> where T: 'a {
 }
 
 /// Compute the difference between two sequences of comparable elements.
-pub fn diff<'a, T: Eq>(lhs: &'a [T], rhs: &'a [T]) -> Vec<Diff<'a, T>> {
-    diff_with(lhs, rhs, &|lhs, rhs| lhs == rhs)
+pub fn diff<'a, T>(lhs: &'a [T], rhs: &'a [T]) -> Vec<Diff<'a, T>>
+    where T: PartialEq
+{
+    diff_with(lhs, rhs, |lhs, rhs| lhs == rhs)
 }
 
 // Here we use the classical approach to computing diffs. First we find the longest common
@@ -34,8 +41,8 @@ pub fn diff<'a, T: Eq>(lhs: &'a [T], rhs: &'a [T]) -> Vec<Diff<'a, T>> {
 // may be expensive, so we take care to reduce the amount of work to be done.
 
 /// Compute the difference between two sequences using the provided comparator.
-pub fn diff_with<'a, T>(lhs: &'a[T], rhs: &'a[T], equal: &Fn(&T, &T) -> bool)
-    -> Vec<Diff<'a, T>>
+pub fn diff_with<'a, T, F>(lhs: &'a [T], rhs: &'a [T], equal: F) -> Vec<Diff<'a, T>>
+    where F: Fn(&T, &T) -> bool
 {
     let fwd = lhs.iter().zip(rhs.iter());
     let rev = lhs.iter().rev().zip(rhs.iter().rev());
@@ -80,8 +87,8 @@ pub fn diff_with<'a, T>(lhs: &'a[T], rhs: &'a[T], equal: &Fn(&T, &T) -> bool)
 }
 
 /// Actually compute the diff between the sequences using the provided comparator.
-fn compute_diff<'a, T>(lhs: &'a[T], rhs: &'a[T], equal: &Fn(&T, &T) -> bool)
-    -> Vec<Diff<'a, T>>
+fn compute_diff<'a, T, F>(lhs: &'a [T], rhs: &'a [T], equal: F) -> Vec<Diff<'a, T>>
+    where F: Fn(&T, &T) -> bool
 {
     let (lcs, eqv) = compute_lcs_lookup(lhs, rhs, equal);
 
@@ -98,8 +105,8 @@ fn compute_diff<'a, T>(lhs: &'a[T], rhs: &'a[T], equal: &Fn(&T, &T) -> bool)
 ///
 /// The matrices are represented with just Vecs. You have to compute offsets manually.
 /// Thanks for having built-in array support, Rust!
-fn compute_lcs_lookup<T>(lhs: &[T], rhs: &[T], equal: &Fn(&T, &T) -> bool)
-    -> (Vec<usize>, Vec<bool>)
+fn compute_lcs_lookup<T, F>(lhs: &[T], rhs: &[T], equal: F) -> (Vec<usize>, Vec<bool>)
+    where F: Fn(&T, &T) -> bool
 {
     use std::cmp::max;
 
@@ -312,7 +319,7 @@ mod tests {
         let b: Vec<i32> = vec![    1, -2,  3, -4];
         //                     -               +
 
-        let diff = diff_with(&a, &b, &|a, b| a.abs() == b.abs());
+        let diff = diff_with(&a, &b, |a, b| a.abs() == b.abs());
 
         assert_eq!(diff, vec![
             Diff::Left  (&a[0]       ), // -[ 0]
