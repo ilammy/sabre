@@ -16,4 +16,5 @@ pub mod datum;
 pub mod diagnostics;
 pub mod intern_pool;
 pub mod lexer;
+pub mod parser;
 pub mod tokens;
