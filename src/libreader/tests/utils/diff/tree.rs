@@ -82,7 +82,7 @@ impl<'a, T> DisplayTreeNode for Diff<'a, T> where T: DisplayTreeNode {
 ///
 /// See [`flat_diff_with`](fn.flat_diff_with.html) for an explanation of what _flat_ means.
 pub fn flat_diff<'a, T: TreeNode + Eq>(lhs: &'a T, rhs: &'a T) -> Diff<'a, T> {
-    flat_diff_with(lhs, rhs, &|lhs, rhs| lhs == rhs)
+    flat_diff_with(lhs, rhs, |lhs, rhs| lhs == rhs)
 }
 
 /// Compute the flat difference between two tree using the provided comparator.
@@ -114,23 +114,25 @@ pub fn flat_diff<'a, T: TreeNode + Eq>(lhs: &'a T, rhs: &'a T) -> Diff<'a, T> {
 ///                              |  `- J
 ///                              `- H
 /// ```
-pub fn flat_diff_with<'a, T>(lhs: &'a T, rhs: &'a T, equal: &Fn(&T, &T) -> bool) -> Diff<'a, T>
-    where T: TreeNode
+pub fn flat_diff_with<'a, T, F>(lhs: &'a T, rhs: &'a T, equal: F) -> Diff<'a, T>
+    where T: TreeNode, F: Fn(&T, &T) -> bool
 {
     if equal(lhs, rhs) {
-        Diff::Equal(lhs, rhs, flat_child_diff(lhs, rhs, equal))
+        Diff::Equal(lhs, rhs, flat_child_diff(lhs, rhs, &equal))
     } else {
         Diff::Replace(lhs, rhs)
     }
 }
 
-fn flat_child_diff<'a, T>(lhs: &'a T, rhs: &'a T, equal: &Fn(&T, &T) -> bool) -> Vec<Diff<'a, T>>
-    where T: TreeNode
+/// Actually compute a flat diff between equal child nodes. This accepts the comparator
+/// by reference in order to be able to recurse. It should still be elided for closures.
+fn flat_child_diff<'a, T, F>(lhs: &'a T, rhs: &'a T, equal: &F) -> Vec<Diff<'a, T>>
+    where T: TreeNode, F: Fn(&T, &T) -> bool
 {
     let lhs_children = lhs.children();
     let rhs_children = rhs.children();
 
-    sequence::diff_with(&lhs_children, &rhs_children, &|lhs, rhs| equal(lhs, rhs))
+    sequence::diff_with(&lhs_children, &rhs_children, |lhs, rhs| equal(lhs, rhs))
         .iter()
         .map(|diff| match *diff {
             sequence::Diff::Left(lhs) => {
