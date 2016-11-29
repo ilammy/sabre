@@ -11,11 +11,10 @@
 //! for trees we need to know the internal structure of their nodes. One will need to provide an
 //! implementation of the `TreeNode` trait which provides access to child nodes of a given node.
 //!
-//! Also, tree diff expects that provided comparators or `Eq` implementation compare only immediate
-//! labels of the nodes, without doing a deep comparison of their child nodes. Failure to observe
-//! this expectation results into over-conservative diffs (though, they are _not_ incorrect). Know
-//! that derived implementations of `Eq` usually do a deep comparison, so you will usually need to
-//! write an explicit comparator anyway.
+//! Also, tree diff wants to compare only nodes themselves, not their child nodes. However, the
+//! default derived implementation of `PartialEq` usually will compare the child nodes as well,
+//! thus producing pretty meaningless diffs. This is the reason why we require an implementation
+//! of [`ShallowPartialEq`](trait.ShallowPartialEq.html) for tree nodes.
 
 use std::fmt;
 
@@ -78,11 +77,28 @@ impl<'a, T> DisplayTreeNode for Diff<'a, T> where T: DisplayTreeNode {
     }
 }
 
+/// Trait for _shallow_ equality comparisons.
+///
+/// This is effectively `PartialEq` which does not recurse into substructure of the compared items.
+/// All provisions required by `PartialEq` are also required by `ShallowPartialEq`: the relation
+/// must be symmetrical and transitive, and (non-default) implementation of `ne()` must ensure
+/// that `eq()` is its strict inverse.
+pub trait ShallowPartialEq<Rhs = Self> {
+    /// Test whether `self == other`.
+    fn eq(&self, other: &Rhs) -> bool;
+
+    /// Test whether `self != other`.
+    #[inline]
+    fn ne(&self, other: &Rhs) -> bool { !self.eq(other) }
+}
+
 /// Compute the flat difference between two trees of comparable elements.
 ///
 /// See [`flat_diff_with`](fn.flat_diff_with.html) for an explanation of what _flat_ means.
-pub fn flat_diff<'a, T: TreeNode + Eq>(lhs: &'a T, rhs: &'a T) -> Diff<'a, T> {
-    flat_diff_with(lhs, rhs, |lhs, rhs| lhs == rhs)
+pub fn flat_diff<'a, T>(lhs: &'a T, rhs: &'a T) -> Diff<'a, T>
+    where T: TreeNode + ShallowPartialEq<T>
+{
+    flat_diff_with(lhs, rhs, |lhs, rhs| lhs.eq(rhs))
 }
 
 /// Compute the flat difference between two tree using the provided comparator.
@@ -185,13 +201,13 @@ mod tests {
     use tree::{TreeNode};
     use pretty_tree::{self, DisplayTreeNode};
 
-    #[derive(Debug, Eq)]
+    #[derive(Debug, PartialEq)]
     struct Tree<T> {
         value: T,
         children: Vec<Tree<T>>,
     }
 
-    impl<T> PartialEq for Tree<T> where T: PartialEq {
+    impl<T> ShallowPartialEq for Tree<T> where T: PartialEq {
         fn eq(&self, other: &Self) -> bool {
             self.value == other.value
         }
