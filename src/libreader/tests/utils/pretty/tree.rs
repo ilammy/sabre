@@ -64,20 +64,19 @@ pub fn write<T>(tree: &T, output: &mut fmt::Write) -> fmt::Result
 }
 
 /// Format a tree into a string, formatting nodes in a specified way.
-pub fn format_with<T>(tree: &T, format: &Fn(&T) -> String) -> String
-    where T: TreeNode
+pub fn format_with<T, F>(tree: &T, format: F) -> String
+    where T: TreeNode, F: Fn(&T) -> String
 {
     let mut string = String::new();
-    let _ = write_with(tree, &mut string, format);
+    let _ = write_with(tree, &mut string, &format);
     return string;
 }
 
 /// Write a tree into the provided sink, formatting nodes in a specified way.
-pub fn write_with<T>(tree: &T, output: &mut fmt::Write, format: &Fn(&T) -> String)
-    -> fmt::Result
-    where T: TreeNode
+pub fn write_with<T, F>(tree: &T, output: &mut fmt::Write, format: F) -> fmt::Result
+    where T: TreeNode, F: Fn(&T) -> String
 {
-    write_with_prefix(tree, output, format, "")
+    write_with_prefix(tree, output, &format, "")
 }
 
 /// A wrapper for `Display` trait.
@@ -97,9 +96,9 @@ impl<'a, T> fmt::Display for DisplayProxy<'a, T> where T: DisplayTreeNode {
 
 /// Write a given tree into the provided writer while formatting nodes using the given formatter
 /// and prefixing each line with a given prefix.
-fn write_with_prefix<T>(root: &T, output: &mut fmt::Write, format: &Fn(&T) -> String, prefix: &str)
+fn write_with_prefix<T, F>(root: &T, output: &mut fmt::Write, format: &F, prefix: &str)
     -> fmt::Result
-    where T: TreeNode
+    where T: TreeNode, F: Fn(&T) -> String
 {
     let root_str = format(root);
     let mut line = root_str.lines();
@@ -280,6 +279,6 @@ a
 |- <2>
 `- <3>";
 
-        assert_eq!(expected, format_with(&tree, &|node| format!("<{}>", node.value)));
+        assert_eq!(expected, format_with(&tree, |node| format!("<{}>", node.value)));
     }
 }
