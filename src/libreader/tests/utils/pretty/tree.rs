@@ -21,16 +21,18 @@
 //! Users must implement the `TreeNode` trait for their data to describe the tree structure.
 //! Actual formatting of individual nodes may be performed in several ways:
 //!
-//!   - Implement the `DisplayTreeNode` trait (exported by this module).
+//!   - Implement the standard `fmt::Display` trait for tree nodes.
 //!
-//!     This trait is similar to the usual `fmt::Display`. It requires identical interface
-//!     based on `fmt::Formatter`, and is suitable when your nodes have some canonical
-//!     representation which you will be using 99% of time.
+//!     `fmt::Display` implementation should display an individual node (without attempting
+//!     to display the whole tree). With this you can use [`format`](fn.format.html) to
+//!     format trees as strings and [`write`](fn.write.html) to append them directly to
+//!     an `fmt::Write` (for example, when implementing `fmt::Display` for something else).
 //!
 //!   - Explicitly specify the way to format your nodes.
 //!
 //!     This is convenient when you need to use multiple representations of tree nodes.
-//!     Just write a formatting function for each of your representations.
+//!     Just pass a relevant closure to [`format_with`](fn.format_with.html) or
+//!     [`write_with`](fn.write_with.html) which will be then used to format tree nodes.
 //!
 //! The pretty-printer can handle multiline node representations, but it will normalize all
 //! newlines into just `\n`.
