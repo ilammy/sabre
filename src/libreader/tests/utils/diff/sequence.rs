@@ -218,6 +218,51 @@ fn backtrace_diff<'a, T>(lhs: &'a [T], rhs: &'a [T],
     return diff;
 }
 
+/// Replace all `Diff::Replace` in a diff with pairs of `Diff::Left` and `Diff::Right`.
+///
+/// This is mostly relevant for _consecutive_ replacements as they are regrouped into consecutive
+/// `Diff::Left` followed by `Diff::Right` which makes the resulting diff more readable for humans
+/// when pretty-printed.
+pub fn unfold_replacements<'a, T>(diff: Vec<Diff<'a, T>>) -> Vec<Diff<'a, T>> {
+    // Vec does not provide an efficient method to insert multiple elements into the middle of it
+    // so it's better to just rebuild the diff from scratch.
+    let mut new_diff = Vec::with_capacity(diff.capacity());
+
+    let mut chunk_start = 0;
+    for item in diff {
+        match item {
+            // Reuse Left and Right diffs as is.
+            Diff::Left(_) | Diff::Right(_) => {
+                new_diff.push(item);
+            }
+            // Expand replacements into pairs of Left and Right.
+            Diff::Replace(left, right) => {
+                new_diff.push(Diff::Left(left));
+                new_diff.push(Diff::Right(right));
+            }
+            // And this is the fun part. Diffs are usually structured as chunks of non-Equal
+            // items delimited with large sequences of Equal items. To get a readable diff
+            // we make sure that all chunks are always formatted as Left items followed by
+            // Right items (and there will be no Replace items there as we have expanded
+            // them all above).
+            Diff::Equal(_, _) => {
+                new_diff[chunk_start..].sort_by(|a, b| {
+                    use std::cmp::Ordering;
+                    match (a, b) {
+                        (&Diff::Left(_), &Diff::Right(_)) => Ordering::Less,
+                        (&Diff::Right(_), &Diff::Left(_)) => Ordering::Greater,
+                         _                                => Ordering::Equal,
+                    }
+                });
+                new_diff.push(item);
+                chunk_start = new_diff.len();
+            }
+        }
+    }
+
+    return new_diff;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -359,6 +404,75 @@ mod tests {
     }
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // Folding replacements
+
+    #[test]
+    fn unfold_irrelevant() {
+        let a = vec![1, 2   ];
+        let b = vec![   2, 3];
+        //           -     +
+
+        assert_eq!(unfold_replacements(diff(&a, &b)), vec![
+            Diff::Left (&a[0]),         // -1
+            Diff::Equal(&a[1], &b[0]),  //  2
+            Diff::Right(&b[1]),         // +3
+        ]);
+    }
+
+    #[test]
+    fn unfold_singular() {
+        let a = vec![1, 2, 3, 4   ];
+        let b = vec![   2, 0, 4, 5];
+        //           -     |     +
+
+        assert_eq!(unfold_replacements(diff(&a, &b)), vec![
+            Diff::Left (&a[0]),         // -1
+            Diff::Equal(&a[1], &b[0]),  //  2
+            Diff::Left (&a[2]),         // -3
+            Diff::Right(&b[1]),         // +0
+            Diff::Equal(&a[3], &b[2]),  //  4
+            Diff::Right(&b[3]),         // +5
+        ]);
+    }
+
+    #[test]
+    fn unfold_multiple() {
+        let a = vec![1, 2, 3, 4, 5   ];
+        let b = vec![   2, 0, 0, 5, 6];
+        //           -     |  |     +
+
+        assert_eq!(unfold_replacements(diff(&a, &b)), vec![
+            Diff::Left (&a[0]),         // -1
+            Diff::Equal(&a[1], &b[0]),  //  2
+            Diff::Left (&a[2]),         // -3
+            Diff::Left (&a[3]),         // -4
+            Diff::Right(&b[1]),         // +0
+            Diff::Right(&b[2]),         // +0
+            Diff::Equal(&a[4], &b[3]),  //  5
+            Diff::Right(&b[4]),         // +6
+        ]);
+    }
+
+    #[test]
+    fn unfold_multiple_interleaved() {
+        let a = vec![1, 2,    3, 4, 5, 6];
+        let b = vec![   2, 0, 1, 0, 5   ];
+        //           -     +  |  |     -
+
+        assert_eq!(unfold_replacements(diff(&a, &b)), vec![
+            Diff::Left (&a[0]),         // -1
+            Diff::Equal(&a[1], &b[0]),  //  2
+            Diff::Left (&a[2]),         // -3
+            Diff::Left (&a[3]),         // -4
+            Diff::Right(&b[1]),         // +0
+            Diff::Right(&b[2]),         // +1
+            Diff::Right(&b[3]),         // +0
+            Diff::Equal(&a[4], &b[4]),  //  5
+            Diff::Left (&a[5]),         // -6
+        ]);
+    }
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Pretty-printing diffs
 
     #[test]
@@ -382,5 +496,33 @@ mod tests {
             " 2",
             "+3",
         ]);
+    }
+
+    #[test]
+    fn print_diff_pretty() {
+        let a = vec![1, 2,    3, 4, 5, 6, 7, 8, 2   ];
+        let b = vec![8, 2, 4, 3, 1, 1, 6, 7, 5, 2, 3];
+        //           |     +     |  |        |     +
+
+        let diff_string = unfold_replacements(diff(&a, &b))
+            .iter().map(|d| format!("{}\n", d)).collect::<String>();
+
+        assert_eq!(diff_string, "\
+-1
++8
+ 2
++4
+ 3
+-4
+-5
++1
++1
+ 6
+ 7
+-8
++5
+ 2
++3
+");
     }
 }
