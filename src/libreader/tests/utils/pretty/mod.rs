@@ -5,14 +5,8 @@
 // at your option. This file may be copied, distributed, and modified only
 // in accordance with the terms specified by the chosen license.
 
-//! Test utilities.
+//! Pretty-printing.
 //!
-//! Here be testing utilities.
+//! Various code for pretty-printing entities.
 
-extern crate reader;
-
-pub mod build;
-pub mod diff;
-pub mod pretty;
-pub mod stubs;
 pub mod tree;

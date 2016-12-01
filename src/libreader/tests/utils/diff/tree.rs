@@ -20,7 +20,7 @@ use std::fmt;
 
 use diff::sequence;
 use tree::{TreeNode};
-use pretty_tree::{DisplayTreeNode};
+use pretty::tree::{DisplayTreeNode};
 
 /// Result of tree node comparison.
 #[derive(Debug, PartialEq)]
@@ -199,7 +199,8 @@ mod tests {
     use std::fmt;
     use std::ops::Index;
     use tree::{TreeNode};
-    use pretty_tree::{self, DisplayTreeNode};
+    use pretty;
+    use pretty::tree::{DisplayTreeNode};
 
     #[derive(Debug, PartialEq)]
     struct Tree<T> {
@@ -455,7 +456,7 @@ mod tests {
                 ]),
             ]));
 
-        assert_eq!(pretty_tree::format(&pruned(&diff)), "\
+        assert_eq!(pretty::tree::format(&pruned(&diff)), "\
 A
 |- B
 |  |- (-) D
@@ -478,7 +479,7 @@ A
                 Diff::Left(&a[0]),
             ]));
 
-        assert_eq!(pretty_tree::format(&pruned(&diff)), "\
+        assert_eq!(pretty::tree::format(&pruned(&diff)), "\
 A
 `- (-) B");
     }
@@ -495,7 +496,7 @@ A
                 Diff::Right(&b[0]),
             ]));
 
-        assert_eq!(pretty_tree::format(&pruned(&diff)), "\
+        assert_eq!(pretty::tree::format(&pruned(&diff)), "\
 A
 `- (+) B");
     }
@@ -509,7 +510,7 @@ A
 
         assert_eq!(diff, Diff::Replace(&a, &b));
 
-        assert_eq!(pretty_tree::format(&pruned(&diff)), "\
+        assert_eq!(pretty::tree::format(&pruned(&diff)), "\
 (-) A
 (+) B");
     }
@@ -526,7 +527,7 @@ A
                 Diff::Replace(&a[0], &b[0]),
             ]));
 
-        assert_eq!(pretty_tree::format(&pruned(&diff)), "\
+        assert_eq!(pretty::tree::format(&pruned(&diff)), "\
 A
 `- (-) B
    (+) C");
@@ -541,7 +542,7 @@ A
 
         assert_eq!(diff, Diff::Equal(&a, &b, vec![]));
 
-        assert_eq!(pretty_tree::format(&pruned(&diff)), "A");
+        assert_eq!(pretty::tree::format(&pruned(&diff)), "A");
     }
 
     #[test]
@@ -580,7 +581,7 @@ A
                 ]),
             ]));
 
-        assert_eq!(pretty_tree::format(&pruned(&diff)), "\
+        assert_eq!(pretty::tree::format(&pruned(&diff)), "\
 A
 |- B
 |  |- C
