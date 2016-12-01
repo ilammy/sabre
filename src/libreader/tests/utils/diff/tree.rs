@@ -20,7 +20,6 @@ use std::fmt;
 
 use diff::sequence;
 use tree::{TreeNode};
-use pretty::tree::{DisplayTreeNode};
 
 /// Result of tree node comparison.
 #[derive(Debug, PartialEq)]
@@ -52,7 +51,7 @@ impl<'a, T> TreeNode for Diff<'a, T> {
     }
 }
 
-impl<'a, T> DisplayTreeNode for Diff<'a, T> where T: DisplayTreeNode {
+impl<'a, T> fmt::Display for Diff<'a, T> where T: fmt::Display {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Diff::Left(node) => {
@@ -200,7 +199,6 @@ mod tests {
     use std::ops::Index;
     use tree::{TreeNode};
     use pretty;
-    use pretty::tree::{DisplayTreeNode};
 
     #[derive(Debug, PartialEq)]
     struct Tree<T> {
@@ -234,7 +232,7 @@ mod tests {
         }
     }
 
-    impl<T> DisplayTreeNode for Tree<T> where T: fmt::Display {
+    impl<T> fmt::Display for Tree<T> where T: fmt::Display {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, "{}", self.value)
         }

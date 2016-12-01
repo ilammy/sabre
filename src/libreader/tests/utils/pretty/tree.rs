@@ -39,17 +39,9 @@ use std::fmt;
 
 use tree::{TreeNode};
 
-/// Formatting trait for trees.
-///
-/// This trait is similar to `fmt::Display` and its friends from `std::fmt`.
-pub trait DisplayTreeNode {
-    /// Formats this node using the given formatter.
-    fn fmt(&self, &mut fmt::Formatter) -> fmt::Result;
-}
-
 /// Format a tree into a string.
 pub fn format<T>(tree: &T) -> String
-    where T: DisplayTreeNode + TreeNode
+    where T: fmt::Display + TreeNode
 {
     let mut string = String::new();
     let _ = write(tree, &mut string);
@@ -58,9 +50,9 @@ pub fn format<T>(tree: &T) -> String
 
 /// Write a tree into the provided sink.
 pub fn write<T>(tree: &T, output: &mut fmt::Write) -> fmt::Result
-    where T: DisplayTreeNode + TreeNode
+    where T: fmt::Display + TreeNode
 {
-    write_with_prefix(tree, output, &|node| format!("{}", DisplayProxy { value: node }), "")
+    write_with_prefix(tree, output, &|node| format!("{}", node), "")
 }
 
 /// Format a tree into a string, formatting nodes in a specified way.
@@ -77,21 +69,6 @@ pub fn write_with<T, F>(tree: &T, output: &mut fmt::Write, format: F) -> fmt::Re
     where T: TreeNode, F: Fn(&T) -> String
 {
     write_with_prefix(tree, output, &format, "")
-}
-
-/// A wrapper for `Display` trait.
-///
-/// We *do want* to provide the user with access to `fmt::Formatter` in `DisplayTreeNode` which
-/// enables formatting code reuse. However, Rust does not allow custom formatting traits or
-/// multiple implementations of Display for a single type. Thus we introduce this proxy type
-/// that wraps a reference to `DisplayTreeNode` and provides an implementation of `Display` trait
-/// so that we can use the `{}` format string to output our format.
-struct DisplayProxy<'a, T> where T: 'a + DisplayTreeNode { value: &'a T }
-
-impl<'a, T> fmt::Display for DisplayProxy<'a, T> where T: DisplayTreeNode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.value.fmt(f)
-    }
 }
 
 /// Write a given tree into the provided writer while formatting nodes using the given formatter
@@ -147,7 +124,7 @@ mod tests {
         children: Vec<Tree<T>>,
     }
 
-    impl<T> DisplayTreeNode for Tree<T> where T: fmt::Display {
+    impl<T> fmt::Display for Tree<T> where T: fmt::Display {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, "{}", self.value)
         }
