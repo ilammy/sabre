@@ -3923,11 +3923,11 @@ fn no_unicode_numbers_no_normalization() {
 // Test helpers
 
 use std::cell::RefCell;
-use std::fmt::Write;
 use std::rc::Rc;
 
 use utils::diff::sequence::{self, Diff};
 use utils::stubs::{SinkReporter};
+use utils::pretty::diff::sequence as pretty_sequence;
 
 struct ScannerTestDiagnostic {
     pub from: usize,
@@ -4055,36 +4055,25 @@ fn compute_scanning_results(string: &str, pool: &InternPool) -> ScannerTestResul
 fn verify<T, F>(title: &str, expected: &[T], actual: &[T], to_string: F) -> Result<(), String>
     where T: Eq, F: Fn(&T) -> String
 {
-    let mut report = String::new();
+    let diff = sequence::unfold_replacements(sequence::diff(expected, actual));
 
-    writeln!(&mut report, "{}", title).unwrap();
-
-    let diff = sequence::diff(expected, actual);
-
-    let mut okay = true;
-
-    for entry in diff {
-        match entry {
-            Diff::Equal(ref actual, _) => {
-                writeln!(&mut report, "  {}", to_string(actual)).unwrap();
-            }
-            Diff::Replace(ref actual, ref expected) => {
-                okay = false;
-                writeln!(&mut report, "- {}", to_string(actual)).unwrap();
-                writeln!(&mut report, "+ {}", to_string(expected)).unwrap();
-            }
-            Diff::Left(ref actual) => {
-                okay = false;
-                writeln!(&mut report, "- {}", to_string(actual)).unwrap();
-            }
-            Diff::Right(ref expected) => {
-                okay = false;
-                writeln!(&mut report, "+ {}", to_string(expected)).unwrap();
-            }
-        }
+    if diff.iter().all(|item|{ match *item { Diff::Equal(_, _) => true, _ => false } }) {
+        return Ok(());
     }
 
-    return if okay { Ok(()) } else { Err(report) };
+    let mut report = String::new();
+
+    report.push_str(title);
+    report.push_str(":\n");
+
+    for line in pretty_sequence::format_unified_with(&diff, to_string).lines() {
+        report.push_str(&line[0..1]);
+        report.push_str(" ");
+        report.push_str(&line[1..]);
+        report.push_str("\n");
+    }
+
+    return Err(report);
 }
 
 /// Pretty-print a token in diffs.
