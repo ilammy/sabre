@@ -228,6 +228,15 @@ pub fn unfold_replacements<'a, T>(diff: Vec<Diff<'a, T>>) -> Vec<Diff<'a, T>> {
     // so it's better to just rebuild the diff from scratch.
     let mut new_diff = Vec::with_capacity(diff.capacity());
 
+    let diff_ordering = |a: &Diff<'a, T>, b: &Diff<'a, T>| {
+        use std::cmp::Ordering;
+        match (a, b) {
+            (&Diff::Left(_), &Diff::Right(_)) => Ordering::Less,
+            (&Diff::Right(_), &Diff::Left(_)) => Ordering::Greater,
+             _                                => Ordering::Equal,
+        }
+    };
+
     let mut chunk_start = 0;
     for item in diff {
         match item {
@@ -246,19 +255,15 @@ pub fn unfold_replacements<'a, T>(diff: Vec<Diff<'a, T>>) -> Vec<Diff<'a, T>> {
             // Right items (and there will be no Replace items there as we have expanded
             // them all above).
             Diff::Equal(_, _) => {
-                new_diff[chunk_start..].sort_by(|a, b| {
-                    use std::cmp::Ordering;
-                    match (a, b) {
-                        (&Diff::Left(_), &Diff::Right(_)) => Ordering::Less,
-                        (&Diff::Right(_), &Diff::Left(_)) => Ordering::Greater,
-                         _                                => Ordering::Equal,
-                    }
-                });
+                new_diff[chunk_start..].sort_by(&diff_ordering);
                 new_diff.push(item);
                 chunk_start = new_diff.len();
             }
         }
     }
+
+    // Sort the last chunk that may not end with an Equal item.
+    new_diff[chunk_start..].sort_by(&diff_ordering);
 
     return new_diff;
 }
@@ -469,6 +474,19 @@ mod tests {
             Diff::Right(&b[3]),         // +0
             Diff::Equal(&a[4], &b[4]),  //  5
             Diff::Left (&a[5]),         // -6
+        ]);
+    }
+
+    #[test]
+    fn unfold_no_context() {
+        let a = vec!["line 1", "line 2"];
+        let b = vec!["line A", "line B"];
+
+        assert_eq!(unfold_replacements(diff(&a, &b)), vec![
+            Diff::Left (&a[0]),         // -line 1
+            Diff::Left (&a[1]),         // -line 2
+            Diff::Right(&b[0]),         // +line A
+            Diff::Right(&b[1]),         // +line B
         ]);
     }
 
