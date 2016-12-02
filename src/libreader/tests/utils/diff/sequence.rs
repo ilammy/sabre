@@ -12,8 +12,6 @@
 //! If you need a different comparison then you can use [`diff_with()`](fn.diff_with.html) which
 //! accepts an arbitrary comparator.
 
-use std::fmt;
-
 /// Result of sequence element comparison.
 #[derive(Debug, PartialEq)]
 pub enum Diff<'a, T> where T: 'a {
@@ -28,32 +26,6 @@ pub enum Diff<'a, T> where T: 'a {
 
     /// Matching elements in the left and right sequences are not equal.
     Replace(&'a T, &'a T),
-}
-
-impl<'a, T> fmt::Display for Diff<'a, T> where T: fmt::Display {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Diff::Left(element) => {
-                try!(f.write_str("-"));
-                try!(element.fmt(f));
-            }
-            Diff::Right(element) => {
-                try!(f.write_str("+"));
-                try!(element.fmt(f));
-            }
-            Diff::Equal(element, _) => {
-                try!(f.write_str(" "));
-                try!(element.fmt(f));
-            }
-            Diff::Replace(lhs, rhs) => {
-                try!(f.write_str("-"));
-                try!(lhs.fmt(f));
-                try!(f.write_str("\n+"));
-                try!(rhs.fmt(f));
-            }
-        }
-        Ok(())
-    }
 }
 
 /// Compute the difference between two sequences of comparable elements.
@@ -488,59 +460,5 @@ mod tests {
             Diff::Right(&b[0]),         // +line A
             Diff::Right(&b[1]),         // +line B
         ]);
-    }
-
-    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    // Pretty-printing diffs
-
-    #[test]
-    fn print_diff_individual() {
-        let a = vec![1, 2,    3, 4, 5, 6, 7, 8, 2   ];
-        let b = vec![8, 2, 4, 3, 1, 1, 6, 7, 5, 2, 3];
-        //           |     +     |  |        |     +
-
-        let diff_lines = diff(&a, &b).iter().map(|d| format!("{}", d)).collect::<Vec<_>>();
-
-        assert_eq!(diff_lines, vec![
-            "-1\n+8",
-            " 2",
-            "+4",
-            " 3",
-            "-4\n+1",
-            "-5\n+1",
-            " 6",
-            " 7",
-            "-8\n+5",
-            " 2",
-            "+3",
-        ]);
-    }
-
-    #[test]
-    fn print_diff_pretty() {
-        let a = vec![1, 2,    3, 4, 5, 6, 7, 8, 2   ];
-        let b = vec![8, 2, 4, 3, 1, 1, 6, 7, 5, 2, 3];
-        //           |     +     |  |        |     +
-
-        let diff_string = unfold_replacements(diff(&a, &b))
-            .iter().map(|d| format!("{}\n", d)).collect::<String>();
-
-        assert_eq!(diff_string, "\
--1
-+8
- 2
-+4
- 3
--4
--5
-+1
-+1
- 6
- 7
--8
-+5
- 2
-+3
-");
     }
 }

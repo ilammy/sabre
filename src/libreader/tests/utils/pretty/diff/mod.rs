@@ -5,9 +5,6 @@
 // at your option. This file may be copied, distributed, and modified only
 // in accordance with the terms specified by the chosen license.
 
-//! Pretty-printing.
-//!
-//! Various code for pretty-printing entities.
+//! Pretty-printing diffs.
 
-pub mod diff;
-pub mod tree;
+pub mod sequence;
