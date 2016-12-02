@@ -134,28 +134,28 @@ pub trait ShallowPartialEq<Rhs = Self> {
 pub fn diff<'a, T>(lhs: &'a T, rhs: &'a T) -> Diff<'a, T>
     where T: TreeNode + ShallowPartialEq<T>
 {
-    diff_with(lhs, rhs, &|lhs, rhs| lhs.eq(rhs))
+    diff_with(lhs, rhs, |lhs, rhs| lhs.eq(rhs))
 }
 
 /// Compute the difference between two tree using the provided comparator.
-pub fn diff_with<'a, T>(lhs: &'a T, rhs: &'a T, equal: &Fn(&T, &T) -> bool) -> Diff<'a, T>
-    where T: TreeNode
+pub fn diff_with<'a, T, F>(lhs: &'a T, rhs: &'a T, equal: F) -> Diff<'a, T>
+    where T: TreeNode, F: Fn(&T, &T) -> bool
 {
     if equal(lhs, rhs) {
-        Diff::Equal(lhs, rhs, child_diff(lhs, rhs, equal))
+        Diff::Equal(lhs, rhs, child_diff(lhs, rhs, &equal))
     } else {
         Diff::Replace(lhs, rhs)
     }
 }
 
 /// Actually compute a diff between equal child nodes.
-fn child_diff<'a, T>(lhs: &'a T, rhs: &'a T, equal: &Fn(&T, &T) -> bool) -> Vec<Diff<'a, T>>
-    where T: TreeNode
+fn child_diff<'a, T, F>(lhs: &'a T, rhs: &'a T, equal: &F) -> Vec<Diff<'a, T>>
+    where T: TreeNode, F: Fn(&T, &T) -> bool
 {
     let lhs_children = lhs.children();
     let rhs_children = rhs.children();
 
-    sequence::diff_with(&lhs_children, &rhs_children, &|lhs, rhs| equal(lhs, rhs))
+    sequence::diff_with(&lhs_children, &rhs_children, |lhs, rhs| equal(lhs, rhs))
         .iter()
         .map(|diff| match *diff {
             sequence::Diff::Left(lhs) => {
