@@ -6,6 +6,14 @@
 // in accordance with the terms specified by the chosen license.
 
 //! Diffing sequences.
+//!
+//! This module provides functions for computing linear diffs between two sequences represented
+//! with slices.
+//!
+//!   - [`diff()`](fn.diff.html) uses the standard `PartialEq` trait for element comparison.
+//!
+//!   - [`diff_with()`](fn.diff_with.html) accepts a custom comparator if you need something
+//!     different.
 
 /// Result of sequence element comparison.
 #[derive(Debug, PartialEq)]
@@ -24,7 +32,9 @@ pub enum Diff<'a, T> where T: 'a {
 }
 
 /// Compute the difference between two sequences of comparable elements.
-pub fn diff<'a, T: Eq>(lhs: &'a [T], rhs: &'a [T]) -> Vec<Diff<'a, T>> {
+pub fn diff<'a, T>(lhs: &'a [T], rhs: &'a [T]) -> Vec<Diff<'a, T>>
+    where T: PartialEq
+{
     diff_with(lhs, rhs, &|lhs, rhs| lhs == rhs)
 }
 

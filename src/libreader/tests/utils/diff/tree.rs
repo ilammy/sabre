@@ -9,13 +9,50 @@
 //!
 //! Trees are more complex than sequences. Slices are enough to represent diffable sequences, but
 //! for trees we need to know the internal structure of their nodes. One will need to provide an
-//! implementation of the `TreeNode` trait which provides access to child nodes of a given node.
+//! implementation of the [`TreeNode`][TreeNode] trait which provides access to child nodes of
+//! a given node.
 //!
-//! Also, tree diff expects that provided comparators or `Eq` implementation compare only immediate
-//! labels of the nodes, without doing a deep comparison of their child nodes. Failure to observe
-//! this expectation results into over-conservative diffs (though, they are _not_ incorrect). Know
-//! that derived implementations of `Eq` usually do a deep comparison, so you will usually need to
-//! write an explicit comparator anyway.
+//! Also, tree diff wants to compare only nodes themselves, not their child nodes. However, the
+//! default derived implementation of `PartialEq` usually will compare the child nodes as well,
+//! thus producing pretty meaningless diffs. This is the reason why we require an implementation
+//! of [`ShallowPartialEq`][ShallowPartialEq] for tree nodes.
+//!
+//!   - [`diff()`](fn.diff.html) uses the [`ShallowPartialEq`][ShallowPartialEq] trait for
+//!     node comparison.
+//!
+//!   - [`diff_with()`](fn.diff_with.html) accepts a custom comparator if you need something
+//!     different.
+//!
+//! These functions compute a _flat_ difference, meaning that they simply compares trees from
+//! root to leaves in breadth-first fashion until the first difference is met, and sibling nodes
+//! are compared with a sequence diff algorithm. The most prominent implication of all this is
+//! that this algorithm fails to notice node movement.
+//!
+//! While such awareness is sometimes desired, it has much more significant computation cost.
+//! More precise algorithms for computing tree edit distance (e.g. Zhang-Shasha) have O(n1 * n2)
+//! complexity, where n1 and n2 are amounts of nodes in the trees. This algorithm, however, has
+//! O((n1 + n2) * (m1 * m2)) complexity, where m1 and m2 are maximum number of child nodes in the
+//! trees (which are usually small). Thus it is much more efficient at comparing mostly equivalent
+//! syntax trees with minor number of errors. Finally, flat diff is much more suitable for textual
+//! presentation, as it captures only horizontal movements of nodes on the same level.
+//!
+//! Example:
+//!
+//! ```plaintext
+//!         A              A               A
+//!         |- B           |- B            |- B
+//!         |  |- D        |  |- E         |  |- (-) D
+//!         |  |  |- G     |  |- Q         |  |- E
+//! diff (  |  |  `- H  ,  |  `- F   )  =  |  |- (+) Q
+//!         |  |- E        `- C            |  `- F
+//!         |  `- F           `- D         `- C
+//!         `- C                 |- G         `- (+) D
+//!                              |  `- J
+//!                              `- H
+//! ```
+//!
+//! [ShallowPartialEq]: trait.ShallowPartialEq.html
+//! [TreeNode]: ../../tree/trait.TreeNode.html
 
 use std::fmt;
 
@@ -78,53 +115,41 @@ impl<'a, T> DisplayTreeNode for Diff<'a, T> where T: DisplayTreeNode {
     }
 }
 
-/// Compute the flat difference between two trees of comparable elements.
+/// Trait for _shallow_ equality comparisons.
 ///
-/// See [`flat_diff_with`](fn.flat_diff_with.html) for an explanation of what _flat_ means.
-pub fn flat_diff<'a, T: TreeNode + Eq>(lhs: &'a T, rhs: &'a T) -> Diff<'a, T> {
-    flat_diff_with(lhs, rhs, &|lhs, rhs| lhs == rhs)
+/// This is effectively a `PartialEq` which does not recurse into substructure of the compared
+/// items. All provisions required by `PartialEq` are also required by `ShallowPartialEq`:
+/// the relation _must_ be symmetrical and transitive, and (non-default) implementation of
+/// `ne()` _must_ ensure that `eq()` is its strict inverse.
+pub trait ShallowPartialEq<Rhs = Self> {
+    /// Test whether `self == other`.
+    fn eq(&self, other: &Rhs) -> bool;
+
+    /// Test whether `self != other`.
+    #[inline]
+    fn ne(&self, other: &Rhs) -> bool { !self.eq(other) }
 }
 
-/// Compute the flat difference between two tree using the provided comparator.
-///
-/// This function computes a _flat_ difference, meaning that it simply compares trees from root
-/// to leaves in breadth-first fashion until the first difference is met, and sibling nodes are
-/// compared with a sequence diff algorithm. The most prominent implication of all this is that
-/// this algorithm fails to notice node movement.
-///
-/// While such awareness is sometimes desired, it has much more significant computation cost.
-/// More precise algorithms for computing tree edit distance (e.g. Zhang-Shasha) have O(n1 * n2)
-/// complexity, where n1 and n2 are amounts of nodes in the trees. This algorithm, however, has
-/// O((n1 + n2) * (m1 * m2)) complexity, where m1 and m2 are maximum number of child nodes in the
-/// trees (which are usually small). Thus it is much more efficient at comparing mostly equivalent
-/// syntax trees with minor number of errors. Finally, flat diff is much more suitable for textual
-/// presentation, as it captures only horizontal movements of nodes on the same level.
-///
-/// Example:
-///
-/// ```plaintext
-///         A              A               A
-///         |- B           |- B            |- B
-///         |  |- D        |  |- E         |  |- (-) D
-///         |  |  |- G     |  |- Q         |  |- E
-/// diff (  |  |  `- H  ,  |  `- F   )  =  |  |- (+) Q
-///         |  |- E        `- C            |  `- F
-///         |  `- F           `- D         `- C
-///         `- C                 |- G         `- (+) D
-///                              |  `- J
-///                              `- H
-/// ```
-pub fn flat_diff_with<'a, T>(lhs: &'a T, rhs: &'a T, equal: &Fn(&T, &T) -> bool) -> Diff<'a, T>
+/// Compute the difference between two trees of comparable elements.
+pub fn diff<'a, T>(lhs: &'a T, rhs: &'a T) -> Diff<'a, T>
+    where T: TreeNode + ShallowPartialEq<T>
+{
+    diff_with(lhs, rhs, &|lhs, rhs| lhs.eq(rhs))
+}
+
+/// Compute the difference between two tree using the provided comparator.
+pub fn diff_with<'a, T>(lhs: &'a T, rhs: &'a T, equal: &Fn(&T, &T) -> bool) -> Diff<'a, T>
     where T: TreeNode
 {
     if equal(lhs, rhs) {
-        Diff::Equal(lhs, rhs, flat_child_diff(lhs, rhs, equal))
+        Diff::Equal(lhs, rhs, child_diff(lhs, rhs, equal))
     } else {
         Diff::Replace(lhs, rhs)
     }
 }
 
-fn flat_child_diff<'a, T>(lhs: &'a T, rhs: &'a T, equal: &Fn(&T, &T) -> bool) -> Vec<Diff<'a, T>>
+/// Actually compute a diff between equal child nodes.
+fn child_diff<'a, T>(lhs: &'a T, rhs: &'a T, equal: &Fn(&T, &T) -> bool) -> Vec<Diff<'a, T>>
     where T: TreeNode
 {
     let lhs_children = lhs.children();
@@ -143,7 +168,7 @@ fn flat_child_diff<'a, T>(lhs: &'a T, rhs: &'a T, equal: &Fn(&T, &T) -> bool) ->
                 self::Diff::Replace(*lhs, *rhs)
             }
             sequence::Diff::Equal(lhs, rhs) => {
-                self::Diff::Equal(*lhs, *rhs, flat_child_diff(*lhs, *rhs, equal))
+                self::Diff::Equal(*lhs, *rhs, child_diff(*lhs, *rhs, equal))
             }
         })
         .collect()
@@ -183,13 +208,13 @@ mod tests {
     use tree::{TreeNode};
     use pretty_tree::{self, DisplayTreeNode};
 
-    #[derive(Debug, Eq)]
+    #[derive(Debug, PartialEq)]
     struct Tree<T> {
         value: T,
         children: Vec<Tree<T>>,
     }
 
-    impl<T> PartialEq for Tree<T> where T: PartialEq {
+    impl<T> ShallowPartialEq for Tree<T> where T: PartialEq {
         fn eq(&self, other: &Self) -> bool {
             self.value == other.value
         }
@@ -222,14 +247,14 @@ mod tests {
     }
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    // Flat diff
+    // Computing diffs
 
     #[test]
     fn root_not_equal() {
         let a = Tree::new(1, vec![]);
         let b = Tree::new(2, vec![]);
 
-        assert_eq!(flat_diff(&a, &b), Diff::Replace(&a, &b));
+        assert_eq!(diff(&a, &b), Diff::Replace(&a, &b));
     }
 
     #[test]
@@ -237,7 +262,7 @@ mod tests {
         let a = Tree::new(1, vec![Tree::new(2, vec![]), Tree::new(3, vec![])]);
         let b = Tree::new(2, vec![Tree::new(2, vec![]), Tree::new(3, vec![])]);
 
-        assert_eq!(flat_diff(&a, &b), Diff::Replace(&a, &b));
+        assert_eq!(diff(&a, &b), Diff::Replace(&a, &b));
     }
 
     #[test]
@@ -245,7 +270,7 @@ mod tests {
         let a = Tree::new(1, vec![]);
         let b = Tree::new(1, vec![]);
 
-        assert_eq!(flat_diff(&a, &b), Diff::Equal(&a, &b, vec![]));
+        assert_eq!(diff(&a, &b), Diff::Equal(&a, &b, vec![]));
     }
 
     #[test]
@@ -253,7 +278,7 @@ mod tests {
         let a = Tree::new(1, vec![Tree::new(2, vec![]), Tree::new(3, vec![])]);
         let b = Tree::new(1, vec![Tree::new(2, vec![]), Tree::new(3, vec![])]);
 
-        assert_eq!(flat_diff(&a, &b),
+        assert_eq!(diff(&a, &b),
             Diff::Equal(&a, &b, vec![
                 Diff::Equal(&a[0], &b[0], vec![]),
                 Diff::Equal(&a[1], &b[1], vec![]),
@@ -266,7 +291,7 @@ mod tests {
         let a = Tree::new(1, vec![Tree::new(2, vec![])]);
         let b = Tree::new(1, vec![Tree::new(2, vec![]), Tree::new(3, vec![])]);
 
-        assert_eq!(flat_diff(&a, &b),
+        assert_eq!(diff(&a, &b),
             Diff::Equal(&a, &b, vec![
                 Diff::Equal(&a[0], &b[0], vec![]),
                 Diff::Right(&b[1]),
@@ -279,7 +304,7 @@ mod tests {
         let a = Tree::new(1, vec![Tree::new(2, vec![]), Tree::new(3, vec![])]);
         let b = Tree::new(1, vec![Tree::new(2, vec![])]);
 
-        assert_eq!(flat_diff(&a, &b),
+        assert_eq!(diff(&a, &b),
             Diff::Equal(&a, &b, vec![
                 Diff::Equal(&a[0], &b[0], vec![]),
                 Diff::Left(&a[1]),
@@ -292,7 +317,7 @@ mod tests {
         let a = Tree::new(1, vec![Tree::new(2, vec![])]);
         let b = Tree::new(1, vec![Tree::new(3, vec![])]);
 
-        assert_eq!(flat_diff(&a, &b),
+        assert_eq!(diff(&a, &b),
             Diff::Equal(&a, &b, vec![
                 Diff::Replace(&a[0], &b[0]),
             ])
@@ -354,7 +379,7 @@ mod tests {
             Tree::new(16, vec![]),
         ]);
 
-        assert_eq!(flat_diff(&a, &b),
+        assert_eq!(diff(&a, &b),
             Diff::Equal(&a, &b, vec![
                 Diff::Equal(&a[0], &b[0], vec![
                     Diff::Equal(&a[0][0], &b[0][0], vec![
@@ -422,7 +447,7 @@ mod tests {
                 ]),
             ]);
 
-        let diff = flat_diff(&a, &b);
+        let diff = diff(&a, &b);
 
         assert_eq!(diff,
             Diff::Equal(&a, &b, vec![
@@ -453,7 +478,7 @@ A
         let a = Tree::new("A", vec![Tree::new("B", vec![])]);
         let b = Tree::new("A", vec![]);
 
-        let diff = flat_diff(&a, &b);
+        let diff = diff(&a, &b);
 
         assert_eq!(diff,
             Diff::Equal(&a, &b, vec![
@@ -470,7 +495,7 @@ A
         let a = Tree::new("A", vec![]);
         let b = Tree::new("A", vec![Tree::new("B", vec![])]);
 
-        let diff = flat_diff(&a, &b);
+        let diff = diff(&a, &b);
 
         assert_eq!(diff,
             Diff::Equal(&a, &b, vec![
@@ -487,7 +512,7 @@ A
         let a = Tree::new("A", vec![]);
         let b = Tree::new("B", vec![]);
 
-        let diff = flat_diff(&a, &b);
+        let diff = diff(&a, &b);
 
         assert_eq!(diff, Diff::Replace(&a, &b));
 
@@ -501,7 +526,7 @@ A
         let a = Tree::new("A", vec![Tree::new("B", vec![])]);
         let b = Tree::new("A", vec![Tree::new("C", vec![])]);
 
-        let diff = flat_diff(&a, &b);
+        let diff = diff(&a, &b);
 
         assert_eq!(diff,
             Diff::Equal(&a, &b, vec![
@@ -519,7 +544,7 @@ A
         let a = Tree::new("A", vec![]);
         let b = Tree::new("A", vec![]);
 
-        let diff = flat_diff(&a, &b);
+        let diff = diff(&a, &b);
 
         assert_eq!(diff, Diff::Equal(&a, &b, vec![]));
 
@@ -549,7 +574,7 @@ A
                 ]),
             ]);
 
-        let diff = flat_diff(&a, &b);
+        let diff = diff(&a, &b);
 
         assert_eq!(diff,
             Diff::Equal(&a, &b, vec![
