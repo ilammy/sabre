@@ -46,9 +46,7 @@ use diff::sequence::Diff;
 pub fn format_unified<'a, T>(diff: &[Diff<'a, T>]) -> String
     where T: fmt::Display
 {
-    let mut string = String::new();
-    let _ = write_unified(diff, &mut string);
-    return string;
+    do_format_unified_with(diff, |elt| format!("{}", elt))
 }
 
 /// Write a unified diff into the provided sink.
@@ -60,11 +58,9 @@ pub fn write_unified<'a, T>(diff: &[Diff<'a, T>], output: &mut fmt::Write) -> fm
 
 /// Format a unified diff into a string, formatting elements in a specified way.
 pub fn format_unified_with<'a, T, F>(diff: &[Diff<'a, T>], format: F) -> String
-    where F: Fn(&mut fmt::Write, &T) -> fmt::Result
+    where F: Fn(&T) -> String
 {
-    let mut string = String::new();
-    let _ = write_unified_with(diff, &mut string, format);
-    return string;
+    do_format_unified_with(diff, format)
 }
 
 /// Write a unified diff into the provided sink, formatting elements in a specified way.
@@ -75,8 +71,19 @@ pub fn write_unified_with<'a, T, F>(diff: &[Diff<'a, T>], output: &mut fmt::Writ
     do_write_unified_with(diff, output, format)
 }
 
+/// Format a diff in unified format into a string while formatting elements using the given
+/// formatter.
+fn do_format_unified_with<'a, T, F>(diff: &[Diff<'a, T>], format: F) -> String
+    where F: Fn(&T) -> String
+{
+    let mut string = String::new();
+    let _ = do_write_unified_with(diff, &mut string, |buf, elt| buf.write_str(&format(elt)));
+    return string;
+}
+
 /// Write a diff in unified format into the provided writer while formatting elements using
 /// the given formatter.
+#[must_use]
 fn do_write_unified_with<'a, T, F>(diff: &[Diff<'a, T>], output: &mut fmt::Write, format: F)
     -> fmt::Result
     where F: Fn(&mut fmt::Write, &T) -> fmt::Result
@@ -185,7 +192,7 @@ mod tests {
 
         let diff = sequence::diff(&a, &b);
 
-        assert_eq!(format_unified_with(&diff, |buf, string| write!(buf, "<{}>", string)),
+        assert_eq!(format_unified_with(&diff, |string| format!("<{}>", string)),
 " <thing>
 +<with>
 +<stuff>
