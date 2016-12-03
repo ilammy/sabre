@@ -24,7 +24,7 @@
 //! }
 //! ```
 //!
-//! Then you can straightforwardly decribe these nodes in the following way:
+//! Then you can straightforwardly decribe nodes of this tree in the following way:
 //!
 //! ```
 //! # struct Tree<T> {
@@ -37,7 +37,7 @@
 //! use utils::tree::TreeNode;
 //!
 //! impl<T> TreeNode for Tree<T> {
-//!     /// `Tree<T>` is a _node_ of a tree while `Value` is the actual payload
+//!     /// `Self` is a _node_ of a tree while `Value` is the actual payload
 //!     /// that gets acted upon during tree traversal.
 //!     ///
 //!     /// In our case this is the type of the `value` field of `Tree<T>`.
