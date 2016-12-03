@@ -39,17 +39,9 @@ use std::fmt;
 
 use tree::{TreeNode};
 
-/// Formatting trait for trees.
-///
-/// This trait is similar to `fmt::Display` and its friends from `std::fmt`.
-pub trait DisplayTreeNode {
-    /// Formats this node using the given formatter.
-    fn fmt(&self, &mut fmt::Formatter) -> fmt::Result;
-}
-
 /// Format a tree into a string.
-pub fn format<T>(tree: &T) -> String
-    where T: DisplayTreeNode + TreeNode
+pub fn format<'a, T>(tree: &'a T) -> String
+    where T: TreeNode<'a>, T::Value: fmt::Display
 {
     let mut string = String::new();
     let _ = write(tree, &mut string);
@@ -57,15 +49,15 @@ pub fn format<T>(tree: &T) -> String
 }
 
 /// Write a tree into the provided sink.
-pub fn write<T>(tree: &T, output: &mut fmt::Write) -> fmt::Result
-    where T: DisplayTreeNode + TreeNode
+pub fn write<'a, T>(tree: &'a T, output: &mut fmt::Write) -> fmt::Result
+    where T: TreeNode<'a>, T::Value: fmt::Display
 {
-    write_with_prefix(tree, output, &|node| format!("{}", DisplayProxy { value: node }), "")
+    write_with_prefix(tree, output, &|node| format!("{}", node), "")
 }
 
 /// Format a tree into a string, formatting nodes in a specified way.
-pub fn format_with<T>(tree: &T, format: &Fn(&T) -> String) -> String
-    where T: TreeNode
+pub fn format_with<'a, T>(tree: &'a T, format: &Fn(&'a T::Value) -> String) -> String
+    where T: TreeNode<'a>
 {
     let mut string = String::new();
     let _ = write_with(tree, &mut string, format);
@@ -73,35 +65,21 @@ pub fn format_with<T>(tree: &T, format: &Fn(&T) -> String) -> String
 }
 
 /// Write a tree into the provided sink, formatting nodes in a specified way.
-pub fn write_with<T>(tree: &T, output: &mut fmt::Write, format: &Fn(&T) -> String)
+pub fn write_with<'a, T>(tree: &'a T, output: &mut fmt::Write, format: &Fn(&'a T::Value) -> String)
     -> fmt::Result
-    where T: TreeNode
+    where T: TreeNode<'a>
 {
     write_with_prefix(tree, output, format, "")
 }
 
-/// A wrapper for `Display` trait.
-///
-/// We *do want* to provide the user with access to `fmt::Formatter` in `DisplayTreeNode` which
-/// enables formatting code reuse. However, Rust does not allow custom formatting traits or
-/// multiple implementations of Display for a single type. Thus we introduce this proxy type
-/// that wraps a reference to `DisplayTreeNode` and provides an implementation of `Display` trait
-/// so that we can use the `{}` format string to output our format.
-struct DisplayProxy<'a, T> where T: 'a + DisplayTreeNode { value: &'a T }
-
-impl<'a, T> fmt::Display for DisplayProxy<'a, T> where T: DisplayTreeNode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.value.fmt(f)
-    }
-}
-
 /// Write a given tree into the provided writer while formatting nodes using the given formatter
 /// and prefixing each line with a given prefix.
-fn write_with_prefix<T>(root: &T, output: &mut fmt::Write, format: &Fn(&T) -> String, prefix: &str)
+fn write_with_prefix<'a, T>(root: &'a T, output: &mut fmt::Write,
+                            format: &Fn(&'a T::Value) -> String, prefix: &str)
     -> fmt::Result
-    where T: TreeNode
+    where T: TreeNode<'a>
 {
-    let root_str = format(root);
+    let root_str = format(root.value());
     let mut line = root_str.lines();
 
     if let Some(current) = line.next() {
@@ -118,17 +96,16 @@ fn write_with_prefix<T>(root: &T, output: &mut fmt::Write, format: &Fn(&T) -> St
     let before_last = format!("\n{}`- ", prefix);
     let continue_last = format!("{}   ", prefix);
 
-    let children = root.children();
-    let mut iter = children.iter();
+    let mut children = root.children();
 
-    if let Some(mut current) = iter.next() {
-        while let Some(next) = iter.next() {
+    if let Some(mut current) = children.next() {
+        while let Some(next) = children.next() {
             try!(output.write_str(&before_next));
-            try!(write_with_prefix(*current, output, format, &continue_next));
+            try!(write_with_prefix(current, output, format, &continue_next));
             current = next;
         }
         try!(output.write_str(&before_last));
-        try!(write_with_prefix(*current, output, format, &continue_last));
+        try!(write_with_prefix(current, output, format, &continue_last));
     }
 
     Ok(())
@@ -137,7 +114,7 @@ fn write_with_prefix<T>(root: &T, output: &mut fmt::Write, format: &Fn(&T) -> St
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fmt;
+    use std::slice;
     use tree::TreeNode;
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -148,15 +125,16 @@ mod tests {
         children: Vec<Tree<T>>,
     }
 
-    impl<T> DisplayTreeNode for Tree<T> where T: fmt::Display {
-        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(f, "{}", self.value)
-        }
-    }
+    impl<'a, T> TreeNode<'a> for Tree<T> where T: 'a {
+        type Value = T;
+        type ChildIter = slice::Iter<'a, Tree<T>>;
 
-    impl<T> TreeNode for Tree<T> {
-        fn children<'a>(&'a self) -> Vec<&'a Self> {
-            self.children.iter().collect()
+        fn value(&'a self) -> &'a Self::Value {
+            &self.value
+        }
+
+        fn children(&'a self) -> Self::ChildIter {
+            self.children.iter()
         }
     }
 
@@ -280,6 +258,6 @@ a
 |- <2>
 `- <3>";
 
-        assert_eq!(expected, format_with(&tree, &|node| format!("<{}>", node.value)));
+        assert_eq!(expected, format_with(&tree, &|value| format!("<{}>", value)));
     }
 }

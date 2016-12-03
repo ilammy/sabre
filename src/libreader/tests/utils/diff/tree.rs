@@ -55,10 +55,10 @@
 //! [TreeNode]: ../../tree/trait.TreeNode.html
 
 use std::fmt;
+use std::slice;
 
 use diff::sequence;
 use tree::{TreeNode};
-use pretty_tree::{DisplayTreeNode};
 
 /// Result of tree node comparison.
 #[derive(Debug, PartialEq)]
@@ -76,21 +76,28 @@ pub enum Diff<'a, T> where T: 'a {
     Replace(&'a T, &'a T),
 }
 
-impl<'a, T> TreeNode for Diff<'a, T> {
-    fn children<'b>(&'b self) -> Vec<&'b Self> {
+impl<'a, T> TreeNode<'a> for Diff<'a, T> {
+    type Value = Diff<'a, T>;
+    type ChildIter = slice::Iter<'a, Diff<'a, T>>;
+
+    fn value(&'a self) -> &'a Self::Value {
+        self
+    }
+
+    fn children(&'a self) -> Self::ChildIter {
         match *self {
             // Non-equal diffs are terminal, they have no child nodes
-            Diff::Left(_) | Diff::Right(_) | Diff::Replace(_, _) => vec![],
+            Diff::Left(_) | Diff::Right(_) | Diff::Replace(_, _) => [].iter(),
 
             // Equal diffs provide access to their child diffs
             Diff::Equal(_, _, ref children) => {
-                children.iter().collect()
+                children.iter()
             }
         }
     }
 }
 
-impl<'a, T> DisplayTreeNode for Diff<'a, T> where T: DisplayTreeNode {
+impl<'a, T> fmt::Display for Diff<'a, T> where T: fmt::Display {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
             Diff::Left(node) => {
@@ -132,14 +139,14 @@ pub trait ShallowPartialEq<Rhs = Self> {
 
 /// Compute the difference between two trees of comparable elements.
 pub fn diff<'a, T>(lhs: &'a T, rhs: &'a T) -> Diff<'a, T>
-    where T: TreeNode + ShallowPartialEq<T>
+    where T: TreeNode<'a> + ShallowPartialEq<T>
 {
     diff_with(lhs, rhs, |lhs, rhs| lhs.eq(rhs))
 }
 
 /// Compute the difference between two tree using the provided comparator.
 pub fn diff_with<'a, T, F>(lhs: &'a T, rhs: &'a T, equal: F) -> Diff<'a, T>
-    where T: TreeNode, F: Fn(&T, &T) -> bool
+    where T: TreeNode<'a>, F: Fn(&'a T, &'a T) -> bool
 {
     if equal(lhs, rhs) {
         Diff::Equal(lhs, rhs, child_diff(lhs, rhs, &equal))
@@ -150,10 +157,10 @@ pub fn diff_with<'a, T, F>(lhs: &'a T, rhs: &'a T, equal: F) -> Diff<'a, T>
 
 /// Actually compute a diff between equal child nodes.
 fn child_diff<'a, T, F>(lhs: &'a T, rhs: &'a T, equal: &F) -> Vec<Diff<'a, T>>
-    where T: TreeNode, F: Fn(&T, &T) -> bool
+    where T: TreeNode<'a>, F: Fn(&'a T, &'a T) -> bool
 {
-    let lhs_children = lhs.children();
-    let rhs_children = rhs.children();
+    let lhs_children = lhs.children().collect::<Vec<_>>();
+    let rhs_children = rhs.children().collect::<Vec<_>>();
 
     sequence::diff_with(&lhs_children, &rhs_children, |lhs, rhs| equal(lhs, rhs))
         .iter()
@@ -205,8 +212,9 @@ mod tests {
     use super::*;
     use std::fmt;
     use std::ops::Index;
+    use std::slice;
     use tree::{TreeNode};
-    use pretty_tree::{self, DisplayTreeNode};
+    use pretty_tree;
 
     #[derive(Debug, PartialEq)]
     struct Tree<T> {
@@ -220,9 +228,16 @@ mod tests {
         }
     }
 
-    impl<T> TreeNode for Tree<T> {
-        fn children<'a>(&'a self) -> Vec<&'a Self> {
-            self.children.iter().collect()
+    impl<'a, T> TreeNode<'a> for Tree<T> where T: 'a {
+        type Value = T;
+        type ChildIter = slice::Iter<'a, Tree<T>>;
+
+        fn value(&'a self) -> &'a Self::Value {
+            &self.value
+        }
+
+        fn children(&'a self) -> Self::ChildIter {
+            self.children.iter()
         }
     }
 
@@ -240,7 +255,7 @@ mod tests {
         }
     }
 
-    impl<T> DisplayTreeNode for Tree<T> where T: fmt::Display {
+    impl<T> fmt::Display for Tree<T> where T: fmt::Display {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write!(f, "{}", self.value)
         }
