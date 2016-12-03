@@ -7,7 +7,53 @@
 
 //! Tree utilities.
 //!
-//! TODO describe pp format
+//! The core definition here is the [`TreeNode`](trait.TreeNode.html) trait which describes
+//! recursive tree-like structures. For example, suppose you have the following `Tree` type
+//! which is obviously tree-like:
+//!
+//! ```
+//! struct Tree<T> {
+//!     value: T,
+//!     children: Vec<Tree<T>>,
+//! }
+//!
+//! impl<T> Tree<T> {
+//!     fn new(value: T, children: Vec<Tree<T>>) -> Tree<T> {
+//!         Tree { value: value, children: children }
+//!     }
+//! }
+//! ```
+//!
+//! Then you can straightforwardly decribe these nodes in the following way:
+//!
+//! ```
+//! # struct Tree<T> {
+//! #     value: T,
+//! #     children: Vec<Tree<T>>,
+//! # }
+//! #
+//! extern crate utils;
+//!
+//! use utils::tree::TreeNode;
+//!
+//! impl<T> TreeNode for Tree<T> {
+//!     /// `Tree<T>` is a _node_ of a tree while `Value` is the actual payload
+//!     /// that gets acted upon during tree traversal.
+//!     ///
+//!     /// In our case this is the type of the `value` field of `Tree<T>`.
+//!     type Value = T;
+//!
+//!     /// Provide a way to get a reference to the value of a node.
+//!     fn value(&self) -> &Self::Value {
+//!         &self.value
+//!     }
+//!
+//!     /// Provide a way to obtain references to the child nodes of a node.
+//!     fn children(&self) -> Vec<&Self> {
+//!         self.children.iter().collect()
+//!     }
+//! }
+//! ```
 
 use std::fmt;
 
@@ -21,7 +67,7 @@ pub trait TreeNode {
     /// Returns reference to the value of this node.
     fn value(&self) -> &Self::Value;
 
-    /// Returns references to child nodes of this node.
+    /// Returns references to the child nodes of this node.
     fn children(&self) -> Vec<&Self>;
 }
 
