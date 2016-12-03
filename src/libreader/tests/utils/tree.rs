@@ -22,7 +22,7 @@ pub trait TreeNode {
     fn value(&self) -> &Self::Value;
 
     /// Returns references to child nodes of this node.
-    fn children<'a>(&'a self) -> Vec<&'a Self>;
+    fn children(&self) -> Vec<&Self>;
 }
 
 impl<T> Pretty for T where T: TreeNode {
@@ -99,11 +99,11 @@ mod tests {
     impl<T> TreeNode for Tree<T> {
         type Value = T;
 
-        fn value(&self) -> &T {
+        fn value(&self) -> &Self::Value {
             &self.value
         }
 
-        fn children<'a>(&'a self) -> Vec<&'a Self> {
+        fn children(&self) -> Vec<&Self> {
             self.children.iter().collect()
         }
     }

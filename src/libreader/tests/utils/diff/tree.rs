@@ -79,11 +79,11 @@ pub enum Diff<'a, T> where T: 'a {
 impl<'a, T> TreeNode for Diff<'a, T> {
     type Value = Self;
 
-    fn value(&self) -> &Self {
+    fn value(&self) -> &Self::Value {
         &self
     }
 
-    fn children<'b>(&'b self) -> Vec<&'b Self> {
+    fn children(&self) -> Vec<&Self> {
         match *self {
             // Non-equal diffs are terminal, they have no child nodes
             Diff::Left(_) | Diff::Right(_) | Diff::Replace(_, _) => vec![],
@@ -230,11 +230,11 @@ mod tests {
     impl<T> TreeNode for Tree<T> {
         type Value = T;
 
-        fn value(&self) -> &T {
+        fn value(&self) -> &Self::Value {
             &self.value
         }
 
-        fn children<'a>(&'a self) -> Vec<&'a Self> {
+        fn children(&self) -> Vec<&Self> {
             self.children.iter().collect()
         }
     }
