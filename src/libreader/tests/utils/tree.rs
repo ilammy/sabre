@@ -15,6 +15,12 @@ use pretty::Pretty;
 
 /// Trait of tree nodes.
 pub trait TreeNode {
+    /// Value of this node.
+    type Value;
+
+    /// Returns reference to the value of this node.
+    fn value(&self) -> &Self::Value;
+
     /// Returns references to child nodes of this node.
     fn children<'a>(&'a self) -> Vec<&'a Self>;
 }

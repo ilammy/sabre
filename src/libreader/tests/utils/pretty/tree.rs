@@ -155,6 +155,12 @@ mod tests {
     }
 
     impl<T> TreeNode for Tree<T> {
+        type Value = T;
+
+        fn value(&self) -> &T {
+            &self.value
+        }
+
         fn children<'a>(&'a self) -> Vec<&'a Self> {
             self.children.iter().collect()
         }
