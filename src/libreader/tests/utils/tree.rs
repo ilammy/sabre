@@ -29,29 +29,35 @@ impl<T> Pretty for T where T: TreeNode {
     type Element = T::Value;
 
     fn write_with<F>(&self, buf: &mut fmt::Write, write: F) -> fmt::Result
-        where F: Fn(&Self::Element, &mut fmt::Write) -> fmt::Result
+        where F: Fn(&T::Value, &mut fmt::Write) -> fmt::Result
     {
         write_with_prefix(self, buf, &write, "")
     }
 }
 
-/// Write a given tree into the provided sink while formatting nodes using the given formatter
-/// and prefixing each line with the given prefix.
+/// Write a given tree into the provided sink while formatting node values using the given
+/// formatter and prefixing each line with the given prefix.
 fn write_with_prefix<T, F>(root: &T, buf: &mut fmt::Write, write: &F, prefix: &str) -> fmt::Result
     where T: TreeNode, F: Fn(&T::Value, &mut fmt::Write) -> fmt::Result
 {
-    // Repackage the representation of the root node and write it out.
+    // Render the root node, writing its first line as is and prefixing the extra ones
+    // with the given prefix.
     let mut line_buffer = String::new();
     try!(write(root.value(), &mut line_buffer));
 
-    for line in line_buffer.lines() {
-        try!(buf.write_str(prefix));
-        try!(buf.write_str(line));
+    let mut line = line_buffer.lines();
+    if let Some(current) = line.next() {
+        try!(buf.write_str(current));
         try!(buf.write_str("\n"));
+        while let Some(current) = line.next() {
+            try!(buf.write_str(prefix));
+            try!(buf.write_str(current));
+            try!(buf.write_str("\n"));
+        }
     }
 
-    // Write out the child nodes, prefixing them with branch indicators. We use iterators
-    // directly here as we need to do special things with the last element.
+    // Render the child nodes, prefixing them with branching indicators. The last node is a bit
+    // special.
     let children = root.children();
     let mut iter = children.iter();
 
@@ -121,6 +127,7 @@ mod tests {
                 Tree::new(3, vec![]),
                 Tree::new(4, vec![]),
             ]);
+
         assert_eq!(tree.format(), "\
 1
 |- 2
@@ -128,9 +135,8 @@ mod tests {
 `- 4\n");
     }
 
-/*
     #[test]
-    fn nested_elements() {
+    fn pretty_nested_tree() {
         let tree =
             Tree::new(1, vec![
                 Tree::new(2, vec![
@@ -152,7 +158,8 @@ mod tests {
                     Tree::new(13, vec![]),
                 ]),
             ]);
-        let expected = "\
+
+        assert_eq!(tree.format(), "\
 1
 |- 2
 |  |- 3
@@ -165,13 +172,11 @@ mod tests {
 |     |- 10
 |     `- 11
 `- 12
-   `- 13";
-
-        assert_eq!(expected, format(&tree));
+   `- 13\n");
     }
 
     #[test]
-    fn multiline_nodes() {
+    fn pretty_multiline_nodes() {
         let tree =
             Tree::new("Node\na", vec![
                 Tree::new("Node\nb\nb\n\nb", vec![]),
@@ -180,7 +185,8 @@ mod tests {
                 ]),
                 Tree::new("Node\ne", vec![]),
             ]);
-        let expected = "\
+
+        assert_eq!(tree.format(), "\
 Node
 a
 |- Node
@@ -193,27 +199,20 @@ a
 |  `- Node
 |     d
 `- Node
-   e";
-
-        assert_eq!(expected, format(&tree));
+   e\n");
     }
 
-    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    // Ad-hoc formatting function
-
     #[test]
-    fn formatting_function() {
+    fn pretty_custom_node_value_format() {
         let tree =
             Tree::new(1, vec![
                 Tree::new(2, vec![]),
                 Tree::new(3, vec![])
             ]);
-        let expected = "\
+
+        assert_eq!(tree.format_with(|value| format!("<{}>", value)), "\
 <1>
 |- <2>
-`- <3>";
-
-        assert_eq!(expected, format_with(&tree, &|node| format!("<{}>", node.value)));
+`- <3>\n");
     }
-*/
 }
