@@ -198,3 +198,145 @@ impl<'a, T> fmt::Display for ClangStyleTree<'a, T>
         //       for repackaging multiline strings
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::slice;
+    use pretty::Pretty;
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // Example tree implementation
+
+    struct Tree<T> {
+        value: T,
+        children: Vec<Tree<T>>,
+    }
+
+    impl<T> Tree<T> {
+        fn new(value: T, children: Vec<Tree<T>>) -> Tree<T> {
+            Tree { value: value, children: children }
+        }
+    }
+
+    impl<'a, T> TreeNode<'a> for Tree<T> where T: 'a {
+        type Value = T;
+        type ChildIter = slice::Iter<'a, Tree<T>>;
+
+        fn value(&'a self) -> &'a Self::Value {
+            &self.value
+        }
+
+        fn children(&'a self) -> Self::ChildIter {
+            self.children.iter()
+        }
+    }
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // Pretty-printing
+
+    #[test]
+    fn pretty_lonely_root() {
+        let tree = Tree::new(1, vec![]);
+
+        assert_eq!(tree.format(), "\
+1\n");
+    }
+
+    #[test]
+    fn pretty_siblings() {
+        let tree =
+            Tree::new(1, vec![
+                Tree::new(2, vec![]),
+                Tree::new(3, vec![]),
+                Tree::new(4, vec![]),
+            ]);
+
+        assert_eq!(tree.format(), "\
+1
+|- 2
+|- 3
+`- 4\n");
+    }
+
+    #[test]
+    fn pretty_nested_tree() {
+        let tree =
+            Tree::new(1, vec![
+                Tree::new(2, vec![
+                    Tree::new(3, vec![]),
+                    Tree::new(4, vec![]),
+                ]),
+                Tree::new(5, vec![
+                    Tree::new(6, vec![
+                        Tree::new(7, vec![]),
+                    ]),
+                ]),
+                Tree::new(8, vec![
+                    Tree::new(9, vec![
+                        Tree::new(10, vec![]),
+                        Tree::new(11, vec![]),
+                    ]),
+                ]),
+                Tree::new(12, vec![
+                    Tree::new(13, vec![]),
+                ]),
+            ]);
+
+        assert_eq!(tree.format(), "\
+1
+|- 2
+|  |- 3
+|  `- 4
+|- 5
+|  `- 6
+|     `- 7
+|- 8
+|  `- 9
+|     |- 10
+|     `- 11
+`- 12
+   `- 13\n");
+    }
+
+    #[test]
+    fn pretty_multiline_nodes() {
+        let tree =
+            Tree::new("Node\na", vec![
+                Tree::new("Node\nb\nb\n\nb", vec![]),
+                Tree::new("Node\nc", vec![
+                    Tree::new("Node\r\nd", vec![]),
+                ]),
+                Tree::new("Node\ne", vec![]),
+            ]);
+
+        assert_eq!(tree.format(), "\
+Node
+a
+|- Node
+|  b
+|  b
+|  \n\
+|  b
+|- Node
+|  c
+|  `- Node
+|     d
+`- Node
+   e\n");
+    }
+
+    #[test]
+    fn pretty_custom_node_value_format() {
+        let tree =
+            Tree::new(1, vec![
+                Tree::new(2, vec![]),
+                Tree::new(3, vec![])
+            ]);
+
+        assert_eq!(tree.format_with(|value| format!("<{}>", value)), "\
+<1>
+|- <2>
+`- <3>\n");
+    }
+}
