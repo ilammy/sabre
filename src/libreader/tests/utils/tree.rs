@@ -142,3 +142,55 @@ pub trait TreeNode where Self: Sized {
     /// Returns an iterator over child nodes of this node.
     fn children(self) -> Self::ChildIter;
 }
+
+use std::fmt;
+
+use pretty::ClangStyleTree;
+
+impl<'a, T> fmt::Display for ClangStyleTree<'a, T>
+    where &'a T: TreeNode, <&'a T as TreeNode>::Value: fmt::Display
+{
+    fn fmt(&self, buf: &mut fmt::Formatter) -> fmt::Result
+    {
+        fn do_fmt<'a, T>(root: &'a T, buf: &mut fmt::Formatter, prefix: &str) -> fmt::Result
+            where &'a T: TreeNode, <&'a T as TreeNode>::Value: fmt::Display
+        {
+            // Render the root node, writing its first line as is and prefixing the extra ones
+            // with the given prefix.
+            let line_buffer = format!("{}", root.value());
+
+            let mut lines = line_buffer.lines();
+            if let Some(current) = lines.next() {
+                try!(buf.write_str(current));
+                try!(buf.write_str("\n"));
+                while let Some(current) = lines.next() {
+                    try!(buf.write_str(prefix));
+                    try!(buf.write_str(current));
+                    try!(buf.write_str("\n"));
+                }
+            }
+
+            // Render the child nodes, prefixing them with branching indicators.
+            // The last node is a bit special.
+            let mut children = root.children();
+            if let Some(mut current) = children.next() {
+                while let Some(next) = children.next() {
+                    try!(buf.write_str(prefix));
+                    try!(buf.write_str("|- "));
+                    try!(do_fmt(current, buf, &format!("{}|  ", prefix)));
+                    current = next;
+                }
+                try!(buf.write_str(prefix));
+                try!(buf.write_str("`- "));
+                try!(do_fmt(current, buf, &format!("{}   ", prefix)));
+            }
+
+            Ok(())
+        }
+
+        do_fmt(self.root, buf, "")
+
+        // TODO: try replacing recursion with an explicit stack and keeping a single string buffer
+        //       for repackaging multiline strings
+    }
+}
