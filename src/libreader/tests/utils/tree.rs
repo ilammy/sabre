@@ -126,6 +126,10 @@
 //!
 //! Explicit lifetime specifications are a bit clunky, but that's the price of generality.
 //! Unfortunately, the compiler cannot infer them for us at the moment.
+//!
+//! # Pretty-printing
+//!
+//! TODO
 
 /// Trait of tree nodes.
 ///
