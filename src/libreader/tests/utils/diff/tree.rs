@@ -58,7 +58,7 @@ use std::fmt;
 use std::slice;
 
 use diff::sequence;
-use tree::{TreeNode};
+use tree::TreeNodeEx;
 
 /// Result of tree node comparison.
 #[derive(Debug, PartialEq)]
@@ -76,15 +76,15 @@ pub enum Diff<'a, T> where T: 'a {
     Replace(&'a T, &'a T),
 }
 
-impl<'a, T> TreeNode<'a> for Diff<'a, T> {
-    type Value = Diff<'a, T>;
+impl<'a, T> TreeNodeEx for &'a Diff<'a, T> {
+    type Value = &'a Diff<'a, T>;
     type ChildIter = slice::Iter<'a, Diff<'a, T>>;
 
-    fn value(&'a self) -> &'a Self::Value {
+    fn value(self) -> Self::Value {
         self
     }
 
-    fn children(&'a self) -> Self::ChildIter {
+    fn children(self) -> Self::ChildIter {
         match *self {
             // Non-equal diffs are terminal, they have no child nodes
             Diff::Left(_) | Diff::Right(_) | Diff::Replace(_, _) => [].iter(),
@@ -139,14 +139,14 @@ pub trait ShallowPartialEq<Rhs = Self> {
 
 /// Compute the difference between two trees of comparable elements.
 pub fn diff<'a, T>(lhs: &'a T, rhs: &'a T) -> Diff<'a, T>
-    where T: TreeNode<'a> + ShallowPartialEq<T>
+    where T: ShallowPartialEq<T>, &'a T: TreeNodeEx
 {
     diff_with(lhs, rhs, |lhs, rhs| lhs.eq(rhs))
 }
 
 /// Compute the difference between two tree using the provided comparator.
 pub fn diff_with<'a, T, F>(lhs: &'a T, rhs: &'a T, equal: F) -> Diff<'a, T>
-    where T: TreeNode<'a>, F: Fn(&'a T, &'a T) -> bool
+    where &'a T: TreeNodeEx, F: Fn(&'a T, &'a T) -> bool
 {
     if equal(lhs, rhs) {
         Diff::Equal(lhs, rhs, child_diff(lhs, rhs, &equal))
@@ -157,7 +157,7 @@ pub fn diff_with<'a, T, F>(lhs: &'a T, rhs: &'a T, equal: F) -> Diff<'a, T>
 
 /// Actually compute a diff between equal child nodes.
 fn child_diff<'a, T, F>(lhs: &'a T, rhs: &'a T, equal: &F) -> Vec<Diff<'a, T>>
-    where T: TreeNode<'a>, F: Fn(&'a T, &'a T) -> bool
+    where &'a T: TreeNodeEx, F: Fn(&'a T, &'a T) -> bool
 {
     let lhs_children = lhs.children().collect::<Vec<_>>();
     let rhs_children = rhs.children().collect::<Vec<_>>();
@@ -213,7 +213,7 @@ mod tests {
     use std::fmt;
     use std::ops::Index;
     use std::slice;
-    use tree::{TreeNode};
+    use tree::TreeNodeEx;
     use pretty_tree;
 
     #[derive(Debug, PartialEq)]
@@ -228,15 +228,15 @@ mod tests {
         }
     }
 
-    impl<'a, T> TreeNode<'a> for Tree<T> where T: 'a {
-        type Value = T;
+    impl<'a, T> TreeNodeEx for &'a Tree<T> {
+        type Value = &'a T;
         type ChildIter = slice::Iter<'a, Tree<T>>;
 
-        fn value(&'a self) -> &'a Self::Value {
+        fn value(self) -> Self::Value {
             &self.value
         }
 
-        fn children(&'a self) -> Self::ChildIter {
+        fn children(self) -> Self::ChildIter {
             self.children.iter()
         }
     }
