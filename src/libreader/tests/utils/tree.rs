@@ -34,10 +34,10 @@
 //! # }
 //! #
 //! use std::slice;
-//! use utils::tree::TreeNodeEx;
+//! use utils::tree::TreeNode;
 //!
 //! /// Implementing TreeNode for _a reference_ to Tree<T>.
-//! impl<'a, T> TreeNodeEx for &'a Tree<T> {
+//! impl<'a, T> TreeNode for &'a Tree<T> {
 //!     /// `Self` is a _node_ of a tree while `Self::Value` is the actual payload
 //!     /// that gets acted upon during tree traversal.
 //!     ///
@@ -72,29 +72,29 @@
 //! # }
 //! #
 //! # use std::slice;
-//! # use utils::tree::TreeNodeEx;
+//! # use utils::tree::TreeNode;
 //! #
-//! # impl<'a, T> TreeNodeEx for &'a Tree<T> {
+//! # impl<'a, T> TreeNode for &'a Tree<T> {
 //! #     type Value = &'a T;
 //! #     type ChildIter = slice::Iter<'a, Tree<T>>;
 //! #     fn value(self) -> Self::Value { &self.value }
 //! #     fn children(self) -> Self::ChildIter { self.children.iter() }
 //! # }
 //! #
-//! struct DfsIterator<'a, T> where T: 'a, &'a T: TreeNodeEx {
+//! struct DfsIterator<'a, T> where T: 'a, &'a T: TreeNode {
 //!     unseen: Vec<&'a T>,
 //! }
 //!
 //! fn dfs<'a, T>(root: &'a T) -> DfsIterator<'a, T>
-//!     where &'a T: TreeNodeEx
+//!     where &'a T: TreeNode
 //! {
 //!     DfsIterator {
 //!         unseen: vec![root],
 //!     }
 //! }
 //!
-//! impl<'a, Node> Iterator for DfsIterator<'a, Node> where &'a Node: TreeNodeEx {
-//!     type Item = <&'a Node as TreeNodeEx>::Value;
+//! impl<'a, Node> Iterator for DfsIterator<'a, Node> where &'a Node: TreeNode {
+//!     type Item = <&'a Node as TreeNode>::Value;
 //!
 //!     fn next(&mut self) -> Option<Self::Item> {
 //!         if let Some(next) = self.unseen.pop() {
@@ -127,7 +127,9 @@
 //! of generality. Unfortunately, the compiler cannot infer these for us at the moment.
 
 /// Trait of tree nodes.
-pub trait TreeNodeEx where Self: Sized {
+///
+/// See [module documenetation](index.html) for more details.
+pub trait TreeNode where Self: Sized {
     /// Value of this node.
     type Value;
 
