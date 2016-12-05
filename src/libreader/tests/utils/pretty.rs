@@ -5,15 +5,12 @@
 // at your option. This file may be copied, distributed, and modified only
 // in accordance with the terms specified by the chosen license.
 
-//! Test utilities.
+//! Pretty-printing wrappers.
 //!
-//! Here we put various data structures and functions that prove to be useful for testing
-//! the `reader` crate.
+//! A collection of marker structs.
 
-extern crate reader;
+use tree::TreeNode;
 
-pub mod diff;
-pub mod pretty;
-pub mod pretty_tree;
-pub mod stubs;
-pub mod tree;
+pub struct ClangStyleTree<'a, T> where T: 'a, &'a T: TreeNode {
+    root: &'a T,
+}
