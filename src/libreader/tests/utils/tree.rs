@@ -200,11 +200,20 @@ impl<'a, T> fmt::Display for ClangStyleTree<'a, T>
     }
 }
 
+pub trait ClangStyle<'a> where Self: Sized + 'a, &'a Self: TreeNode {
+    fn clang_styled(&'a self) -> ClangStyleTree<'a, Self> {
+        ClangStyleTree {
+            root: self
+        }
+    }
+}
+
+impl<'a, T> ClangStyle<'a> for T where T: 'a, &'a T: TreeNode { }
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::slice;
-    use pretty::ClangStyleTree;
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Example tree implementation
@@ -240,7 +249,7 @@ mod tests {
     fn pretty_clang_lonely_root() {
         let tree = Tree::new(1, vec![]);
 
-        assert_eq!(format!("{}", ClangStyleTree { root: &tree }), "\
+        assert_eq!(format!("{}", tree.clang_styled()), "\
 1\n");
     }
 
@@ -253,7 +262,7 @@ mod tests {
                 Tree::new(4, vec![]),
             ]);
 
-        assert_eq!(format!("{}", ClangStyleTree { root: &tree }), "\
+        assert_eq!(format!("{}", tree.clang_styled()), "\
 1
 |- 2
 |- 3
@@ -284,7 +293,7 @@ mod tests {
                 ]),
             ]);
 
-        assert_eq!(format!("{}", ClangStyleTree { root: &tree }), "\
+        assert_eq!(format!("{}", tree.clang_styled()), "\
 1
 |- 2
 |  |- 3
@@ -311,7 +320,7 @@ mod tests {
                 Tree::new("Node\ne", vec![]),
             ]);
 
-        assert_eq!(format!("{}", ClangStyleTree { root: &tree }), "\
+        assert_eq!(format!("{}", tree.clang_styled()), "\
 Node
 a
 |- Node
