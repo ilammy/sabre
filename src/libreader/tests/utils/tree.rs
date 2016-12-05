@@ -203,7 +203,7 @@ impl<'a, T> fmt::Display for ClangStyleTree<'a, T>
 mod tests {
     use super::*;
     use std::slice;
-    use pretty::Pretty;
+    use pretty::ClangStyleTree;
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Example tree implementation
@@ -219,27 +219,27 @@ mod tests {
         }
     }
 
-    impl<'a, T> TreeNode<'a> for Tree<T> where T: 'a {
-        type Value = T;
+    impl<'a, T> TreeNode for &'a Tree<T> {
+        type Value = &'a T;
         type ChildIter = slice::Iter<'a, Tree<T>>;
 
-        fn value(&'a self) -> &'a Self::Value {
+        fn value(self) -> Self::Value {
             &self.value
         }
 
-        fn children(&'a self) -> Self::ChildIter {
+        fn children(self) -> Self::ChildIter {
             self.children.iter()
         }
     }
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-    // Pretty-printing
+    // ClangStyleTree pretty-printing
 
     #[test]
-    fn pretty_lonely_root() {
+    fn pretty_clang_lonely_root() {
         let tree = Tree::new(1, vec![]);
 
-        assert_eq!(tree.format(), "\
+        assert_eq!(format!("{}", ClangStyleTree { root: &tree }), "\
 1\n");
     }
 
@@ -252,7 +252,7 @@ mod tests {
                 Tree::new(4, vec![]),
             ]);
 
-        assert_eq!(tree.format(), "\
+        assert_eq!(format!("{}", ClangStyleTree { root: &tree }), "\
 1
 |- 2
 |- 3
@@ -283,7 +283,7 @@ mod tests {
                 ]),
             ]);
 
-        assert_eq!(tree.format(), "\
+        assert_eq!(format!("{}", ClangStyleTree { root: &tree }), "\
 1
 |- 2
 |  |- 3
@@ -310,7 +310,7 @@ mod tests {
                 Tree::new("Node\ne", vec![]),
             ]);
 
-        assert_eq!(tree.format(), "\
+        assert_eq!(format!("{}", ClangStyleTree { root: &tree }), "\
 Node
 a
 |- Node
