@@ -12,5 +12,5 @@
 use tree::TreeNode;
 
 pub struct ClangStyleTree<'a, T> where T: 'a, &'a T: TreeNode {
-    root: &'a T,
+    pub root: &'a T,
 }
