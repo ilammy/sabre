@@ -260,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    fn pretty_nested_tree() {
+    fn pretty_clang_nested_tree() {
         let tree =
             Tree::new(1, vec![
                 Tree::new(2, vec![
@@ -300,7 +300,7 @@ mod tests {
     }
 
     #[test]
-    fn pretty_multiline_nodes() {
+    fn pretty_clang_multiline_nodes() {
         let tree =
             Tree::new("Node\na", vec![
                 Tree::new("Node\nb\nb\n\nb", vec![]),
