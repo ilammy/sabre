@@ -125,6 +125,10 @@
 //!
 //! Explicit lifetime specifications and trait casts are a bit clunky, but that's the price
 //! of generality. Unfortunately, the compiler cannot infer these for us at the moment.
+//!
+//! # Pretty-printing
+//!
+//! TODO
 
 /// Trait of tree nodes.
 ///
