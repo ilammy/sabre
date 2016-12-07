@@ -132,7 +132,7 @@ pub trait TreeNode<'a> where Self: 'a {
 }
 
 /// Trait of tree nodes.
-pub trait TreeNodeEx<'a> where Self: Sized {
+pub trait TreeNodeEx where Self: Sized {
     /// Value of this node.
     type Value;
 
@@ -140,8 +140,8 @@ pub trait TreeNodeEx<'a> where Self: Sized {
     type ChildIter: Iterator<Item=Self>;
 
     /// Returns value of this node.
-    fn value(&'a self) -> &'a Self::Value;
+    fn value(&self) -> &Self::Value;
 
     /// Returns iterator over child nodes of this node.
-    fn children(&'a self) -> Self::ChildIter;
+    fn children(&self) -> Self::ChildIter;
 }
