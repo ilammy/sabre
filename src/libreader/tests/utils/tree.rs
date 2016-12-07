@@ -233,11 +233,11 @@ mod tests {
         type Value = &'a T;
         type ChildIter = slice::Iter<'a, Tree<T>>;
 
-        fn value(self) -> Self::Value {
+        fn value(&self) -> Self::Value {
             &self.value
         }
 
-        fn children(self) -> Self::ChildIter {
+        fn children(&self) -> Self::ChildIter {
             self.children.iter()
         }
     }
