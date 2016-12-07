@@ -228,7 +228,7 @@ mod tests {
         }
     }
 
-    impl<'a, T> TreeNodeEx for &'a Tree<T> where T: 'a {
+    impl<'a, T> TreeNodeEx for &'a Tree<T> {
         type Value = &'a T;
         type ChildIter = slice::Iter<'a, Tree<T>>;
 

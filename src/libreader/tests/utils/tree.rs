@@ -8,8 +8,14 @@
 //! Tree utilities.
 //!
 //! The core definition here is the [`TreeNode`](trait.TreeNode.html) trait which describes
-//! recursive tree-like structures. For example, suppose you have the following `Tree` type
-//! which is obviously tree-like:
+//! recursive tree-like structures. It is somewhat similar to the standard `Iterator` trait
+//! in that it actually represents an iteration state. However, iterators describe sequential
+//! structures while trees have hierarchy. There is no a single right way to traverse a tree,
+//! so `TreeNode` does not provide one.
+//!
+//! # Example usage
+//!
+//! Suppose you have the following `Tree` type which is obviously tree-like:
 //!
 //! ```
 //! struct Tree<T> {
@@ -18,38 +24,43 @@
 //! }
 //! ```
 //!
-//! Then you can straightforwardly decribe nodes of this tree in the following way:
+//! Then you can straightforwardly decribe references to its nodes in the following way:
 //!
-//! ```x
+//! ```
 //! # struct Tree<T> {
 //! #     value: T,
 //! #     children: Vec<Tree<T>>,
 //! # }
 //! #
 //! use std::slice;
-//! use utils::tree::TreeNode;
+//! use utils::tree::TreeNodeEx;
 //!
-//! impl<'a, T> TreeNode<'a> for Tree<T> where T: 'a {
-//!     /// `Self` is a _node_ of a tree while `Self::Value` is the actual payload
-//!     /// that gets acted upon during tree traversal.
+//! /// We are implementing `TreeNode` for _a reference_ to `Tree<T>` because
+//! /// the reference _is_ a representation of traversal state.
+//! impl<'a, T> TreeNodeEx for &'a Tree<T> {
+//!     /// `Self::Value` is the payload type of the node referenced by `Self`.
+//!     /// This is the return type of the `value()` method.
 //!     ///
-//!     /// In our case this is the type of the `value` field of `Tree<T>`.
-//!     type Value = T;
+//!     /// In our case this is simply the reference to the `value` field, but
+//!     /// it can be effectively anything. In fact, the value may have nothing
+//!     /// to do with the traversed tree at all.
+//!     type Value = &'a T;
 //!
-//!     /// `Self::ChildIter` is the type of the iterator over the node's chilren.
-//!     /// It should be an `Iterator<Item=&'a Self>`.
+//!     /// `Self::ChildIter` is the type of an iterator over the node's children.
+//!     /// Trees are homogenous, so this has to be an `Iterator<Item=Self>`.
+//!     /// This is the return type of the `chilren()` method.
 //!     ///
-//!     /// In our case this is the type of an iterator over the `children` field
-//!     /// of `Tree<T>`.
-//!     type ChildIter = slice::Iter<'a, Self>;
+//!     /// Again, in our case this is an iterator over the slice owned by the
+//!     /// `children` vector field, but it can by any iterator type.
+//!     type ChildIter = slice::Iter<'a, Tree<T>>;
 //!
-//!     /// Describe how to get a reference to the value of a node.
-//!     fn value(&'a self) -> &'a Self::Value {
+//!     /// Describe how to get the value of this node.
+//!     fn value(&self) -> Self::Value {
 //!         &self.value
 //!     }
 //!
-//!     /// Describe how to iterate over references to the children of a node.
-//!     fn children(&'a self) -> Self::ChildIter {
+//!     /// Describe how to iterate over children of this node.
+//!     fn children(&self) -> Self::ChildIter {
 //!         self.children.iter()
 //!     }
 //! }
@@ -57,34 +68,34 @@
 //!
 //! And here is how a generic tree traversal may look like:
 //!
-//! ```x
+//! ```
 //! # use std::slice;
-//! # use utils::tree::TreeNode;
+//! # use utils::tree::TreeNodeEx;
 //! #
 //! # struct Tree<T> {
 //! #     value: T,
 //! #     children: Vec<Tree<T>>,
 //! # }
 //! #
-//! # impl<'a, T> TreeNode<'a> for Tree<T> where T: 'a {
-//! #     type Value = T;
-//! #     type ChildIter = slice::Iter<'a, Self>;
-//! #     fn value(&'a self) -> &'a Self::Value { &self.value }
-//! #     fn children(&'a self) -> Self::ChildIter { self.children.iter() }
+//! # impl<'a, T> TreeNodeEx for &'a Tree<T> {
+//! #     type Value = &'a T;
+//! #     type ChildIter = slice::Iter<'a, Tree<T>>;
+//! #     fn value(&self) -> Self::Value { &self.value }
+//! #     fn children(&self) -> Self::ChildIter { self.children.iter() }
 //! # }
 //! #
-//! struct DfsIterator<'a, T> where T: 'a {
-//!     unseen: Vec<&'a T>,
+//! struct DfsIterator<Node> {
+//!     unseen: Vec<Node>,
 //! }
 //!
-//! fn dfs<'a, T>(root: &'a T) -> DfsIterator<'a, T> {
+//! fn dfs<Node>(root: Node) -> DfsIterator<Node> {
 //!     DfsIterator {
 //!         unseen: vec![root],
 //!     }
 //! }
 //!
-//! impl<'a, Node> Iterator for DfsIterator<'a, Node> where Node: TreeNode<'a> {
-//!     type Item = &'a Node::Value;
+//! impl<Node: TreeNodeEx> Iterator for DfsIterator<Node> {
+//!     type Item = Node::Value;
 //!
 //!     fn next(&mut self) -> Option<Self::Item> {
 //!         if let Some(next) = self.unseen.pop() {
@@ -132,6 +143,8 @@ pub trait TreeNode<'a> where Self: 'a {
 }
 
 /// Trait of tree nodes.
+///
+/// See [module documenetation](index.html) for more details.
 pub trait TreeNodeEx where Self: Sized {
     /// Value of this node.
     type Value;
@@ -142,6 +155,6 @@ pub trait TreeNodeEx where Self: Sized {
     /// Returns value of this node.
     fn value(&self) -> Self::Value;
 
-    /// Returns iterator over child nodes of this node.
+    /// Returns an iterator over child nodes of this node.
     fn children(&self) -> Self::ChildIter;
 }
