@@ -56,7 +56,7 @@ pub fn write<T>(tree: T, output: &mut fmt::Write) -> fmt::Result
 }
 
 /// Format a tree into a string, formatting nodes in a specified way.
-pub fn format_with<T>(tree: T, format: &Fn(&T::Value) -> String) -> String
+pub fn format_with<T>(tree: T, format: &Fn(T::Value) -> String) -> String
     where T: TreeNodeEx
 {
     let mut string = String::new();
@@ -65,7 +65,7 @@ pub fn format_with<T>(tree: T, format: &Fn(&T::Value) -> String) -> String
 }
 
 /// Write a tree into the provided sink, formatting nodes in a specified way.
-pub fn write_with<T>(tree: T, output: &mut fmt::Write, format: &Fn(&T::Value) -> String)
+pub fn write_with<T>(tree: T, output: &mut fmt::Write, format: &Fn(T::Value) -> String)
     -> fmt::Result
     where T: TreeNodeEx
 {
@@ -75,7 +75,7 @@ pub fn write_with<T>(tree: T, output: &mut fmt::Write, format: &Fn(&T::Value) ->
 /// Write a given tree into the provided writer while formatting nodes using the given formatter
 /// and prefixing each line with a given prefix.
 fn write_with_prefix<T>(root: &T, output: &mut fmt::Write,
-                            format: &Fn(&T::Value) -> String, prefix: &str)
+                            format: &Fn(T::Value) -> String, prefix: &str)
     -> fmt::Result
     where T: TreeNodeEx
 {
@@ -126,10 +126,10 @@ mod tests {
     }
 
     impl<'a, T> TreeNodeEx for &'a Tree<T> where T: 'a {
-        type Value = T;
+        type Value = &'a T;
         type ChildIter = slice::Iter<'a, Tree<T>>;
 
-        fn value(&self) -> &Self::Value {
+        fn value(&self) -> Self::Value {
             &self.value
         }
 

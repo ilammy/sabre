@@ -140,7 +140,7 @@ pub trait TreeNodeEx where Self: Sized {
     type ChildIter: Iterator<Item=Self>;
 
     /// Returns value of this node.
-    fn value(&self) -> &Self::Value;
+    fn value(&self) -> Self::Value;
 
     /// Returns iterator over child nodes of this node.
     fn children(&self) -> Self::ChildIter;

@@ -77,10 +77,10 @@ pub enum Diff<'a, T> where T: 'a {
 }
 
 impl<'a, T> TreeNodeEx for &'a Diff<'a, T> {
-    type Value = Diff<'a, T>;
+    type Value = &'a Diff<'a, T>;
     type ChildIter = slice::Iter<'a, Diff<'a, T>>;
 
-    fn value(&self) -> &Self::Value {
+    fn value(&self) -> Self::Value {
         &self
     }
 
@@ -229,10 +229,10 @@ mod tests {
     }
 
     impl<'a, T> TreeNodeEx for &'a Tree<T> where T: 'a {
-        type Value = T;
+        type Value = &'a T;
         type ChildIter = slice::Iter<'a, Tree<T>>;
 
-        fn value(&self) -> &Self::Value {
+        fn value(&self) -> Self::Value {
             &self.value
         }
 
