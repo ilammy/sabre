@@ -37,11 +37,11 @@
 
 use std::fmt;
 
-use tree::TreeNodeEx;
+use tree::TreeNode;
 
 /// Format a tree into a string.
 pub fn format<T>(tree: T) -> String
-    where T: TreeNodeEx, T::Value: fmt::Display
+    where T: TreeNode, T::Value: fmt::Display
 {
     let mut string = String::new();
     let _ = write(tree, &mut string);
@@ -50,14 +50,14 @@ pub fn format<T>(tree: T) -> String
 
 /// Write a tree into the provided sink.
 pub fn write<T>(tree: T, output: &mut fmt::Write) -> fmt::Result
-    where T: TreeNodeEx, T::Value: fmt::Display
+    where T: TreeNode, T::Value: fmt::Display
 {
     write_with_prefix(&tree, output, &|node| format!("{}", node), "")
 }
 
 /// Format a tree into a string, formatting nodes in a specified way.
 pub fn format_with<T>(tree: T, format: &Fn(T::Value) -> String) -> String
-    where T: TreeNodeEx
+    where T: TreeNode
 {
     let mut string = String::new();
     let _ = write_with(tree, &mut string, format);
@@ -67,7 +67,7 @@ pub fn format_with<T>(tree: T, format: &Fn(T::Value) -> String) -> String
 /// Write a tree into the provided sink, formatting nodes in a specified way.
 pub fn write_with<T>(tree: T, output: &mut fmt::Write, format: &Fn(T::Value) -> String)
     -> fmt::Result
-    where T: TreeNodeEx
+    where T: TreeNode
 {
     write_with_prefix(&tree, output, format, "")
 }
@@ -77,7 +77,7 @@ pub fn write_with<T>(tree: T, output: &mut fmt::Write, format: &Fn(T::Value) -> 
 fn write_with_prefix<T>(root: &T, output: &mut fmt::Write,
                             format: &Fn(T::Value) -> String, prefix: &str)
     -> fmt::Result
-    where T: TreeNodeEx
+    where T: TreeNode
 {
     let root_str = format(root.value());
     let mut line = root_str.lines();
@@ -115,7 +115,7 @@ fn write_with_prefix<T>(root: &T, output: &mut fmt::Write,
 mod tests {
     use super::*;
     use std::slice;
-    use tree::TreeNodeEx;
+    use tree::TreeNode;
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Example tree implementation
@@ -125,7 +125,7 @@ mod tests {
         children: Vec<Tree<T>>,
     }
 
-    impl<'a, T> TreeNodeEx for &'a Tree<T> {
+    impl<'a, T> TreeNode for &'a Tree<T> {
         type Value = &'a T;
         type ChildIter = slice::Iter<'a, Tree<T>>;
 

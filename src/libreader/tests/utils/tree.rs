@@ -33,11 +33,11 @@
 //! # }
 //! #
 //! use std::slice;
-//! use utils::tree::TreeNodeEx;
+//! use utils::tree::TreeNode;
 //!
 //! /// We are implementing `TreeNode` for _a reference_ to `Tree<T>` because
 //! /// the reference _is_ a representation of traversal state.
-//! impl<'a, T> TreeNodeEx for &'a Tree<T> {
+//! impl<'a, T> TreeNode for &'a Tree<T> {
 //!     /// `Self::Value` is the payload type of the node referenced by `Self`.
 //!     /// This is the return type of the `value()` method.
 //!     ///
@@ -70,14 +70,14 @@
 //!
 //! ```
 //! # use std::slice;
-//! # use utils::tree::TreeNodeEx;
+//! # use utils::tree::TreeNode;
 //! #
 //! # struct Tree<T> {
 //! #     value: T,
 //! #     children: Vec<Tree<T>>,
 //! # }
 //! #
-//! # impl<'a, T> TreeNodeEx for &'a Tree<T> {
+//! # impl<'a, T> TreeNode for &'a Tree<T> {
 //! #     type Value = &'a T;
 //! #     type ChildIter = slice::Iter<'a, Tree<T>>;
 //! #     fn value(&self) -> Self::Value { &self.value }
@@ -94,7 +94,7 @@
 //!     }
 //! }
 //!
-//! impl<Node: TreeNodeEx> Iterator for DfsIterator<Node> {
+//! impl<Node: TreeNode> Iterator for DfsIterator<Node> {
 //!     type Item = Node::Value;
 //!
 //!     fn next(&mut self) -> Option<Self::Item> {
@@ -128,24 +128,9 @@
 //! Unfortunately, the compiler cannot infer them for us at the moment.
 
 /// Trait of tree nodes.
-pub trait TreeNode<'a> where Self: 'a {
-    /// Value of this node.
-    type Value;
-
-    /// Iterator over child nodes.
-    type ChildIter: Iterator<Item=&'a Self>;
-
-    /// Returns value of this node.
-    fn value(&'a self) -> &'a Self::Value;
-
-    /// Returns iterator over child nodes of this node.
-    fn children(&'a self) -> Self::ChildIter;
-}
-
-/// Trait of tree nodes.
 ///
 /// See [module documenetation](index.html) for more details.
-pub trait TreeNodeEx where Self: Sized {
+pub trait TreeNode where Self: Sized {
     /// Value of this node.
     type Value;
 
