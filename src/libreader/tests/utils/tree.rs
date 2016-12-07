@@ -20,7 +20,7 @@
 //!
 //! Then you can straightforwardly decribe nodes of this tree in the following way:
 //!
-//! ```
+//! ```x
 //! # struct Tree<T> {
 //! #     value: T,
 //! #     children: Vec<Tree<T>>,
@@ -57,7 +57,7 @@
 //!
 //! And here is how a generic tree traversal may look like:
 //!
-//! ```
+//! ```x
 //! # use std::slice;
 //! # use utils::tree::TreeNode;
 //! #
