@@ -26,9 +26,6 @@ pub enum Diff<'a, T> where T: 'a {
 
     /// Matching elements in the left and right sequences are equal.
     Equal(&'a T, &'a T),
-
-    /// Matching elements in the left and right sequences are not equal.
-    Replace(&'a T, &'a T),
 }
 
 /// Compute the difference between two sequences of comparable elements.
@@ -95,7 +92,11 @@ fn compute_diff<'a, T, F>(lhs: &'a [T], rhs: &'a [T], equal: F) -> Vec<Diff<'a, 
 {
     let (lcs, eqv) = compute_lcs_lookup(lhs, rhs, equal);
 
-    return backtrace_diff(lhs, rhs, &lcs, &eqv);
+    let mut diff = backtrace_diff(lhs, rhs, &lcs, &eqv);
+
+    reorder_chunks(&mut diff);
+
+    return diff;
 }
 
 /// Compute the longest common subsequence lookup matrix.
@@ -170,7 +171,8 @@ fn backtrace_diff<'a, T>(lhs: &'a [T], rhs: &'a [T],
                 if eqv[w * i + j] {
                     diff.push(Diff::Equal(&lhs[i - 1], &rhs[j - 1]));
                 } else {
-                    diff.push(Diff::Replace(&lhs[i - 1], &rhs[j - 1]));
+                    diff.push(Diff::Right(&rhs[j - 1]));
+                    diff.push(Diff::Left(&lhs[i - 1]));
                 }
                 i -= 1;
                 j -= 1;
@@ -191,6 +193,33 @@ fn backtrace_diff<'a, T>(lhs: &'a [T], rhs: &'a [T],
     }
 
     return diff;
+}
+
+/// Reorder diff chunks (slices delimited by Diff:Equal) so that all Diff::Left are followed
+/// by all Diff::Right. This does not change the diff, but makes it easier for humans to read.
+fn reorder_chunks<'a, T>(diff: &mut [Diff<'a, T>]) {
+    use std::cmp::Ordering;
+
+    // Note that the diff is still reversed now, so is this ordering.
+    let diff_ordering = |a: &Diff<'a, T>, b: &Diff<'a, T>| {
+        match (a, b) {
+            (&Diff::Left(_), &Diff::Right(_)) => Ordering::Greater,
+            (&Diff::Right(_), &Diff::Left(_)) => Ordering::Less,
+             _                                => Ordering::Equal,
+        }
+    };
+
+    let mut chunk_start = 0;
+
+    for current in 0..diff.len() {
+        if let Diff::Equal(_, _) = diff[current] {
+            diff[chunk_start..].sort_by(&diff_ordering);
+            chunk_start = current;
+        }
+    }
+
+    // Sort the last chunk that may end with a non-Equal item.
+    diff[chunk_start..].sort_by(&diff_ordering);
 }
 
 #[cfg(test)]
@@ -258,15 +287,19 @@ mod tests {
         let diff = diff(&a, &b);
 
         assert_eq!(diff, vec![
-            Diff::Replace (&a[0], &b[0]),  // -1  +8
+            Diff::Left    (&a[0]       ),  // -1
+            Diff::Right   (       &b[0]),  //     +8
             Diff::Equal   (&a[1], &b[1]),  //  2   2
             Diff::Right   (       &b[2]),  //     +4
             Diff::Equal   (&a[2], &b[3]),  //  3   3
-            Diff::Replace (&a[3], &b[4]),  // -4  +1
-            Diff::Replace (&a[4], &b[5]),  // -5  +1
+            Diff::Left    (&a[3]       ),  // -4
+            Diff::Left    (&a[4]       ),  // -5
+            Diff::Right   (       &b[4]),  //     +1
+            Diff::Right   (       &b[5]),  //     +1
             Diff::Equal   (&a[5], &b[6]),  //  6   6
             Diff::Equal   (&a[6], &b[7]),  //  7   7
-            Diff::Replace (&a[7], &b[8]),  // -8  +5
+            Diff::Left    (&a[7]       ),  // -8
+            Diff::Right   (       &b[8]),  //     +5
             Diff::Equal   (&a[8], &b[9]),  //  2   2
             Diff::Right   (       &b[10]), //     +3
         ]);
@@ -283,16 +316,19 @@ mod tests {
         assert_eq!(diff, vec![
             Diff::Left    (&a[0]         ), // -O
             Diff::Left    (&a[1]         ), // -h
-            Diff::Replace (&a[2],  &b[0] ), // -a  +H
+            Diff::Left    (&a[2],        ), // -a
+            Diff::Right   (        &b[0] ), //     +H
             Diff::Equal   (&a[3],  &b[1] ), //  i   i
             Diff::Equal   (&a[4],  &b[2] ), //  ,   ,
             Diff::Equal   (&a[5],  &b[3] ), //
+            Diff::Left    (&a[6],        ), // -I
             Diff::Right   (        &b[4] ), //     +w
-            Diff::Replace (&a[6],  &b[5] ), // -I  +e
+            Diff::Right   (        &b[5] ), //     +e
             Diff::Equal   (&a[7],  &b[6] ), //
             Diff::Equal   (&a[8],  &b[7] ), //  a   a
+            Diff::Left    (&a[9],        ), // -m
             Diff::Right   (        &b[8] ), //     +r
-            Diff::Replace (&a[9],  &b[9] ), // -m  +e
+            Diff::Right   (        &b[9] ), //     +e
             Diff::Equal   (&a[10], &b[10]), //
             Diff::Equal   (&a[11], &b[11]), //  B   B
             Diff::Equal   (&a[12], &b[12]), //  o   o
@@ -311,8 +347,25 @@ mod tests {
 
         assert_eq!(diff, vec![
             Diff::Equal   (&a[0],  &b[0] ), //  "foo"  "foo"
-            Diff::Replace (&a[1],  &b[1] ), // -"bar" +"BAR"
+            Diff::Left    (&a[1],        ), // -"bar"
+            Diff::Right   (        &b[1] ), //        +"BAR"
             Diff::Equal   (&a[2],  &b[2] ), //  "baz"  "baz"
+        ]);
+    }
+
+    #[test]
+    fn completely_different() {
+        let a = vec![1, 2];
+        let b = vec![3, 4];
+        //           |  |
+
+        let diff = diff(&a, &b);
+
+        assert_eq!(diff, vec![
+            Diff::Left    (&a[0]      ), // -1
+            Diff::Left    (&a[1]      ), // -2
+            Diff::Right   (      &b[0]), // +3
+            Diff::Right   (      &b[1]), // +4
         ]);
     }
 
