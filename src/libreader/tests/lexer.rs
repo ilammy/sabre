@@ -4068,11 +4068,6 @@ fn verify<T, F>(title: &str, expected: &[T], actual: &[T], to_string: F) -> Resu
             Diff::Equal(ref actual, _) => {
                 writeln!(&mut report, "  {}", to_string(actual)).unwrap();
             }
-            Diff::Replace(ref actual, ref expected) => {
-                okay = false;
-                writeln!(&mut report, "- {}", to_string(actual)).unwrap();
-                writeln!(&mut report, "+ {}", to_string(expected)).unwrap();
-            }
             Diff::Left(ref actual) => {
                 okay = false;
                 writeln!(&mut report, "- {}", to_string(actual)).unwrap();
