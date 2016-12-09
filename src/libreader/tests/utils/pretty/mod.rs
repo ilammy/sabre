@@ -5,15 +5,8 @@
 // at your option. This file may be copied, distributed, and modified only
 // in accordance with the terms specified by the chosen license.
 
-//! Test utilities.
+//! Pretty-printing.
 //!
-//! Here we put various data structures and functions that prove to be useful for testing
-//! the `reader` crate.
-
-extern crate reader;
+//! Various code for pretty-printing entities.
 
 pub mod diff;
-pub mod pretty;
-pub mod pretty_tree;
-pub mod stubs;
-pub mod tree;
