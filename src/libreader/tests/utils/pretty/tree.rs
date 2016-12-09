@@ -89,6 +89,25 @@ mod tests {
         }
     }
 
+    impl<'a, T> IntoIterator for &'a Tree<T> {
+        type Item = u32;
+        type IntoIter = Empty;
+
+        fn into_iter(self) -> Self::IntoIter {
+            Empty
+        }
+    }
+
+    struct Empty;
+
+    impl Iterator for Empty {
+        type Item = u32;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            None
+        }
+    }
+
     impl<'a, T> Iterator for TreeDfsIter<'a, T> where T: 'a {
         type Item = Dfs<&'a T>;
 
