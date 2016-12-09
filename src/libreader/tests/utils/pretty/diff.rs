@@ -9,7 +9,7 @@
 
 /// Pretty-printing sequential diffs as produced by the `diff::sequence` module.
 ///
-/// - [`as_unified()`](fn.as_unified.html) — unified diffs with full context
+/// - [`unified()`](fn.unified.html) — unified diffs with full context
 ///
 ///   ```diff
 ///    context
@@ -22,21 +22,78 @@ pub mod sequence {
 
     use diff::sequence::Diff;
 
+    /// Displayable wrapper over `Diff<T>` for displayable types.
+    #[doc(hidden)]
     pub struct UnifiedDiffDisplay<'a, T> where T: 'a {
         diff: &'a [Diff<T>],
     }
 
+    /// Displayable wrapper over `Diff<T>` with custom formatter.
+    #[doc(hidden)]
     pub struct UnifiedDiff<'a, T, F> where T: 'a {
         diff: &'a [Diff<T>],
         f: F,
     }
 
+    /// Display unified diff.
+    ///
+    /// Returns a wrapper over the passed diff slice which can be displayed with
+    /// the usual `{}` format.
+    ///
+    /// Requires elements to be displayable. Use [`unified_format()`](fn.unified_format.html)
+    /// if you want to write out something undisplayable.
+    ///
+    /// Example usage:
+    ///
+    /// ```
+    /// # use utils::diff::sequence;
+    /// # use utils::pretty::diff::sequence::{unified};
+    /// #
+    /// let (a, b) = (vec![1, 2, 3], vec![1, 2, 9]);
+    ///
+    /// let diff = sequence::diff(&a, &b);
+    ///
+    /// assert_eq!(format!("Diff:\n{}", unified(&diff)),
+    ///     concat!("Diff:\n",
+    ///             " 1\n",
+    ///             " 2\n",
+    ///             "-3\n",
+    ///             "+9\n"));
+    /// ```
     pub fn unified<'a, T>(diff: &'a [Diff<T>]) -> UnifiedDiffDisplay<'a, T>
         where T: fmt::Display
     {
         UnifiedDiffDisplay { diff: diff }
     }
 
+    /// Display unified diff with custom element formatting.
+    ///
+    /// Returns a wrapper over the passed diff slice which can be displayed with
+    /// the usual `{}` format.
+    ///
+    /// Example usage:
+    ///
+    /// ```
+    /// # use utils::diff::sequence;
+    /// # use utils::pretty::diff::sequence::{unified_format};
+    /// #
+    /// let (a, b) = (vec![1, 2, 3, 4, 5], vec![5, 2, 3, 7, 9]);
+    ///
+    /// let diff = sequence::diff(&a, &b);
+    ///
+    /// assert_eq!(
+    ///     format!("Diff:\n{}",
+    ///         unified_format(&diff, |item, buf| write!(buf, "Number({})", item))),
+    ///     concat!("Diff:\n",
+    ///             "-Number(1)\n",
+    ///             "+Number(5)\n",
+    ///             " Number(2)\n",
+    ///             " Number(3)\n",
+    ///             "-Number(4)\n",
+    ///             "-Number(5)\n",
+    ///             "+Number(7)\n",
+    ///             "+Number(9)\n"));
+    /// ```
     pub fn unified_format<'a, T, F>(diff: &'a [Diff<T>], f: F) -> UnifiedDiff<'a, T, F>
         where F: Fn(&T, &mut fmt::Write) -> fmt::Result
     {
@@ -59,9 +116,11 @@ pub mod sequence {
         }
     }
 
+    /// Actually write the diff into the provided buffer using the given formatter.
     fn write_unified<T, F>(buf: &mut fmt::Write, diff: &[Diff<T>], format: &F) -> fmt::Result
         where F: Fn(&T, &mut fmt::Write) -> fmt::Result
     {
+        // Use this buffer for repackaging multiline elements.
         let mut line_buffer = String::new();
 
         for item in diff {
