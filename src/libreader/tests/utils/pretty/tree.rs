@@ -100,7 +100,13 @@ mod tests {
         type Item = Dfs<&'a T>;
 
         fn next(&mut self) -> Option<Self::Item> {
-            None
+            if let Some(next) = self.not_seen.pop() {
+                let depth = self.not_seen.len() as u16;
+                self.not_seen.extend(next.children.iter().rev());
+                Some(Dfs { depth: depth, value: &next.value })
+            } else {
+                None
+            }
         }
     }
 
