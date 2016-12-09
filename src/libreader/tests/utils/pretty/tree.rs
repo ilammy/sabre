@@ -7,18 +7,19 @@
 
 //! Pretty-printing trees.
 
+use std::cell::RefCell;
 use std::fmt;
 
 /// Displayable wrapper over `Iterator<Item=Dfs<T>>` for displayable types.
 #[doc(hidden)]
 pub struct ClangTreeDisplay<I> {
-    iter: I,
+    iter: RefCell<I>,
 }
 
 /// Displayable wrapper over `Iterator<Item=Dfs<T>>` with custom formatter.
 #[doc(hidden)]
 pub struct ClangTree<I, F> {
-    iter: I,
+    iter: RefCell<I>,
     f: F,
 }
 
@@ -39,21 +40,24 @@ pub trait IntoDfsIterator {
 pub fn clang_tree<T, V>(tree: T) -> ClangTreeDisplay<T::IntoIter>
     where T: IntoDfsIterator<Item=V>, V: fmt::Display
 {
-    ClangTreeDisplay { iter: tree.into_dfs_iter() }
+    ClangTreeDisplay { iter: RefCell::new(tree.into_dfs_iter()) }
 }
 
 ///
 pub fn clang_tree_format<T, V, F>(tree: T, f: F) -> ClangTree<T::IntoIter, F>
     where T: IntoDfsIterator<Item=V>, F: Fn(V, &mut fmt::Write) -> fmt::Result
 {
-    ClangTree { iter: tree.into_dfs_iter(), f: f }
+    ClangTree { iter: RefCell::new(tree.into_dfs_iter()), f: f }
 }
+
+use std::ops::DerefMut;
 
 impl<I, T> fmt::Display for ClangTreeDisplay<I>
     where I: Iterator<Item=Dfs<T>>, T: fmt::Display
 {
     fn fmt(&self, buf: &mut fmt::Formatter) -> fmt::Result {
-        Ok(())
+        let mut iter = self.iter.borrow_mut();
+        write_clang_tree(buf, iter.deref_mut(), &|v, buf| write!(buf, "{}", v))
     }
 }
 
@@ -61,8 +65,16 @@ impl<I, T, F> fmt::Display for ClangTree<I, F>
     where I: Iterator<Item=Dfs<T>>, F: Fn(T, &mut fmt::Write) -> fmt::Result
 {
     fn fmt(&self, buf: &mut fmt::Formatter) -> fmt::Result {
-        Ok(())
+        let mut iter = self.iter.borrow_mut();
+        write_clang_tree(buf, iter.deref_mut(), &self.f)
     }
+}
+
+///
+fn write_clang_tree<I, T, F>(buf: &mut fmt::Write, iter: &mut I, format: &F) -> fmt::Result
+    where I: Iterator<Item=Dfs<T>>, F: Fn(T, &mut fmt::Write) -> fmt::Result
+{
+    Ok(())
 }
 
 #[cfg(test)]
