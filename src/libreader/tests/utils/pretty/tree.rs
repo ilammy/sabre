@@ -54,3 +54,166 @@ impl<I, T> fmt::Display for ClangTreeDisplay<I>
         Ok(())
     }
 }
+
+impl<'a, I, T, F> fmt::Display for ClangTree<I, F>
+    where I: Iterator<Item=Dfs<T>>, T: 'a, F: Fn(&'a T, &'a mut fmt::Write) -> fmt::Result
+{
+    fn fmt(&self, buf: &mut fmt::Formatter) -> fmt::Result {
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // Example tree implementation
+
+    struct Tree<T> {
+        value: T,
+        children: Vec<Tree<T>>,
+    }
+
+    impl<T> Tree<T> {
+        fn new(value: T, children: Vec<Tree<T>>) -> Tree<T> {
+            Tree { value: value, children: children }
+        }
+
+        fn iter_dfs<'a>(&'a self) -> TreeDfsIter<'a, T> {
+            TreeDfsIter { not_seen: vec![self] }
+        }
+    }
+
+    struct TreeDfsIter<'a, T> where T: 'a {
+        not_seen: Vec<&'a Tree<T>>,
+    }
+
+    impl<'a, T> Iterator for TreeDfsIter<'a, T> where T: 'a {
+        type Item = Dfs<&'a T>;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            None
+        }
+    }
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // Simple formatting
+
+    #[test]
+    fn only_root_element() {
+        let tree = Tree::new(1, vec![]);
+        let expected = "1\n";
+
+        assert_eq!(expected, format!("{}", tree.iter_dfs().format_clang()));
+    }
+
+    #[test]
+    fn sibling_elements() {
+        let tree =
+            Tree::new(1, vec![
+                Tree::new(2, vec![]),
+                Tree::new(3, vec![]),
+                Tree::new(4, vec![]),
+            ]);
+        let expected = "\
+1
+|- 2
+|- 3
+`- 4
+";
+        assert_eq!(expected, format!("{}", tree.iter_dfs().format_clang()));
+    }
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // More complex formatting
+
+    #[test]
+    fn nested_elements() {
+        let tree =
+            Tree::new(1, vec![
+                Tree::new(2, vec![
+                    Tree::new(3, vec![]),
+                    Tree::new(4, vec![]),
+                ]),
+                Tree::new(5, vec![
+                    Tree::new(6, vec![
+                        Tree::new(7, vec![]),
+                    ]),
+                ]),
+                Tree::new(8, vec![
+                    Tree::new(9, vec![
+                        Tree::new(10, vec![]),
+                        Tree::new(11, vec![]),
+                    ]),
+                ]),
+                Tree::new(12, vec![
+                    Tree::new(13, vec![]),
+                ]),
+            ]);
+        let expected = "\
+1
+|- 2
+|  |- 3
+|  `- 4
+|- 5
+|  `- 6
+|     `- 7
+|- 8
+|  `- 9
+|     |- 10
+|     `- 11
+`- 12
+   `- 13
+";
+        assert_eq!(expected, format!("{}", tree.iter_dfs().format_clang()));
+    }
+
+    #[test]
+    fn multiline_nodes() {
+        let tree =
+            Tree::new("Node\na", vec![
+                Tree::new("Node\nb\nb\n\nb", vec![]),
+                Tree::new("Node\nc", vec![
+                    Tree::new("Node\r\nd", vec![]),
+                ]),
+                Tree::new("Node\ne", vec![]),
+            ]);
+        let expected = "\
+Node
+a
+|- Node
+|  b
+|  b
+|  \n\
+|  b
+|- Node
+|  c
+|  `- Node
+|     d
+`- Node
+   e
+";
+        assert_eq!(expected, format!("{}", tree.iter_dfs().format_clang()));
+    }
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // Ad-hoc formatting function
+
+    #[test]
+    fn formatting_function() {
+        let tree =
+            Tree::new(1, vec![
+                Tree::new(2, vec![]),
+                Tree::new(3, vec![])
+            ]);
+        let expected = "\
+<1>
+|- <2>
+`- <3>
+";
+        assert_eq!(expected,
+            format!("{}", tree.iter_dfs()
+                              .format_clang_with(|value, buf| write!(buf, "<{}>", value))));
+    }
+}
