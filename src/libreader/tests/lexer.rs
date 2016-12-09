@@ -4055,31 +4055,22 @@ fn compute_scanning_results(string: &str, pool: &InternPool) -> ScannerTestResul
 fn verify<T, F>(title: &str, expected: &[T], actual: &[T], to_string: F) -> Result<(), String>
     where T: Eq, F: Fn(&T) -> String
 {
-    let mut report = String::new();
-
-    writeln!(&mut report, "{}", title).unwrap();
+    use utils::pretty::diff::sequence::unified_format;
 
     let diff = sequence::diff(expected, actual);
 
-    let mut okay = true;
-
-    for entry in diff {
-        match entry {
-            Diff::Equal(ref actual, _) => {
-                writeln!(&mut report, "  {}", to_string(actual)).unwrap();
-            }
-            Diff::Left(ref actual) => {
-                okay = false;
-                writeln!(&mut report, "- {}", to_string(actual)).unwrap();
-            }
-            Diff::Right(ref expected) => {
-                okay = false;
-                writeln!(&mut report, "+ {}", to_string(expected)).unwrap();
-            }
-        }
+    if diff.iter().all(|item| match *item { Diff::Equal(_, _) => true, _ => false }) {
+        return Ok(());
     }
 
-    return if okay { Ok(()) } else { Err(report) };
+    let mut report = String::new();
+
+    write!(&mut report, "{title}\n{diff}",
+        title = title,
+        diff = unified_format(&diff, |item, buf| write!(buf, "{}", to_string(item)))
+    ).unwrap();
+
+    return Err(report);
 }
 
 /// Pretty-print a token in diffs.
