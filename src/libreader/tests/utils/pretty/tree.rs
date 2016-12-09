@@ -24,7 +24,7 @@ pub struct ClangTree<I, F> {
 
 /// TODO
 pub struct Dfs<T> {
-    pub depth: u16,
+    pub depth: u16, // TODO: parameterize this ?
     pub value: T,
 }
 
