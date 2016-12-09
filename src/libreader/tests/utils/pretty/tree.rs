@@ -29,22 +29,17 @@ pub struct Dfs<T> {
 }
 
 ///
-pub trait ClangFormat where Self: Sized {
-    ///
-    fn format_clang(self) -> ClangTreeDisplay<Self>;
-
-    ///
-    fn format_clang_with<F>(self, f: F) -> ClangTree<Self, F>;
+pub fn clang_tree<T, V>(tree: T) -> ClangTreeDisplay<T::IntoIter>
+    where T: IntoIterator<Item=Dfs<V>>, V: fmt::Display
+{
+    ClangTreeDisplay { iter: tree.into_iter() }
 }
 
-impl<I, T> ClangFormat for I where I: Iterator<Item=Dfs<T>> {
-    fn format_clang(self) -> ClangTreeDisplay<Self> {
-        ClangTreeDisplay { iter: self }
-    }
-
-    fn format_clang_with<F>(self, f: F) -> ClangTree<Self, F> {
-        ClangTree { iter: self, f: f }
-    }
+///
+pub fn clang_tree_format<T, V, F>(tree: T, f: F) -> ClangTree<T::IntoIter, F>
+    where T: IntoIterator<Item=Dfs<V>>, F: Fn(V, &mut fmt::Write) -> fmt::Result
+{
+    ClangTree { iter: tree.into_iter(), f: f }
 }
 
 impl<I, T> fmt::Display for ClangTreeDisplay<I>
@@ -55,8 +50,8 @@ impl<I, T> fmt::Display for ClangTreeDisplay<I>
     }
 }
 
-impl<'a, I, T, F> fmt::Display for ClangTree<I, F>
-    where I: Iterator<Item=Dfs<T>>, T: 'a, F: Fn(&'a T, &'a mut fmt::Write) -> fmt::Result
+impl<I, T, F> fmt::Display for ClangTree<I, F>
+    where I: Iterator<Item=Dfs<T>>, F: Fn(T, &mut fmt::Write) -> fmt::Result
 {
     fn fmt(&self, buf: &mut fmt::Formatter) -> fmt::Result {
         Ok(())
@@ -79,14 +74,19 @@ mod tests {
         fn new(value: T, children: Vec<Tree<T>>) -> Tree<T> {
             Tree { value: value, children: children }
         }
-
-        fn iter_dfs<'a>(&'a self) -> TreeDfsIter<'a, T> {
-            TreeDfsIter { not_seen: vec![self] }
-        }
     }
 
     struct TreeDfsIter<'a, T> where T: 'a {
         not_seen: Vec<&'a Tree<T>>,
+    }
+
+    impl<'a, T> IntoIterator for &'a Tree<T> {
+        type Item = Dfs<&'a T>;
+        type IntoIter = TreeDfsIter<'a, T>;
+
+        fn into_iter(self) -> Self::IntoIter {
+            TreeDfsIter { not_seen: vec![self] }
+        }
     }
 
     impl<'a, T> Iterator for TreeDfsIter<'a, T> where T: 'a {
@@ -105,7 +105,7 @@ mod tests {
         let tree = Tree::new(1, vec![]);
         let expected = "1\n";
 
-        assert_eq!(expected, format!("{}", tree.iter_dfs().format_clang()));
+        assert_eq!(expected, format!("{}", clang_tree(&tree)));
     }
 
     #[test]
@@ -122,7 +122,7 @@ mod tests {
 |- 3
 `- 4
 ";
-        assert_eq!(expected, format!("{}", tree.iter_dfs().format_clang()));
+        assert_eq!(expected, format!("{}", clang_tree(&tree)));
     }
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -166,7 +166,7 @@ mod tests {
 `- 12
    `- 13
 ";
-        assert_eq!(expected, format!("{}", tree.iter_dfs().format_clang()));
+        assert_eq!(expected, format!("{}", clang_tree(&tree)));
     }
 
     #[test]
@@ -194,7 +194,7 @@ a
 `- Node
    e
 ";
-        assert_eq!(expected, format!("{}", tree.iter_dfs().format_clang()));
+        assert_eq!(expected, format!("{}", clang_tree(&tree)));
     }
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -213,7 +213,7 @@ a
 `- <3>
 ";
         assert_eq!(expected,
-            format!("{}", tree.iter_dfs()
-                              .format_clang_with(|value, buf| write!(buf, "<{}>", value))));
+            format!("{}", clang_tree_format(&tree,
+                |value, buf| write!(buf, "<{}>", value))));
     }
 }
