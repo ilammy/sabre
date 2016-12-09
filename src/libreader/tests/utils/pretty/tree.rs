@@ -28,18 +28,25 @@ pub struct Dfs<T> {
     pub value: T,
 }
 
+pub trait IntoDfsIterator {
+    type Item;
+    type IntoIter: Iterator<Item=Dfs<Self::Item>>;
+
+    fn into_dfs_iter(self) -> Self::IntoIter;
+}
+
 ///
 pub fn clang_tree<T, V>(tree: T) -> ClangTreeDisplay<T::IntoIter>
-    where T: IntoIterator<Item=Dfs<V>>, V: fmt::Display
+    where T: IntoDfsIterator<Item=V>, V: fmt::Display
 {
-    ClangTreeDisplay { iter: tree.into_iter() }
+    ClangTreeDisplay { iter: tree.into_dfs_iter() }
 }
 
 ///
 pub fn clang_tree_format<T, V, F>(tree: T, f: F) -> ClangTree<T::IntoIter, F>
-    where T: IntoIterator<Item=Dfs<V>>, F: Fn(V, &mut fmt::Write) -> fmt::Result
+    where T: IntoDfsIterator<Item=V>, F: Fn(V, &mut fmt::Write) -> fmt::Result
 {
-    ClangTree { iter: tree.into_iter(), f: f }
+    ClangTree { iter: tree.into_dfs_iter(), f: f }
 }
 
 impl<I, T> fmt::Display for ClangTreeDisplay<I>
@@ -80,31 +87,12 @@ mod tests {
         not_seen: Vec<&'a Tree<T>>,
     }
 
-    impl<'a, T> IntoIterator for &'a Tree<T> {
-        type Item = Dfs<&'a T>;
+    impl<'a, T> IntoDfsIterator for &'a Tree<T> {
+        type Item = &'a T;
         type IntoIter = TreeDfsIter<'a, T>;
 
-        fn into_iter(self) -> Self::IntoIter {
+        fn into_dfs_iter(self) -> Self::IntoIter {
             TreeDfsIter { not_seen: vec![self] }
-        }
-    }
-
-    impl<'a, T> IntoIterator for &'a Tree<T> {
-        type Item = u32;
-        type IntoIter = Empty;
-
-        fn into_iter(self) -> Self::IntoIter {
-            Empty
-        }
-    }
-
-    struct Empty;
-
-    impl Iterator for Empty {
-        type Item = u32;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            None
         }
     }
 
