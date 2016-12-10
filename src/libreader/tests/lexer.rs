@@ -4048,8 +4048,8 @@ fn compute_scanning_results(string: &str, pool: &InternPool) -> ScannerTestResul
     };
 }
 
-/// Print out and verifies produced results. Returns Ok if everything is fine,
-/// otherwise an Err with a string to be shown the user is returned.
+/// Print out and verifies produced results. Returns true if everything is fine,
+/// otherwise prints out inconsistencies and return false.
 fn verify<T, F>(title: &str, expected: &[T], actual: &[T], format: F) -> bool
     where T: Eq, F: Fn(&T, &mut fmt::Write) -> fmt::Result
 {
