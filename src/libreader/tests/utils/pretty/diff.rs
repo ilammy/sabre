@@ -25,13 +25,13 @@ pub mod sequence {
     /// Displayable wrapper over `Diff<T>` for displayable types.
     #[doc(hidden)]
     pub struct UnifiedDiffDisplay<'a, T> where T: 'a {
-        diff: &'a [Diff<T>],
+        diff: &'a [Diff<'a, T>],
     }
 
     /// Displayable wrapper over `Diff<T>` with custom formatter.
     #[doc(hidden)]
     pub struct UnifiedDiff<'a, T, F> where T: 'a {
-        diff: &'a [Diff<T>],
+        diff: &'a [Diff<'a, T>],
         f: F,
     }
 

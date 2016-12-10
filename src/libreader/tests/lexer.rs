@@ -4051,7 +4051,7 @@ fn compute_scanning_results(string: &str, pool: &InternPool) -> ScannerTestResul
 /// Print out and verifies produced results. Returns Ok if everything is fine,
 /// otherwise an Err with a string to be shown the user is returned.
 fn verify<T, F>(title: &str, expected: &[T], actual: &[T], format: F) -> bool
-    where T: Eq, F: Fn(&&T, &mut fmt::Write) -> fmt::Result
+    where T: Eq, F: Fn(&T, &mut fmt::Write) -> fmt::Result
 {
     use utils::pretty::diff::sequence::unified_format;
 
