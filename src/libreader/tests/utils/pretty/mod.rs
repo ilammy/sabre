@@ -9,5 +9,6 @@
 //!
 //! Various code for pretty-printing entities.
 
+pub mod diagnostics;
 pub mod diff;
 pub mod lexer;
