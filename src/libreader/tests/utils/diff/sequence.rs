@@ -17,19 +17,19 @@
 
 /// Result of sequence element comparison.
 #[derive(Debug, PartialEq)]
-pub enum Diff<T> {
+pub enum Diff<'a, T> where T: 'a {
     /// The element is present only in the left sequence.
-    Left(T),
+    Left(&'a T),
 
     /// The element is present only in the right sequence.
-    Right(T),
+    Right(&'a T),
 
     /// Matching elements in the left and right sequences are equal.
-    Equal(T, T),
+    Equal(&'a T, &'a T),
 }
 
 /// Compute the difference between two sequences of comparable elements.
-pub fn diff<'a, T>(lhs: &'a [T], rhs: &'a [T]) -> Vec<Diff<&'a T>>
+pub fn diff<'a, T>(lhs: &'a [T], rhs: &'a [T]) -> Vec<Diff<'a, T>>
     where T: PartialEq
 {
     diff_with(lhs, rhs, |lhs, rhs| lhs == rhs)
@@ -41,7 +41,7 @@ pub fn diff<'a, T>(lhs: &'a [T], rhs: &'a [T]) -> Vec<Diff<&'a T>>
 // may be expensive, so we take care to reduce the amount of work to be done.
 
 /// Compute the difference between two sequences using the provided comparator.
-pub fn diff_with<'a, T, F>(lhs: &'a [T], rhs: &'a [T], equal: F) -> Vec<Diff<&'a T>>
+pub fn diff_with<'a, T, F>(lhs: &'a [T], rhs: &'a [T], equal: F) -> Vec<Diff<'a, T>>
     where F: Fn(&T, &T) -> bool
 {
     let fwd = lhs.iter().zip(rhs.iter());
@@ -87,7 +87,7 @@ pub fn diff_with<'a, T, F>(lhs: &'a [T], rhs: &'a [T], equal: F) -> Vec<Diff<&'a
 }
 
 /// Actually compute the diff between the sequences using the provided comparator.
-fn compute_diff<'a, T, F>(lhs: &'a [T], rhs: &'a [T], equal: F) -> Vec<Diff<&'a T>>
+fn compute_diff<'a, T, F>(lhs: &'a [T], rhs: &'a [T], equal: F) -> Vec<Diff<'a, T>>
     where F: Fn(&T, &T) -> bool
 {
     let (lcs, eqv) = compute_lcs_lookup(lhs, rhs, equal);
@@ -149,7 +149,7 @@ fn compute_lcs_lookup<T, F>(lhs: &[T], rhs: &[T], equal: F) -> (Vec<usize>, Vec<
 ///
 /// Refer to any book on dynamic programming for a better explanation of how this works.
 fn backtrace_diff<'a, T>(lhs: &'a [T], rhs: &'a [T],
-                         lcs: &[usize], eqv: &[bool]) -> Vec<Diff<&'a T>>
+                         lcs: &[usize], eqv: &[bool]) -> Vec<Diff<'a, T>>
 {
     let h = lhs.len() + 1;
     let w = rhs.len() + 1;
@@ -197,11 +197,11 @@ fn backtrace_diff<'a, T>(lhs: &'a [T], rhs: &'a [T],
 
 /// Reorder diff chunks (slices delimited by Diff:Equal) so that all Diff::Left are followed
 /// by all Diff::Right. This does not change the diff, but makes it easier for humans to read.
-fn reorder_chunks<'a, T>(diff: &mut [Diff<&'a T>]) {
+fn reorder_chunks<'a, T>(diff: &mut [Diff<'a, T>]) {
     use std::cmp::Ordering;
 
     // Note that the diff is still reversed now, so is this ordering.
-    let diff_ordering = |a: &Diff<&'a T>, b: &Diff<&'a T>| {
+    let diff_ordering = |a: &Diff<'a, T>, b: &Diff<'a, T>| {
         match (a, b) {
             (&Diff::Left(_), &Diff::Right(_)) => Ordering::Greater,
             (&Diff::Right(_), &Diff::Left(_)) => Ordering::Less,
