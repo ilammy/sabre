@@ -3923,7 +3923,7 @@ fn no_unicode_numbers_no_normalization() {
 // Test helpers
 
 use std::cell::RefCell;
-use std::fmt::Write;
+use std::fmt;
 use std::rc::Rc;
 
 use utils::diff::sequence::{self, Diff};
@@ -3949,28 +3949,26 @@ struct ScannerTestResults {
 /// Check whether the scanner produces expected results and reports expected diagnostics
 /// when given a sequence of test string slices. Panic if this is not true.
 fn check(pool: &InternPool, slices: &[ScannerTestSlice]) {
+    use utils::pretty::lexer::pretty_scanned_token;
+    use utils::pretty::diagnostics::pretty_diagnostic;
+
     let test_string = concatenate_test_slices(slices);
     let expected = compute_expected_results(slices);
     let actual = compute_scanning_results(&test_string, pool);
 
-    let token_mismatches =
+    println!("");
+
+    let mut all_passed = true;
+
+    all_passed &=
         verify("Tokens", &expected.tokens, &actual.tokens,
-            |token| print_token(token, &test_string, pool));
+            |token, buf| write!(buf, "{}", pretty_scanned_token(token, &test_string, pool)));
 
-    let diagnostic_mismatches =
+    all_passed &=
         verify("Diagnostics", &expected.diagnostics, &actual.diagnostics,
-            |diagnostic| print_diagnostic(diagnostic, &test_string));
+            |diagnostic, buf| write!(buf, "{}", pretty_diagnostic(diagnostic, &test_string)));
 
-    if token_mismatches.is_err() || diagnostic_mismatches.is_err() {
-        println!("");
-
-        if let Err(string) = token_mismatches {
-            println!("{}", string);
-        }
-        if let Err(string) = diagnostic_mismatches {
-            println!("{}", string);
-        }
-
+    if !all_passed {
         panic!("test failed");
     }
 }
@@ -4052,84 +4050,26 @@ fn compute_scanning_results(string: &str, pool: &InternPool) -> ScannerTestResul
 
 /// Print out and verifies produced results. Returns Ok if everything is fine,
 /// otherwise an Err with a string to be shown the user is returned.
-fn verify<T, F>(title: &str, expected: &[T], actual: &[T], to_string: F) -> Result<(), String>
-    where T: Eq, F: Fn(&T) -> String
+fn verify<T, F>(title: &str, expected: &[T], actual: &[T], format: F) -> bool
+    where T: Eq, F: Fn(&&T, &mut fmt::Write) -> fmt::Result
 {
-    let mut report = String::new();
-
-    writeln!(&mut report, "{}", title).unwrap();
+    use utils::pretty::diff::sequence::unified_format;
 
     let diff = sequence::diff(expected, actual);
 
-    let mut okay = true;
-
-    for entry in diff {
-        match entry {
-            Diff::Equal(ref actual, _) => {
-                writeln!(&mut report, "  {}", to_string(actual)).unwrap();
-            }
-            Diff::Left(ref actual) => {
-                okay = false;
-                writeln!(&mut report, "- {}", to_string(actual)).unwrap();
-            }
-            Diff::Right(ref expected) => {
-                okay = false;
-                writeln!(&mut report, "+ {}", to_string(expected)).unwrap();
-            }
-        }
-    }
-
-    return if okay { Ok(()) } else { Err(report) };
-}
-
-/// Pretty-print a token in diffs.
-fn print_token(token: &ScannedToken, buf: &str, pool: &InternPool) -> String {
-    format!("{token} @ [{from}, {to}] = {slice:?}",
-        token = pretty_print_token(token, pool),
-        from  = token.span.from,
-        to    = token.span.to,
-        slice = &buf[token.span.from..token.span.to],
-    )
-}
-
-/// Pretty-print a diagnostic in diffs.
-fn print_diagnostic(diagnostic: &Diagnostic, buf: &str) -> String {
-    if let Some(ref loc) = diagnostic.loc {
-        format!("{diagnostic} @ [{from}, {to}] = {slice:?}",
-            diagnostic = pretty_print_diagnostic(diagnostic),
-            from       = loc.from,
-            to         = loc.to,
-            slice      = &buf[loc.from..loc.to],
-        )
+    if diff.iter().all(diff_is_equal) {
+        return true;
     } else {
-        format!("{diagnostic} @ nowhere",
-            diagnostic = pretty_print_diagnostic(diagnostic),
-        )
+        print!("{}\n{}", title, unified_format(&diff, format));
+
+        return false;
     }
 }
 
-/// Pretty-print a token.
-fn pretty_print_token(token: &ScannedToken, pool: &InternPool) -> String {
-    match token.tok {
-        Token::String(value) => {
-            format!("String({:?})", pool.get(value))
-        }
-        Token::Number(value) => {
-            format!("Number({:?})", pool.get(value))
-        }
-        Token::Identifier(value) => {
-            format!("Identifier({:?})", pool.get(value))
-        }
-        Token::Directive(value) => {
-            format!("Directive({:?})", pool.get(value))
-        }
-        _ => format!("{:?}", token.tok)
-    }
-}
-
-/// Pretty-print a diagnostic.
-fn pretty_print_diagnostic(diagnostic: &Diagnostic) -> String {
-    match diagnostic.kind {
-        _ => format!("{:?}", diagnostic.kind)
+/// Check if a diff is Diff::Equal.
+fn diff_is_equal<T>(diff: &Diff<T>) -> bool {
+    match *diff {
+        Diff::Equal(_, _) => true,
+        _ => false,
     }
 }
