@@ -10,3 +10,4 @@
 //! Various code for pretty-printing entities.
 
 pub mod diff;
+pub mod lexer;
