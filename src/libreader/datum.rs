@@ -39,4 +39,7 @@ pub enum DatumValue {
 
     /// Symbol.
     Symbol(Atom),
+
+    /// Bytevector literal.
+    Bytevector(Vec<Atom>),
 }

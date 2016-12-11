@@ -82,7 +82,7 @@ pub enum Token {
 }
 
 /// Type of an opening or closing parenthesis.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum ParenType {
     /// Parentheses: `( )`
     Parenthesis,

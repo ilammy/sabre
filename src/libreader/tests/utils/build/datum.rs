@@ -39,6 +39,11 @@ pub fn boolean(text: &str, value: bool) -> DataTest {
     literal(text, DatumValue::Boolean(value))
 }
 
+/// Make a test for a bytevector literal.
+pub fn bytevector(text: &str, values: Vec<Atom>) -> DataTest {
+    literal(text, DatumValue::Bytevector(values))
+}
+
 /// Make a test for a character literal.
 pub fn character(text: &str, value: char) -> DataTest {
     literal(text, DatumValue::Character(value))
@@ -116,6 +121,7 @@ fn offset_scanned_datum(datum: ScannedDatum, offset: usize) -> ScannedDatum {
 fn offset_datum(value: DatumValue, offset: usize) -> DatumValue {
     match value {
         DatumValue::Boolean(_) => value,
+        DatumValue::Bytevector(_) => value,
         DatumValue::Character(_) => value,
         DatumValue::Number(_) => value,
         DatumValue::String(_) => value,
@@ -162,6 +168,32 @@ mod tests {
         assert_eq!(test.text, "#false");
         assert_eq!(test.data, vec![
             ScannedDatum { value: DatumValue::Boolean(false), span: Span::new(0, 6) },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
+    }
+
+    #[test]
+    fn primitive_bytevector_empty() {
+        let test = bytevector("#u8()", vec![]);
+
+        assert_eq!(test.text, "#u8()");
+        assert_eq!(test.data, vec![
+            ScannedDatum { value: DatumValue::Bytevector(vec![]), span: Span::new(0, 5) },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
+    }
+
+    #[test]
+    fn primitive_bytevector_values() {
+        let pool = InternPool::new();
+        let test = bytevector("#u8(12  34)", vec![pool.intern("12"), pool.intern("34")]);
+
+        assert_eq!(test.text, "#u8(12  34)");
+        assert_eq!(test.data, vec![
+            ScannedDatum {
+                value: DatumValue::Bytevector(vec![pool.intern("12"), pool.intern("34")]),
+                span: Span::new(0, 11),
+            },
         ]);
         assert_eq!(test.diagnostics, vec![]);
     }

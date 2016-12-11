@@ -151,6 +151,153 @@ fn simple_symbol_unterminated() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Bytevectors
+
+#[test]
+fn bytevector_empty() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::bytevector("#U8()", vec![]),
+        datum::bytevector("#u8[]", vec![]),
+        datum::bytevector("#u8{}", vec![]),
+    ]));
+}
+
+#[test]
+fn bytevector_numbers() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::bytevector("#u8(1 2 3 #e#x3A)", vec![
+            pool.intern("1"),
+            pool.intern("2"),
+            pool.intern("3"),
+            pool.intern("#e#x3A"),
+        ]),
+    ]));
+}
+
+#[test]
+fn bytevector_padded() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::bytevector("#U8( 1 2 )", vec![pool.intern("1"), pool.intern("2")]),
+    ]));
+}
+
+#[test]
+fn bytevector_out_of_range_numbers() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::bytevector("#u8(100500 1e+400 3.1415 -74+i +inf.0)", vec![
+            pool.intern("100500"),
+            pool.intern("1e+400"),
+            pool.intern("3.1415"),
+            pool.intern("-74+i"),
+            pool.intern("+inf.0"),
+        ]),
+    ]));
+}
+
+#[test]
+fn bytevector_incorrect_numbers() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::bytevector("#u8(#k9 1+1 #o9 1/.)", vec![
+            pool.intern("#k9"),
+            pool.intern("1+1"),
+            pool.intern("#o9"),
+            pool.intern("1/."),
+        ])
+            .diagnostic( 4,  6, DiagnosticKind::err_lexer_invalid_number_prefix)
+            .diagnostic(11, 11, DiagnosticKind::err_lexer_missing_i)
+            .diagnostic(14, 15, DiagnosticKind::err_lexer_invalid_number_digit)
+            .diagnostic(18, 19, DiagnosticKind::err_lexer_digits_missing)
+            .diagnostic(18, 19, DiagnosticKind::err_lexer_noninteger_rational),
+    ]));
+}
+
+#[test]
+fn bytevector_invalid_elements() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        // Only number literals are allowed.
+        datum::bytevector("#u8(#false \"string\" value #\\x42)", vec![])
+            .diagnostic( 4, 10, DiagnosticKind::err_parser_invalid_bytevector_element)
+            .diagnostic(11, 19, DiagnosticKind::err_parser_invalid_bytevector_element)
+            .diagnostic(20, 25, DiagnosticKind::err_parser_invalid_bytevector_element)
+            .diagnostic(26, 31, DiagnosticKind::err_parser_invalid_bytevector_element),
+
+        // No way bytevectors can be nested.
+        datum::bytevector("#u8(#U8[#u8{0}])", vec![])
+            .diagnostic(8, 14, DiagnosticKind::err_parser_invalid_bytevector_element)
+            .diagnostic(4, 15, DiagnosticKind::err_parser_invalid_bytevector_element),
+    ]));
+}
+
+#[test]
+fn bytevector_invalid_dots() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        // Dot notation cannot be used in bytevectors.
+        datum::bytevector("#u8(1 2 . 3)", vec![pool.intern("1"), pool.intern("2"), pool.intern("3")])
+            .diagnostic(8, 9, DiagnosticKind::err_parser_misplaced_dot),
+
+        datum::bytevector("#u8(. . .)", vec![])
+            .diagnostic(4, 5, DiagnosticKind::err_parser_misplaced_dot)
+            .diagnostic(6, 7, DiagnosticKind::err_parser_misplaced_dot)
+            .diagnostic(8, 9, DiagnosticKind::err_parser_misplaced_dot),
+    ]));
+}
+
+#[test]
+fn bytevector_mismatched_delimiters() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::bytevector("#u8(1 2 3]", vec![pool.intern("1"), pool.intern("2"), pool.intern("3")])
+            .diagnostic(9, 10, DiagnosticKind::err_parser_mismatched_delimiter),
+
+        // Check the (invalid) nested data as well:
+        datum::bytevector("#u8(4 #u8(5 6])", vec![pool.intern("4")])
+            .diagnostic(13, 14, DiagnosticKind::err_parser_mismatched_delimiter)
+            .diagnostic( 6, 14, DiagnosticKind::err_parser_invalid_bytevector_element),
+    ]));
+
+    // TODO: tell the user where the opening parenthesis is (and maybe its kind)
+}
+
+#[test]
+fn bytevector_missing_delimiters() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#u8(1 2")
+            .diagnostic(0, 4, DiagnosticKind::fatal_parser_unterminated_delimiter),
+    ]));
+}
+
+#[test]
+fn bytevector_missing_delimiters_nested() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#u8(1 #u8[2 #u8{3")
+            .diagnostic(12, 16, DiagnosticKind::fatal_parser_unterminated_delimiter)
+            .diagnostic( 6, 10, DiagnosticKind::fatal_parser_unterminated_delimiter)
+            .diagnostic( 0,  4, DiagnosticKind::fatal_parser_unterminated_delimiter),
+    ]));
+
+    // TODO: emit only one fatal_parser_unterminated_delimiter and put the delim stack in it
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
 use std::cell::RefCell;
