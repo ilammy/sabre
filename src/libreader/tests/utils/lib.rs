@@ -13,6 +13,4 @@
 extern crate reader;
 
 pub mod diff;
-pub mod pretty_tree;
 pub mod stubs;
-pub mod tree;
