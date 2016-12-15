@@ -139,13 +139,17 @@ impl<'a> Parser<'a> {
                 return self.parse_bytevector(paren);
             }
 
+            // Handle vectors.
+            Token::OpenVector(paren) => {
+                return self.parse_vector(paren);
+            }
+
             Token::Whitespace | Token::Comment | Token::Directive(_) | Token::Unrecognized
                 => unreachable!("atmosphere not handled before calling next_datum()"),
 
             Token::CommentPrefix => unimplemented!(),
             Token::Quote | Token::Backquote | Token::Comma | Token::CommaSplicing => unimplemented!(),
             Token::Open(_) => unimplemented!(),
-            Token::OpenVector(_) => unimplemented!(),
             Token::LabelMark(_) | Token::LabelRef(_) => unimplemented!(),
             Token::Close(_) => unimplemented!(),
         }
@@ -193,6 +197,43 @@ impl<'a> Parser<'a> {
                             datum.span);
                     }
                 }
+            }
+        }
+    }
+
+    /// Parse a vector datum.
+    fn parse_vector(&mut self, expected_paren: ParenType) -> Option<ScannedDatum> {
+        let mut elements = Vec::new();
+
+        let start_span = self.cur.span;
+
+        loop {
+            self.bump();
+
+            // Vectors are terminated by a closing parenthesis.
+            if let Token::Close(paren) = self.cur.tok {
+                if paren != expected_paren {
+                    self.diagnostic.report(DiagnosticKind::err_parser_mismatched_delimiter,
+                        self.cur.span);
+                }
+
+                return Some(ScannedDatum {
+                    value: DatumValue::Vector(elements),
+                    span: Span::new(start_span.from, self.cur.span.to),
+                });
+            }
+
+            // End of token stream means that we will never see the closing parenthesis.
+            if self.cur.tok == Token::Eof {
+                self.diagnostic.report(DiagnosticKind::fatal_parser_unterminated_delimiter,
+                    start_span);
+
+                return None;
+            }
+
+            // Everything else is a vector element.
+            if let Some(datum) = self.next_datum() {
+                elements.push(datum);
             }
         }
     }

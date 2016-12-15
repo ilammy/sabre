@@ -109,6 +109,38 @@ pub fn line_sequence(tests: Vec<DataTest>) -> DataTest {
     };
 }
 
+/// Combine tests into a vector.
+pub fn vector(elements: Vec<DataTest>) -> DataTest {
+    let mut text = String::new();
+    let mut data = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for element in elements {
+        let start_offset = text.len();
+
+        text.push_str(&element.text);
+
+        data.extend(
+            element.data.into_iter().map(|d| offset_scanned_datum(d, start_offset))
+        );
+
+        diagnostics.extend(
+            element.diagnostics.into_iter().map(|d| offset_diagnostic(d, start_offset))
+        );
+    }
+
+    let total_length = text.len();
+
+    return DataTest {
+        text: text,
+        data: vec![ScannedDatum {
+            value: DatumValue::Vector(data),
+            span: Span::new(0, total_length),
+        }],
+        diagnostics: diagnostics,
+    };
+}
+
 /// Offset spans in a scanned datum.
 fn offset_scanned_datum(datum: ScannedDatum, offset: usize) -> ScannedDatum {
     ScannedDatum {
@@ -126,6 +158,14 @@ fn offset_datum(value: DatumValue, offset: usize) -> DatumValue {
         DatumValue::Number(_) => value,
         DatumValue::String(_) => value,
         DatumValue::Symbol(_) => value,
+
+        DatumValue::Vector(elements) => {
+            DatumValue::Vector(elements
+                .into_iter()
+                .map(|d| offset_scanned_datum(d, offset))
+                .collect()
+            )
+        }
     }
 }
 
@@ -300,5 +340,91 @@ mod tests {
                 loc: Some(Span::new(9, 10)),
             },
         ]);
+    }
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // Vectors
+
+    #[test]
+    fn vector_empty() {
+        let test = vector(vec![ignored("#("), ignored(")")]);
+
+        assert_eq!(test.text, "#()");
+        assert_eq!(test.data, vec![
+            ScannedDatum { value: DatumValue::Vector(vec![]), span: Span::new(0, 3) },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
+    }
+
+    #[test]
+    fn vector_simple() {
+        let pool = InternPool::new();
+        let test = vector(vec![
+            ignored("#("),
+            number("1", pool.intern("1")),
+            ignored(" "),
+            symbol("hi", pool.intern("hi")),
+            ignored(" "),
+            character("#\\1", '1'),
+            ignored(" "),
+            string("\"test\"",  pool.intern("test")),
+            ignored(" "),
+            boolean("#t", true),
+            ignored(")"),
+        ]);
+
+        assert_eq!(test.text, "#(1 hi #\\1 \"test\" #t)");
+        assert_eq!(test.data, vec![
+            ScannedDatum {
+                value: DatumValue::Vector(vec![
+                    ScannedDatum { value: DatumValue::Number(pool.intern("1")), span: Span::new(2, 3) },
+                    ScannedDatum { value: DatumValue::Symbol(pool.intern("hi")), span: Span::new(4, 6) },
+                    ScannedDatum { value: DatumValue::Character('1'), span: Span::new(7, 10) },
+                    ScannedDatum { value: DatumValue::String(pool.intern("test")), span: Span::new(11, 17) },
+                    ScannedDatum { value: DatumValue::Boolean(true), span: Span::new(18, 20) },
+                ]),
+                span: Span::new(0, 21),
+            },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
+    }
+
+    #[test]
+    fn vector_nested() {
+        let pool = InternPool::new();
+        let test = vector(vec![
+            ignored("#("),
+            number("1", pool.intern("1")),
+            ignored(" "),
+            vector(vec![
+                ignored("#["),
+                number("2", pool.intern("2")),
+                ignored("\t"),
+                number("3", pool.intern("3")),
+                ignored("]"),
+            ]),
+            ignored(" "),
+            number("4", pool.intern("4")),
+            ignored(")"),
+        ]);
+
+        assert_eq!(test.text, "#(1 #[2\t3] 4)");
+        assert_eq!(test.data, vec![
+            ScannedDatum {
+                value: DatumValue::Vector(vec![
+                    ScannedDatum { value: DatumValue::Number(pool.intern("1")), span: Span::new(2, 3) },
+                    ScannedDatum {
+                        value: DatumValue::Vector(vec![
+                            ScannedDatum { value: DatumValue::Number(pool.intern("2")), span: Span::new(6, 7) },
+                            ScannedDatum { value: DatumValue::Number(pool.intern("3")), span: Span::new(8, 9) },
+                        ]),
+                        span: Span::new(4, 10),
+                    },
+                    ScannedDatum { value: DatumValue::Number(pool.intern("4")), span: Span::new(11, 12) },
+                ]),
+                span: Span::new(0, 13),
+            },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
     }
 }

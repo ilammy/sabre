@@ -237,6 +237,10 @@ fn bytevector_invalid_elements() {
         datum::bytevector("#u8(#U8[#u8{0}])", vec![])
             .diagnostic(8, 14, DiagnosticKind::err_parser_invalid_bytevector_element)
             .diagnostic(4, 15, DiagnosticKind::err_parser_invalid_bytevector_element),
+
+        // Vectors cannot be nested into bytevectors.
+        datum::bytevector("#u8(#(1 2 3))", vec![])
+            .diagnostic(4, 12, DiagnosticKind::err_parser_invalid_bytevector_element),
     ]));
 }
 
@@ -268,6 +272,10 @@ fn bytevector_mismatched_delimiters() {
         datum::bytevector("#u8(4 #u8(5 6])", vec![pool.intern("4")])
             .diagnostic(13, 14, DiagnosticKind::err_parser_mismatched_delimiter)
             .diagnostic( 6, 14, DiagnosticKind::err_parser_invalid_bytevector_element),
+
+        datum::bytevector("#u8(#{9))", vec![])
+            .diagnostic(7, 8, DiagnosticKind::err_parser_mismatched_delimiter)
+            .diagnostic(4, 8, DiagnosticKind::err_parser_invalid_bytevector_element),
     ]));
 
     // TODO: tell the user where the opening parenthesis is (and maybe its kind)
@@ -295,6 +303,151 @@ fn bytevector_missing_delimiters_nested() {
     ]));
 
     // TODO: emit only one fatal_parser_unterminated_delimiter and put the delim stack in it
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Vectors
+
+#[test]
+fn vector_empty() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::vector(vec![datum::ignored("#()")]),
+        datum::vector(vec![datum::ignored("#[]")]),
+        datum::vector(vec![datum::ignored("#{}")]),
+    ]));
+}
+
+#[test]
+fn vector_elements() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::vector(vec![
+            datum::ignored("#("),
+            datum::number("123", pool.intern("123")),
+            datum::ignored("\t"),
+            datum::string("\"test\"", pool.intern("test")),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn vector_nested() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::vector(vec![
+            datum::ignored("#("),
+            datum::boolean("#true", true),
+            datum::ignored(" "),
+            datum::vector(vec![
+                datum::ignored("#["),
+                datum::boolean("#f", false),
+                datum::ignored(" "),
+                datum::boolean("#f", false),
+                datum::ignored(" "),
+                datum::character("#\\u", 'u'),
+                datum::ignored("]"),
+            ]),
+            datum::ignored(" "),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn vector_invalid_dots() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::vector(vec![
+            datum::ignored("#("),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(")"),
+        ]),
+
+        datum::vector(vec![
+            datum::ignored("#("),
+            datum::symbol("vector", pool.intern("vector")),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::number("9", pool.intern("9")),
+            datum::ignored(")"),
+        ]),
+
+        datum::vector(vec![
+            datum::ignored("#["),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::number("9", pool.intern("9")),
+            datum::ignored("]"),
+        ]),
+
+        datum::vector(vec![
+            datum::ignored("#{"),
+            datum::number("9", pool.intern("9")),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored("}"),
+        ]),
+    ]));
+}
+
+#[test]
+fn vector_mismatched_delimiters() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::vector(vec![
+            datum::ignored("#{"),
+            datum::number("2", pool.intern("2")),
+            datum::ignored(" "),
+            datum::symbol("+", pool.intern("+")),
+            datum::ignored(" "),
+            datum::number("2", pool.intern("2")),
+            datum::ignored(")").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
+        ]),
+
+        // Nested data:
+        datum::vector(vec![
+            datum::ignored("#{"),
+            datum::vector(vec![
+                datum::ignored("#["),
+                datum::ignored("}").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
+            ]),
+            datum::ignored(")").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
+        ]),
+    ]));
+}
+
+#[test]
+fn vector_missing_delimiters() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#(1 2")
+            .diagnostic(0, 2, DiagnosticKind::fatal_parser_unterminated_delimiter),
+    ]));
+}
+
+#[test]
+fn vector_missing_delimiters_nested() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#(#[#u8{")
+            .diagnostic(4, 8, DiagnosticKind::fatal_parser_unterminated_delimiter)
+            .diagnostic(2, 4, DiagnosticKind::fatal_parser_unterminated_delimiter)
+            .diagnostic(0, 2, DiagnosticKind::fatal_parser_unterminated_delimiter),
+    ]));
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

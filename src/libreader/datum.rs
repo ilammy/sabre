@@ -42,4 +42,7 @@ pub enum DatumValue {
 
     /// Bytevector literal.
     Bytevector(Vec<Atom>),
+
+    /// Vector.
+    Vector(Vec<ScannedDatum>),
 }
