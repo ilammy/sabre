@@ -45,4 +45,7 @@ pub enum DatumValue {
 
     /// Vector.
     Vector(Vec<ScannedDatum>),
+
+    /// Proper list.
+    ProperList(Vec<ScannedDatum>),
 }

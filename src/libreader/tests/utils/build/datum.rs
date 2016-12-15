@@ -141,6 +141,38 @@ pub fn vector(elements: Vec<DataTest>) -> DataTest {
     };
 }
 
+/// Combine tests into a proper list.
+pub fn proper_list(elements: Vec<DataTest>) -> DataTest {
+    let mut text = String::new();
+    let mut data = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for element in elements {
+        let start_offset = text.len();
+
+        text.push_str(&element.text);
+
+        data.extend(
+            element.data.into_iter().map(|d| offset_scanned_datum(d, start_offset))
+        );
+
+        diagnostics.extend(
+            element.diagnostics.into_iter().map(|d| offset_diagnostic(d, start_offset))
+        );
+    }
+
+    let total_length = text.len();
+
+    return DataTest {
+        text: text,
+        data: vec![ScannedDatum {
+            value: DatumValue::ProperList(data),
+            span: Span::new(0, total_length),
+        }],
+        diagnostics: diagnostics,
+    };
+}
+
 /// Offset spans in a scanned datum.
 fn offset_scanned_datum(datum: ScannedDatum, offset: usize) -> ScannedDatum {
     ScannedDatum {
@@ -161,6 +193,14 @@ fn offset_datum(value: DatumValue, offset: usize) -> DatumValue {
 
         DatumValue::Vector(elements) => {
             DatumValue::Vector(elements
+                .into_iter()
+                .map(|d| offset_scanned_datum(d, offset))
+                .collect()
+            )
+        }
+
+        DatumValue::ProperList(elements) => {
+            DatumValue::ProperList(elements
                 .into_iter()
                 .map(|d| offset_scanned_datum(d, offset))
                 .collect()
@@ -423,6 +463,92 @@ mod tests {
                     ScannedDatum { value: DatumValue::Number(pool.intern("4")), span: Span::new(11, 12) },
                 ]),
                 span: Span::new(0, 13),
+            },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
+    }
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // Proper lists
+
+    #[test]
+    fn proper_list_empty() {
+        let test = proper_list(vec![ignored("()")]);
+
+        assert_eq!(test.text, "()");
+        assert_eq!(test.data, vec![
+            ScannedDatum { value: DatumValue::ProperList(vec![]), span: Span::new(0, 2) },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
+    }
+
+    #[test]
+    fn proper_list_simple() {
+        let pool = InternPool::new();
+        let test = proper_list(vec![
+            ignored("("),
+            number("1", pool.intern("1")),
+            ignored(" "),
+            symbol("hi", pool.intern("hi")),
+            ignored(" "),
+            character("#\\1", '1'),
+            ignored(" "),
+            string("\"test\"",  pool.intern("test")),
+            ignored(" "),
+            boolean("#t", true),
+            ignored(")"),
+        ]);
+
+        assert_eq!(test.text, "(1 hi #\\1 \"test\" #t)");
+        assert_eq!(test.data, vec![
+            ScannedDatum {
+                value: DatumValue::ProperList(vec![
+                    ScannedDatum { value: DatumValue::Number(pool.intern("1")), span: Span::new(1, 2) },
+                    ScannedDatum { value: DatumValue::Symbol(pool.intern("hi")), span: Span::new(3, 5) },
+                    ScannedDatum { value: DatumValue::Character('1'), span: Span::new(6, 9) },
+                    ScannedDatum { value: DatumValue::String(pool.intern("test")), span: Span::new(10, 16) },
+                    ScannedDatum { value: DatumValue::Boolean(true), span: Span::new(17, 19) },
+                ]),
+                span: Span::new(0, 20),
+            },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
+    }
+
+    #[test]
+    fn proper_list_nested() {
+        let pool = InternPool::new();
+        let test = proper_list(vec![
+            ignored("("),
+            number("1", pool.intern("1")),
+            ignored("\t"),
+            proper_list(vec![
+                ignored("["),
+                number("2", pool.intern("2")),
+                ignored(" "),
+                number("3", pool.intern("3")),
+                ignored("]"),
+            ]),
+            ignored("\t"),
+            number("4", pool.intern("4")),
+            ignored(")"),
+        ]);
+
+        assert_eq!(test.text, "(1\t[2 3]\t4)");
+        assert_eq!(test.data, vec![
+            ScannedDatum {
+                value: DatumValue::ProperList(vec![
+                    ScannedDatum { value: DatumValue::Number(pool.intern("1")), span: Span::new(1, 2) },
+                    ScannedDatum {
+                        value: DatumValue::ProperList(vec![
+                            ScannedDatum { value: DatumValue::Number(pool.intern("2")), span: Span::new(4, 5) },
+                            ScannedDatum { value: DatumValue::Number(pool.intern("3")), span: Span::new(6, 7) },
+                        ]),
+                        span: Span::new(3, 8),
+                    },
+                    ScannedDatum { value: DatumValue::Number(pool.intern("4")), span: Span::new(9, 10) },
+                ]),
+                span: Span::new(0, 11),
             },
         ]);
         assert_eq!(test.diagnostics, vec![]);
