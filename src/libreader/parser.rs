@@ -10,7 +10,7 @@
 //! This module contains definition of the _syntactical analyzer_ which constructs parsing trees
 //! out of token streams.
 
-use datum::{ScannedDatum, DatumValue};
+use datum::{ScannedDatum, DatumValue, AbbreviationKind};
 use diagnostics::{Span, Handler, DiagnosticKind};
 use lexer::{Scanner, ScannedToken};
 use tokens::{Token, ParenType};
@@ -173,6 +173,20 @@ impl<'a> Parser<'a> {
                 self.parse_list(paren)
             }
 
+            // Handle abbreviations.
+            Token::Quote => {
+                self.parse_abbreviation(AbbreviationKind::Quote)
+            }
+            Token::Backquote => {
+                self.parse_abbreviation(AbbreviationKind::Quasiquote)
+            }
+            Token::Comma => {
+                self.parse_abbreviation(AbbreviationKind::Unquote)
+            }
+            Token::CommaSplicing => {
+                self.parse_abbreviation(AbbreviationKind::UnquoteSplicing)
+            }
+
             Token::Whitespace | Token::Comment | Token::Directive(_) | Token::Unrecognized
                 => unreachable!("atmosphere not handled before calling next_datum()"),
 
@@ -180,7 +194,6 @@ impl<'a> Parser<'a> {
                 => unreachable!("EOF not handled before calling next_datum()"),
 
             Token::CommentPrefix => unimplemented!(),
-            Token::Quote | Token::Backquote | Token::Comma | Token::CommaSplicing => unimplemented!(),
             Token::LabelMark(_) | Token::LabelRef(_) => unimplemented!(),
             Token::Close(_) => unimplemented!(),
         }
@@ -387,6 +400,39 @@ impl<'a> Parser<'a> {
             },
             span: Span::new(start_span.from, end_span.to),
         }));
+    }
+
+    /// Parse an abbreviation.
+    fn parse_abbreviation(&mut self, kind: AbbreviationKind) -> ParseResult {
+        assert!(match self.cur.tok {
+            Token::Quote | Token::Backquote | Token::Comma | Token::CommaSplicing => true,
+            _ => false,
+        });
+
+        let start_span = self.cur.span;
+
+        self.bump();
+
+        match self.cur.tok {
+            Token::Close(_) | Token::Dot | Token::Eof => {
+                self.diagnostic.report(DiagnosticKind::err_parser_missing_abbreviation_datum,
+                    Span::new(start_span.to, start_span.to));
+
+                return Ok(None);
+            }
+
+            _ => {
+                if let Some(datum) = try!(self.next_datum()) {
+                    let datum_span = datum.span;
+                    return Ok(Some(ScannedDatum {
+                        value: DatumValue::Abbreviation(kind, Box::new(datum)),
+                        span: Span::new(start_span.from, datum_span.to),
+                    }));
+                } else {
+                    return Ok(None);
+                }
+            }
+        }
     }
 }
 

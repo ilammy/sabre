@@ -161,6 +161,9 @@ pub enum DiagnosticKind {
 
     /// Parser has encountered a dot outside of a list.
     err_parser_misplaced_dot,
+
+    /// Parser has expected a datum after an abbreviation quotation.
+    err_parser_missing_abbreviation_datum,
 }
 
 /// Convenience wrapper for reporting diagnostics with known spans.

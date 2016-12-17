@@ -249,6 +249,9 @@ fn bytevector_invalid_elements() {
         datum::bytevector("#u8({6 7 . 8})", vec![])
             .diagnostic(4, 13, DiagnosticKind::err_parser_invalid_bytevector_element),
 
+        // Abbreviations cannot be nested into bytevectors.
+        datum::bytevector("#U8(1 '2 3)", vec![pool.intern("1"), pool.intern("3")])
+            .diagnostic(6, 8, DiagnosticKind::err_parser_invalid_bytevector_element),
     ]));
 }
 
@@ -847,6 +850,193 @@ fn dotted_list_missing_delimiters_nested() {
     check(&pool, datum::line_sequence(vec![
         datum::ignored("(1 2 . (3 . #(")
             .diagnostic(12, 14, DiagnosticKind::fatal_parser_unterminated_delimiter),
+    ]));
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Abbreviations
+
+#[test]
+fn abbreviation_simple() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::quote(vec![
+            datum::ignored("'"),
+            datum::string("\"a string\"", pool.intern("a string")),
+        ]),
+        datum::quasiquote(vec![
+            datum::ignored("`"),
+            datum::bytevector("#u8(0 0 7)", vec![pool.intern("0"), pool.intern("0"), pool.intern("7")]),
+        ]),
+        datum::unquote(vec![
+            datum::ignored(","),
+            datum::symbol("var", pool.intern("var")),
+        ]),
+        datum::unquote_splicing(vec![
+            datum::ignored(",@"),
+            datum::symbol("another", pool.intern("another")),
+        ]),
+    ]));
+}
+
+#[test]
+fn abbreviation_complex() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::quasiquote(vec![
+            datum::ignored("`"),
+            datum::dotted_list(vec![
+                datum::ignored("("),
+                datum::unquote(vec![
+                    datum::ignored(","),
+                    datum::proper_list(vec![
+                        datum::ignored("("),
+                        datum::symbol("+", pool.intern("+")),
+                        datum::ignored(" "),
+                        datum::number("2", pool.intern("2")),
+                        datum::ignored(" "),
+                        datum::number("2", pool.intern("2")),
+                        datum::ignored(")"),
+                    ]),
+                ]),
+                datum::ignored(" "),
+                datum::quote(vec![
+                    datum::ignored("'"),
+                    datum::vector(vec![
+                        datum::ignored("#["),
+                        datum::symbol("x", pool.intern("x")),
+                        datum::ignored(" "),
+                        datum::symbol("y", pool.intern("y")),
+                        datum::ignored("]"),
+                    ]),
+                ]),
+                datum::ignored(" . "),
+                datum::unquote_splicing(vec![
+                    datum::ignored(",@"),
+                    datum::symbol("dumb-list", pool.intern("dumb-list")),
+                ]),
+                datum::ignored(")"),
+            ]),
+        ]),
+    ]));
+}
+
+#[test]
+fn abbreviation_nested() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::quote(vec![
+            datum::ignored("'"),
+            datum::quote(vec![
+                datum::ignored("'"),
+                datum::quasiquote(vec![
+                    datum::ignored("`"),
+                    datum::quasiquote(vec![
+                        datum::ignored("`"),
+                        datum::unquote(vec![
+                            datum::ignored(","),
+                            datum::unquote_splicing(vec![
+                                datum::ignored(",@"),
+                                datum::unquote(vec![
+                                    datum::ignored(","),
+    /********************/          datum::unquote_splicing(vec![
+    /*                  */              datum::ignored(",@"),
+    /*   YOUR AD HERE   */              datum::quote(vec![
+    /*                  */                  datum::ignored("'"),
+    /********************/                  datum::proper_list(vec![
+             /**/                               datum::ignored("("),
+             /**/                               datum::number("9", pool.intern("9")),
+             /**/                               datum::ignored(")"),
+             /**/                           ]),
+             /**/                       ]),
+            /****/                  ]),
+                                ]),
+                            ]),
+                        ]),
+                    ]),
+                ]),
+            ]),
+        ]),
+    ]));
+}
+
+#[test]
+fn abbreviation_missing_data_eof() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("(1 '")
+            .diagnostic(4, 4, DiagnosticKind::err_parser_missing_abbreviation_datum)
+            .diagnostic(0, 1, DiagnosticKind::fatal_parser_unterminated_delimiter),
+    ]));
+}
+
+#[test]
+fn abbreviation_missing_data_complex() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::number("2", pool.intern("2")),
+            datum::ignored(" .',`")
+                .diagnostic(5, 5, DiagnosticKind::err_parser_missing_abbreviation_datum)
+                .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn abbreviation_invalid_dot() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::dotted_list(vec![
+            datum::ignored("("),
+            datum::number("1", pool.intern("1")),
+            datum::ignored(" "),
+            datum::ignored("'")
+                .diagnostic(1, 1, DiagnosticKind::err_parser_missing_abbreviation_datum),
+            datum::ignored("."),
+            datum::ignored(" "),
+            datum::number("2", pool.intern("2")),
+            datum::ignored(")"),
+        ]),
+
+        datum::vector(vec![
+            datum::ignored("#("),
+            datum::number("1", pool.intern("1")),
+            datum::ignored(" "),
+            datum::ignored("'")
+                .diagnostic(1, 1, DiagnosticKind::err_parser_missing_abbreviation_datum),
+            datum::ignored(".")
+                .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::number("2", pool.intern("2")),
+            datum::ignored(")"),
+        ]),
+
+        datum::dotted_list(vec![
+            datum::ignored("("),
+            datum::number("1", pool.intern("1")),
+            datum::ignored(" "),
+            datum::ignored("."),
+            datum::quote(vec![
+                datum::ignored("'"),
+                datum::ignored(" "),
+                datum::number("2", pool.intern("2")),
+            ]),
+            datum::ignored(")"),
+        ]),
+
+        datum::ignored("'.")
+            .diagnostic(1, 1, DiagnosticKind::err_parser_missing_abbreviation_datum)
+            .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot),
+        datum::proper_list(vec![datum::ignored("()")]),
     ]));
 }
 
