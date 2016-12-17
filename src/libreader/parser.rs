@@ -245,6 +245,7 @@ impl<'a> Parser<'a> {
     /// Parse a list datum.
     fn parse_list(&mut self, expected_paren: ParenType) -> Option<ScannedDatum> {
         let mut elements = Vec::new();
+        let mut dot_locations = Vec::new();
 
         let start_span = self.cur.span;
 
@@ -258,10 +259,15 @@ impl<'a> Parser<'a> {
                         self.cur.span);
                 }
 
-                return Some(ScannedDatum {
-                    value: DatumValue::ProperList(elements),
-                    span: Span::new(start_span.from, self.cur.span.to),
-                });
+                break;
+            }
+
+            // Just remember the locations of all encountered dots. We will check later
+            // whether they are placed correctly to form a dotted list.
+            if self.cur.tok == Token::Dot {
+                dot_locations.push(self.cur.span);
+
+                continue;
             }
 
             // End of token stream means that we will never see the closing parenthesis.
@@ -277,5 +283,41 @@ impl<'a> Parser<'a> {
                 elements.push(datum);
             }
         }
+
+        let dotted_list = is_dotted_list(&elements, &dot_locations);
+
+        // Report the dots if this is not a dotted list.
+        if !dotted_list {
+            for location in dot_locations {
+                self.diagnostic.report(DiagnosticKind::err_parser_misplaced_dot,
+                    location);
+            }
+        }
+
+        return Some(ScannedDatum {
+            value: if dotted_list {
+                DatumValue::DottedList(elements)
+            } else {
+                DatumValue::ProperList(elements)
+            },
+            span: Span::new(start_span.from, self.cur.span.to),
+        });
     }
+}
+
+/// Check whether given elements and dots can form a valid dotted list.
+fn is_dotted_list(elements: &[ScannedDatum], dot_locations: &[Span]) -> bool {
+    // Dotted lists must contain at least two elements and exactly one dot.
+    if !(elements.len() >= 2 && dot_locations.len() == 1) {
+        return false;
+    }
+
+    // And the dot must be located exactly between the last element and the one before it.
+    let prev = elements[elements.len() - 2].span;
+    let last = elements[elements.len() - 1].span;
+    let dot = dot_locations[0];
+
+    assert!(prev.to < last.from);
+
+    return (prev.to < dot.from) && (dot.to < last.from);
 }

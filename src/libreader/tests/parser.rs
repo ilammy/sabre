@@ -245,6 +245,10 @@ fn bytevector_invalid_elements() {
         // Lists cannot be nested into bytevectors.
         datum::bytevector("#u8(4 {5 6})", vec![pool.intern("4")])
             .diagnostic(6, 11, DiagnosticKind::err_parser_invalid_bytevector_element),
+
+        datum::bytevector("#u8({6 7 . 8})", vec![])
+            .diagnostic(4, 13, DiagnosticKind::err_parser_invalid_bytevector_element),
+
     ]));
 }
 
@@ -284,6 +288,10 @@ fn bytevector_mismatched_delimiters() {
         datum::bytevector("#u8(1 [2} 3)", vec![pool.intern("1"), pool.intern("3")])
             .diagnostic(8, 9, DiagnosticKind::err_parser_mismatched_delimiter)
             .diagnostic(6, 9, DiagnosticKind::err_parser_invalid_bytevector_element),
+
+        datum::bytevector("#u8[4 (car . cdr] 5]", vec![pool.intern("4"), pool.intern("5")])
+            .diagnostic(16, 17, DiagnosticKind::err_parser_mismatched_delimiter)
+            .diagnostic( 6, 17, DiagnosticKind::err_parser_invalid_bytevector_element),
     ]));
 
     // TODO: tell the user where the opening parenthesis is (and maybe its kind)
@@ -559,6 +567,265 @@ fn proper_list_missing_delimiters_nested() {
             .diagnostic(5, 7, DiagnosticKind::fatal_parser_unterminated_delimiter)
             .diagnostic(1, 5, DiagnosticKind::fatal_parser_unterminated_delimiter)
             .diagnostic(0, 1, DiagnosticKind::fatal_parser_unterminated_delimiter),
+    ]));
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Dotted lists
+
+#[test]
+fn dotted_list_empty() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::proper_list(vec![datum::ignored("(.)")])
+            .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot),
+
+        datum::proper_list(vec![datum::ignored("[.]")])
+            .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot),
+
+        datum::proper_list(vec![datum::ignored("{.}")])
+            .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot),
+    ]));
+}
+
+#[test]
+fn dotted_list_elements() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::dotted_list(vec![
+            datum::ignored("["),
+            datum::symbol("car", pool.intern("car")),
+            datum::ignored(" . "),
+            datum::symbol("cdr", pool.intern("cdr")),
+            datum::ignored("]"),
+        ]),
+    ]));
+}
+
+#[test]
+fn dotted_list_nested() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::dotted_list(vec![
+            datum::ignored("["),
+            datum::number("1", pool.intern("1")),
+            datum::ignored(" . "),
+            datum::dotted_list(vec![
+                datum::ignored("{"),
+                datum::number("2", pool.intern("2")),
+                datum::ignored(" . "),
+                datum::dotted_list(vec![
+                    datum::ignored("("),
+                    datum::number("3", pool.intern("3")),
+                    datum::ignored(" . "),
+                    datum::proper_list(vec![datum::ignored("[#||||#]")]),
+                    datum::ignored(")"),
+                ]),
+                datum::ignored("}"),
+            ]),
+            datum::ignored("]"),
+        ]),
+    ]));
+}
+
+#[test]
+fn dotted_list_misplaced_dots_leading() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::number("1", pool.intern("1")),
+            datum::ignored(" "),
+            datum::number("2", pool.intern("2")),
+            datum::ignored(")"),
+        ]),
+
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::symbol("x", pool.intern("x")),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn dotted_list_misplaced_dots_trailing() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::number("1", pool.intern("1")),
+            datum::ignored(" "),
+            datum::number("2", pool.intern("2")),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(")"),
+        ]),
+
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::symbol("x", pool.intern("x")),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn dotted_list_misplaced_dots_repeated() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn dotted_list_misplaced_dots_repeated_with_proper_cdr() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::number("1", pool.intern("1")),
+            datum::ignored(" "),
+            datum::number("2", pool.intern("2")),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::number("3", pool.intern("3")),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn dotted_list_misplaced_dots_interleaved() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::number("1", pool.intern("1")),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::number("2", pool.intern("2")),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::number("3", pool.intern("3")),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn dotted_list_misplaced_dots_more_than_one_cdr() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::number("1", pool.intern("1")),
+            datum::ignored(" "),
+            datum::number("2", pool.intern("2")),
+            datum::ignored(" "),
+            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::number("3", pool.intern("3")),
+            datum::ignored(" "),
+            datum::number("4", pool.intern("4")),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn dotted_list_mismatched_delimiters() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::dotted_list(vec![
+            datum::ignored("("),
+            datum::boolean("#t", true),
+            datum::ignored(" . "),
+            datum::boolean("#false", false),
+            datum::ignored("}").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
+        ]),
+
+        datum::dotted_list(vec![
+            datum::ignored("("),
+            datum::boolean("#f", false),
+            datum::ignored(" . "),
+            datum::dotted_list(vec![
+                datum::ignored("["),
+                datum::boolean("#true", true),
+                datum::ignored(" . "),
+                datum::proper_list(vec![
+                    datum::ignored("{"),
+                    datum::ignored("]").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
+                ]),
+                datum::ignored(")").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
+            ]),
+            datum::ignored("}").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
+        ]),
+    ]));
+}
+
+#[test]
+fn dotted_list_missing_delimiters() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("(1 2 . 3")
+            .diagnostic( 0,  1, DiagnosticKind::fatal_parser_unterminated_delimiter),
+    ]));
+}
+
+#[test]
+fn dotted_list_missing_delimiters_no_cdr() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("(1 2 .")
+            .diagnostic( 0,  1, DiagnosticKind::fatal_parser_unterminated_delimiter),
+    ]));
+}
+
+#[test]
+fn dotted_list_missing_delimiters_nested() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("(1 2 . (3 . #(")
+            .diagnostic(12, 14, DiagnosticKind::fatal_parser_unterminated_delimiter)
+            .diagnostic( 7,  8, DiagnosticKind::fatal_parser_unterminated_delimiter)
+            .diagnostic( 0,  1, DiagnosticKind::fatal_parser_unterminated_delimiter),
     ]));
 }
 

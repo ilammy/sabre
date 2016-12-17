@@ -43,7 +43,7 @@ impl Span {
 //
 
 /// A reported diagnostic.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
     /// The kind of a diagnostic.
     pub kind: DiagnosticKind,

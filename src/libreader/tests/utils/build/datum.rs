@@ -14,6 +14,7 @@ use reader::diagnostics::{Span, Diagnostic, DiagnosticKind};
 use reader::intern_pool::{Atom};
 
 /// Parser test data set.
+#[derive(Debug, Clone)]
 pub struct DataTest {
     /// A string to be fed to the scanner used by the parser.
     pub text: String,
@@ -82,52 +83,17 @@ impl DataTest {
 }
 
 /// Combine tests into a sequence of lines.
-pub fn line_sequence(tests: Vec<DataTest>) -> DataTest {
-    let mut text = String::new();
-    let mut data = Vec::new();
-    let mut diagnostics = Vec::new();
-
-    for test in tests {
-        let start_offset = text.len();
-
-        text.push_str(&test.text);
-        text.push_str("\n");
-
-        data.extend(
-            test.data.into_iter().map(|d| offset_scanned_datum(d, start_offset))
-        );
-
-        diagnostics.extend(
-            test.diagnostics.into_iter().map(|d| offset_diagnostic(d, start_offset))
-        );
-    }
-
-    return DataTest {
-        text: text,
-        data: data,
-        diagnostics: diagnostics
-    };
+pub fn line_sequence<I: IntoIterator<Item=DataTest>>(tests: I) -> DataTest {
+    concatenate(
+        tests.into_iter()
+             .zip(vec![ignored("\n")].into_iter().cycle())
+             .flat_map(|(d, n)| vec![d, n])
+    )
 }
 
 /// Combine tests into a vector.
-pub fn vector(elements: Vec<DataTest>) -> DataTest {
-    let mut text = String::new();
-    let mut data = Vec::new();
-    let mut diagnostics = Vec::new();
-
-    for element in elements {
-        let start_offset = text.len();
-
-        text.push_str(&element.text);
-
-        data.extend(
-            element.data.into_iter().map(|d| offset_scanned_datum(d, start_offset))
-        );
-
-        diagnostics.extend(
-            element.diagnostics.into_iter().map(|d| offset_diagnostic(d, start_offset))
-        );
-    }
+pub fn vector<I: IntoIterator<Item=DataTest>>(elements: I) -> DataTest {
+    let DataTest { text, data, diagnostics } = concatenate(elements);
 
     let total_length = text.len();
 
@@ -142,24 +108,8 @@ pub fn vector(elements: Vec<DataTest>) -> DataTest {
 }
 
 /// Combine tests into a proper list.
-pub fn proper_list(elements: Vec<DataTest>) -> DataTest {
-    let mut text = String::new();
-    let mut data = Vec::new();
-    let mut diagnostics = Vec::new();
-
-    for element in elements {
-        let start_offset = text.len();
-
-        text.push_str(&element.text);
-
-        data.extend(
-            element.data.into_iter().map(|d| offset_scanned_datum(d, start_offset))
-        );
-
-        diagnostics.extend(
-            element.diagnostics.into_iter().map(|d| offset_diagnostic(d, start_offset))
-        );
-    }
+pub fn proper_list<I: IntoIterator<Item=DataTest>>(elements: I) -> DataTest {
+    let DataTest { text, data, diagnostics } = concatenate(elements);
 
     let total_length = text.len();
 
@@ -170,6 +120,51 @@ pub fn proper_list(elements: Vec<DataTest>) -> DataTest {
             span: Span::new(0, total_length),
         }],
         diagnostics: diagnostics,
+    };
+}
+
+/// Combine tests into a dotted list.
+pub fn dotted_list<I: IntoIterator<Item=DataTest>>(elements: I) -> DataTest {
+    let DataTest { text, data, diagnostics } = concatenate(elements);
+
+    assert!(data.len() >= 2, "dotted lists must contain as least two elements");
+
+    let total_length = text.len();
+
+    return DataTest {
+        text: text,
+        data: vec![ScannedDatum {
+            value: DatumValue::DottedList(data),
+            span: Span::new(0, total_length),
+        }],
+        diagnostics: diagnostics,
+    };
+}
+
+/// Concatenate tests.
+fn concatenate<I: IntoIterator<Item=DataTest>>(tests: I) -> DataTest {
+    let mut text = String::new();
+    let mut data = Vec::new();
+    let mut diagnostics = Vec::new();
+
+    for test in tests {
+        let start_offset = text.len();
+
+        text.push_str(&test.text);
+
+        data.extend(
+            test.data.into_iter().map(|d| offset_scanned_datum(d, start_offset))
+        );
+
+        diagnostics.extend(
+            test.diagnostics.into_iter().map(|d| offset_diagnostic(d, start_offset))
+        );
+    }
+
+    return DataTest {
+        text: text,
+        data: data,
+        diagnostics: diagnostics
     };
 }
 
@@ -191,22 +186,19 @@ fn offset_datum(value: DatumValue, offset: usize) -> DatumValue {
         DatumValue::String(_) => value,
         DatumValue::Symbol(_) => value,
 
-        DatumValue::Vector(elements) => {
-            DatumValue::Vector(elements
-                .into_iter()
-                .map(|d| offset_scanned_datum(d, offset))
-                .collect()
-            )
-        }
-
-        DatumValue::ProperList(elements) => {
-            DatumValue::ProperList(elements
-                .into_iter()
-                .map(|d| offset_scanned_datum(d, offset))
-                .collect()
-            )
-        }
+        DatumValue::Vector(elements) => DatumValue::Vector(offset_data_vector(elements, offset)),
+        DatumValue::ProperList(elements) => DatumValue::ProperList(offset_data_vector(elements, offset)),
+        DatumValue::DottedList(elements) => DatumValue::DottedList(offset_data_vector(elements, offset)),
     }
+}
+
+/// Offset a vector of scanned data.
+fn offset_data_vector<I>(data: I, offset: usize) -> Vec<ScannedDatum>
+    where I: IntoIterator<Item=ScannedDatum>
+{
+    data.into_iter()
+        .map(|d| offset_scanned_datum(d, offset))
+        .collect()
 }
 
 /// Offset spans in a diagnostic.
@@ -549,6 +541,98 @@ mod tests {
                     ScannedDatum { value: DatumValue::Number(pool.intern("4")), span: Span::new(9, 10) },
                 ]),
                 span: Span::new(0, 11),
+            },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
+    }
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // Dotted lists
+
+    #[test]
+    #[should_panic]
+    fn dotted_list_empty() {
+        let _ = dotted_list(vec![ignored("("), ignored(")")]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn dotted_list_one_element() {
+        let pool = InternPool::new();
+        let _ = dotted_list(vec![
+            ignored("("),
+            number("1", pool.intern("1")),
+            ignored(")"),
+        ]);
+    }
+
+    #[test]
+    fn dotted_list_simple() {
+        let pool = InternPool::new();
+        let test = dotted_list(vec![
+            ignored("("),
+            symbol("car", pool.intern("car")),
+            ignored(" . "),
+            symbol("cdr", pool.intern("cdr")),
+            ignored(")"),
+        ]);
+
+        assert_eq!(test.text, "(car . cdr)");
+        assert_eq!(test.data, vec![
+            ScannedDatum {
+                value: DatumValue::DottedList(vec![
+                    ScannedDatum { value: DatumValue::Symbol(pool.intern("car")), span: Span::new(1, 4) },
+                    ScannedDatum { value: DatumValue::Symbol(pool.intern("cdr")), span: Span::new(7, 10) },
+                ]),
+                span: Span::new(0, 11),
+            },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
+    }
+
+    #[test]
+    fn dotted_list_nested() {
+        let pool = InternPool::new();
+        let test = dotted_list(vec![
+            ignored("("),
+            number("1", pool.intern("1")),
+            ignored(" . "),
+            dotted_list(vec![
+                ignored("["),
+                number("2", pool.intern("2")),
+                ignored(" . "),
+                dotted_list(vec![
+                    ignored("{"),
+                    number("3", pool.intern("3")),
+                    ignored(" . "),
+                    proper_list(vec![ignored("()")]),
+                    ignored("}"),
+                ]),
+                ignored("]"),
+            ]),
+            ignored(")"),
+        ]);
+
+        assert_eq!(test.text, "(1 . [2 . {3 . ()}])");
+        assert_eq!(test.data, vec![
+            ScannedDatum {
+                value: DatumValue::DottedList(vec![
+                    ScannedDatum { value: DatumValue::Number(pool.intern("1")), span: Span::new(1, 2) },
+                    ScannedDatum {
+                        value: DatumValue::DottedList(vec![
+                            ScannedDatum { value: DatumValue::Number(pool.intern("2")), span: Span::new(6, 7) },
+                            ScannedDatum {
+                                value: DatumValue::DottedList(vec![
+                                    ScannedDatum { value: DatumValue::Number(pool.intern("3")), span: Span::new(11, 12) },
+                                    ScannedDatum { value: DatumValue::ProperList(vec![]), span: Span::new(15, 17) },
+                                ]),
+                                span: Span::new(10, 18),
+                            },
+                        ]),
+                        span: Span::new(5, 19),
+                    },
+                ]),
+                span: Span::new(0, 20),
             },
         ]);
         assert_eq!(test.diagnostics, vec![]);
