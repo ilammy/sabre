@@ -42,14 +42,26 @@ pub struct Parser<'a> {
     diagnostic: &'a Handler,
 }
 
+/// Result of a single datum parsing.
+///
+/// Err means fatal parsing error. The parser was unable to recover in a meaningful way and it is
+/// unlikely to produce more data. Currently this happens only on unexpected EOF condition.
+///
+/// Ok(Some) means that the parser has successfully parsed the datum or it has fully recovered
+/// from a parsing error and is able to return a result. Ok(None) means that the parser has
+/// recovered from an error, but it had to disregard the currently parsed datum.
+type ParseResult = Result<Option<ScannedDatum>, ()>;
+
 impl<'a> Parser<'a> {
     /// Construct a new parser that will use the given token stream.
     pub fn new(scanner: Box<Scanner + 'a>, handler: &'a Handler) -> Parser<'a> {
-        Parser {
+        let mut parser = Parser {
             scanner: scanner,
             cur: ScannedToken { tok: Token::Eof, span: Span::new(0, 0) },
             diagnostic: handler,
-        }
+        };
+        parser.bump();
+        return parser;
     }
 
     /// Read in the next meaningful token.
@@ -71,15 +83,18 @@ impl<'a> Parser<'a> {
     pub fn parse_all_data(&mut self) -> Vec<ScannedDatum> {
         let mut data = Vec::new();
 
-        loop {
-            self.bump();
-
-            if let Some(datum) = self.next_datum() {
-                data.push(datum);
-            }
-
-            if self.cur.tok == Token::Eof {
-                break;
+        while self.cur.tok != Token::Eof {
+            match self.next_datum() {
+                Ok(Some(datum)) => {
+                    data.push(datum);
+                }
+                Ok(None) => {
+                    // ignore parser recovery
+                }
+                Err(_) => {
+                    assert_eq!(self.cur.tok, Token::Eof,
+                        "next_datum() is expected to fail only on unexpected EOF");
+                }
             }
         }
 
@@ -87,43 +102,50 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse next datum out of the token stream.
-    fn next_datum(&mut self) -> Option<ScannedDatum> {
-        match self.cur.tok {
-            // No tokens -- no data.
-            Token::Eof => {
-                return None;
-            }
+    fn next_datum(&mut self) -> ParseResult {
+        let cur_span = self.cur.span;
 
+        match self.cur.tok {
             // Handle simple data.
             Token::Boolean(value) => {
-                return Some(ScannedDatum {
+                self.bump();
+
+                return Ok(Some(ScannedDatum {
                     value: DatumValue::Boolean(value),
-                    span: self.cur.span,
-                });
+                    span: cur_span,
+                }));
             }
             Token::Character(value) => {
-                return Some(ScannedDatum {
+                self.bump();
+
+                return Ok(Some(ScannedDatum {
                     value: DatumValue::Character(value),
-                    span: self.cur.span,
-                });
+                    span: cur_span,
+                }));
             }
             Token::String(value) => {
-                return Some(ScannedDatum {
+                self.bump();
+
+                return Ok(Some(ScannedDatum {
                     value: DatumValue::String(value),
-                    span: self.cur.span,
-                });
+                    span: cur_span,
+                }));
             }
             Token::Number(value) => {
-                return Some(ScannedDatum {
+                self.bump();
+
+                return Ok(Some(ScannedDatum {
                     value: DatumValue::Number(value),
-                    span: self.cur.span,
-                });
+                    span: cur_span,
+                }));
             }
             Token::Identifier(value) => {
-                return Some(ScannedDatum {
+                self.bump();
+
+                return Ok(Some(ScannedDatum {
                     value: DatumValue::Symbol(value),
-                    span: self.cur.span,
-                });
+                    span: cur_span,
+                }));
             }
 
             // Dots are expected only in lists.
@@ -131,26 +153,31 @@ impl<'a> Parser<'a> {
                 self.diagnostic.report(DiagnosticKind::err_parser_misplaced_dot,
                     self.cur.span);
 
-                return None;
+                self.bump();
+
+                return Ok(None);
             }
 
             // Handle bytevectors.
             Token::OpenBytevector(paren) => {
-                return self.parse_bytevector(paren);
+                self.parse_bytevector(paren)
             }
 
             // Handle vectors.
             Token::OpenVector(paren) => {
-                return self.parse_vector(paren);
+                self.parse_vector(paren)
             }
 
             // Handle lists.
             Token::Open(paren) => {
-                return self.parse_list(paren);
+                self.parse_list(paren)
             }
 
             Token::Whitespace | Token::Comment | Token::Directive(_) | Token::Unrecognized
                 => unreachable!("atmosphere not handled before calling next_datum()"),
+
+            Token::Eof
+                => unreachable!("EOF not handled before calling next_datum()"),
 
             Token::CommentPrefix => unimplemented!(),
             Token::Quote | Token::Backquote | Token::Comma | Token::CommaSplicing => unimplemented!(),
@@ -160,129 +187,187 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse a bytevector literal.
-    fn parse_bytevector(&mut self, expected_paren: ParenType) -> Option<ScannedDatum> {
+    fn parse_bytevector(&mut self, expected_paren: ParenType) -> ParseResult {
+        assert!(match self.cur.tok {
+            Token::OpenBytevector(_) => true,
+            _ => false,
+        });
+
         let mut values = Vec::new();
 
         let start_span = self.cur.span;
 
-        loop {
-            self.bump();
+        self.bump();
 
-            // Bytevector literal is terminated by a closing parenthesis.
-            if let Token::Close(paren) = self.cur.tok {
-                if paren != expected_paren {
-                    self.diagnostic.report(DiagnosticKind::err_parser_mismatched_delimiter,
-                        self.cur.span);
+        loop {
+            match self.cur.tok {
+                // Bytevector literal is terminated by a closing parenthesis.
+                Token::Close(paren) => {
+                    if paren != expected_paren {
+                        self.diagnostic.report(DiagnosticKind::err_parser_mismatched_delimiter,
+                            self.cur.span);
+                    }
+
+                    break;
                 }
 
-                return Some(ScannedDatum {
-                    value: DatumValue::Bytevector(values),
-                    span: Span::new(start_span.from, self.cur.span.to),
-                });
-            }
+                // End of token stream means that we will never see the closing parenthesis.
+                Token::Eof => {
+                    self.diagnostic.report(DiagnosticKind::fatal_parser_unterminated_delimiter,
+                        start_span);
 
-            // End of token stream means that we will never see the closing parenthesis.
-            if self.cur.tok == Token::Eof {
-                self.diagnostic.report(DiagnosticKind::fatal_parser_unterminated_delimiter,
-                    start_span);
+                    return Err(());
+                }
 
-                return None;
-            }
-
-            // Everything else must be bytevector constituents.
-            if let Some(datum) = self.next_datum() {
-                // Only numbers are allowed in bytevectors.
-                match datum.value {
-                    DatumValue::Number(value) => {
-                        values.push(value);
-                    }
-                    _ => {
-                        self.diagnostic.report(DiagnosticKind::err_parser_invalid_bytevector_element,
-                            datum.span);
+                // Everything else must be bytevector constituents.
+                _ => {
+                    if let Some(datum) = self.next_datum()? {
+                        // Only numbers are allowed in bytevectors.
+                        match datum.value {
+                            DatumValue::Number(value) => {
+                                values.push(value);
+                            }
+                            _ => {
+                                self.diagnostic.report(DiagnosticKind::err_parser_invalid_bytevector_element,
+                                    datum.span);
+                            }
+                        }
                     }
                 }
             }
         }
+
+        assert!(match self.cur.tok {
+            Token::Close(_) => true,
+            _ => false,
+        });
+
+        let end_span = self.cur.span;
+
+        self.bump();
+
+        return Ok(Some(ScannedDatum {
+            value: DatumValue::Bytevector(values),
+            span: Span::new(start_span.from, end_span.to),
+        }));
     }
 
     /// Parse a vector datum.
-    fn parse_vector(&mut self, expected_paren: ParenType) -> Option<ScannedDatum> {
+    fn parse_vector(&mut self, expected_paren: ParenType) -> ParseResult {
+        assert!(match self.cur.tok {
+            Token::OpenVector(_) => true,
+            _ => false,
+        });
+
         let mut elements = Vec::new();
 
         let start_span = self.cur.span;
 
-        loop {
-            self.bump();
+        self.bump();
 
-            // Vectors are terminated by a closing parenthesis.
-            if let Token::Close(paren) = self.cur.tok {
-                if paren != expected_paren {
-                    self.diagnostic.report(DiagnosticKind::err_parser_mismatched_delimiter,
-                        self.cur.span);
+        loop {
+            match self.cur.tok {
+                // Vectors are terminated by a closing parenthesis.
+                Token::Close(paren) => {
+                    if paren != expected_paren {
+                        self.diagnostic.report(DiagnosticKind::err_parser_mismatched_delimiter,
+                            self.cur.span);
+                    }
+
+                    break;
                 }
 
-                return Some(ScannedDatum {
-                    value: DatumValue::Vector(elements),
-                    span: Span::new(start_span.from, self.cur.span.to),
-                });
-            }
+                // End of token stream means that we will never see the closing parenthesis.
+                Token::Eof => {
+                    self.diagnostic.report(DiagnosticKind::fatal_parser_unterminated_delimiter,
+                        start_span);
 
-            // End of token stream means that we will never see the closing parenthesis.
-            if self.cur.tok == Token::Eof {
-                self.diagnostic.report(DiagnosticKind::fatal_parser_unterminated_delimiter,
-                    start_span);
+                    return Err(());
+                }
 
-                return None;
-            }
-
-            // Everything else is a vector element.
-            if let Some(datum) = self.next_datum() {
-                elements.push(datum);
+                // Everything else is a vector element.
+                _ => {
+                    if let Some(datum) = self.next_datum()? {
+                        elements.push(datum);
+                    }
+                }
             }
         }
+
+        assert!(match self.cur.tok {
+            Token::Close(_) => true,
+            _ => false,
+        });
+
+        let end_span = self.cur.span;
+
+        self.bump();
+
+        return Ok(Some(ScannedDatum {
+            value: DatumValue::Vector(elements),
+            span: Span::new(start_span.from, end_span.to),
+        }));
     }
 
     /// Parse a list datum.
-    fn parse_list(&mut self, expected_paren: ParenType) -> Option<ScannedDatum> {
+    fn parse_list(&mut self, expected_paren: ParenType) -> ParseResult {
+        assert!(match self.cur.tok {
+            Token::Open(_) => true,
+            _ => false,
+        });
+
         let mut elements = Vec::new();
         let mut dot_locations = Vec::new();
 
         let start_span = self.cur.span;
 
-        loop {
-            self.bump();
+        self.bump();
 
-            // Lists are terminated by a closing parenthesis.
-            if let Token::Close(paren) = self.cur.tok {
-                if paren != expected_paren {
-                    self.diagnostic.report(DiagnosticKind::err_parser_mismatched_delimiter,
-                        self.cur.span);
+        loop {
+            match self.cur.tok {
+                // Lists are terminated by a closing parenthesis.
+                Token::Close(paren) => {
+                    if paren != expected_paren {
+                        self.diagnostic.report(DiagnosticKind::err_parser_mismatched_delimiter,
+                            self.cur.span);
+                    }
+
+                    break;
                 }
 
-                break;
-            }
+                // End of token stream means that we will never see the closing parenthesis.
+                Token::Eof => {
+                    self.diagnostic.report(DiagnosticKind::fatal_parser_unterminated_delimiter,
+                        start_span);
 
-            // Just remember the locations of all encountered dots. We will check later
-            // whether they are placed correctly to form a dotted list.
-            if self.cur.tok == Token::Dot {
-                dot_locations.push(self.cur.span);
+                    return Err(());
+                }
 
-                continue;
-            }
+                // Just remember the locations of all encountered dots. We will check later
+                // whether they are placed correctly to form a dotted list.
+                Token::Dot => {
+                    dot_locations.push(self.cur.span);
 
-            // End of token stream means that we will never see the closing parenthesis.
-            if self.cur.tok == Token::Eof {
-                self.diagnostic.report(DiagnosticKind::fatal_parser_unterminated_delimiter,
-                    start_span);
+                    self.bump();
+                }
 
-                return None;
-            }
-
-            // Everything else is a list element.
-            if let Some(datum) = self.next_datum() {
-                elements.push(datum);
+                // Everything else is a list element.
+                _ => {
+                    if let Some(datum) = self.next_datum()? {
+                        elements.push(datum);
+                    }
+                }
             }
         }
+
+        assert!(match self.cur.tok {
+            Token::Close(_) => true,
+            _ => false,
+        });
+
+        let end_span = self.cur.span;
+
+        self.bump();
 
         let dotted_list = is_dotted_list(&elements, &dot_locations);
 
@@ -294,14 +379,14 @@ impl<'a> Parser<'a> {
             }
         }
 
-        return Some(ScannedDatum {
+        return Ok(Some(ScannedDatum {
             value: if dotted_list {
                 DatumValue::DottedList(elements)
             } else {
                 DatumValue::ProperList(elements)
             },
-            span: Span::new(start_span.from, self.cur.span.to),
-        });
+            span: Span::new(start_span.from, end_span.to),
+        }));
     }
 }
 

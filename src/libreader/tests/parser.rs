@@ -313,12 +313,8 @@ fn bytevector_missing_delimiters_nested() {
 
     check(&pool, datum::line_sequence(vec![
         datum::ignored("#u8(1 #u8[2 #u8{3")
-            .diagnostic(12, 16, DiagnosticKind::fatal_parser_unterminated_delimiter)
-            .diagnostic( 6, 10, DiagnosticKind::fatal_parser_unterminated_delimiter)
-            .diagnostic( 0,  4, DiagnosticKind::fatal_parser_unterminated_delimiter),
+            .diagnostic(12, 16, DiagnosticKind::fatal_parser_unterminated_delimiter),
     ]));
-
-    // TODO: emit only one fatal_parser_unterminated_delimiter and put the delim stack in it
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -460,9 +456,7 @@ fn vector_missing_delimiters_nested() {
 
     check(&pool, datum::line_sequence(vec![
         datum::ignored("#(#[#u8{")
-            .diagnostic(4, 8, DiagnosticKind::fatal_parser_unterminated_delimiter)
-            .diagnostic(2, 4, DiagnosticKind::fatal_parser_unterminated_delimiter)
-            .diagnostic(0, 2, DiagnosticKind::fatal_parser_unterminated_delimiter),
+            .diagnostic(4, 8, DiagnosticKind::fatal_parser_unterminated_delimiter),
     ]));
 }
 
@@ -564,9 +558,7 @@ fn proper_list_missing_delimiters_nested() {
 
     check(&pool, datum::line_sequence(vec![
         datum::ignored("(#u8{#[")
-            .diagnostic(5, 7, DiagnosticKind::fatal_parser_unterminated_delimiter)
-            .diagnostic(1, 5, DiagnosticKind::fatal_parser_unterminated_delimiter)
-            .diagnostic(0, 1, DiagnosticKind::fatal_parser_unterminated_delimiter),
+            .diagnostic(5, 7, DiagnosticKind::fatal_parser_unterminated_delimiter),
     ]));
 }
 
@@ -854,9 +846,7 @@ fn dotted_list_missing_delimiters_nested() {
 
     check(&pool, datum::line_sequence(vec![
         datum::ignored("(1 2 . (3 . #(")
-            .diagnostic(12, 14, DiagnosticKind::fatal_parser_unterminated_delimiter)
-            .diagnostic( 7,  8, DiagnosticKind::fatal_parser_unterminated_delimiter)
-            .diagnostic( 0,  1, DiagnosticKind::fatal_parser_unterminated_delimiter),
+            .diagnostic(12, 14, DiagnosticKind::fatal_parser_unterminated_delimiter),
     ]));
 }
 
