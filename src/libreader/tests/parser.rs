@@ -632,6 +632,37 @@ fn dotted_list_nested() {
 }
 
 #[test]
+fn dotted_list_no_atmosphere() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::dotted_list(vec![
+            datum::ignored("("),
+            datum::string("\"car\"", pool.intern("car")),
+            datum::ignored("."),
+            datum::string("\"cdr\"", pool.intern("cdr")),
+            datum::ignored(")"),
+        ]),
+
+        datum::dotted_list(vec![
+            datum::ignored("("),
+            datum::string("\"car\"", pool.intern("car")),
+            datum::ignored(". "),
+            datum::string("\"cdr\"", pool.intern("cdr")),
+            datum::ignored(")"),
+        ]),
+
+        datum::dotted_list(vec![
+            datum::ignored("("),
+            datum::string("\"car\"", pool.intern("car")),
+            datum::ignored(" ."),
+            datum::string("\"cdr\"", pool.intern("cdr")),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
 fn dotted_list_misplaced_dots_leading() {
     let pool = InternPool::new();
 

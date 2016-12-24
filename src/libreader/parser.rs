@@ -319,5 +319,5 @@ fn is_dotted_list(elements: &[ScannedDatum], dot_locations: &[Span]) -> bool {
 
     assert!(prev.to < last.from);
 
-    return (prev.to < dot.from) && (dot.to < last.from);
+    return (prev.to <= dot.from) && (dot.to <= last.from);
 }
