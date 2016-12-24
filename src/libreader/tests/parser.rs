@@ -257,6 +257,9 @@ fn bytevector_invalid_elements() {
         datum::bytevector("#u8(#1=2 4 #8# 16)", vec![pool.intern("4"), pool.intern("16")])
             .diagnostic( 4,  8, DiagnosticKind::err_parser_invalid_bytevector_element)
             .diagnostic(11, 14, DiagnosticKind::err_parser_invalid_bytevector_element),
+
+        // S-expr comments *can* be used inside bytevector.
+        datum::bytevector("#U8(#; 1 2 #;[3 4] 5)", vec![pool.intern("2"), pool.intern("5")]),
     ]));
 }
 
@@ -1150,6 +1153,354 @@ fn labels_invalid_dot() {
             datum::ignored("."),
             datum::ignored(" "),
             datum::proper_list(vec![datum::ignored("()")]),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// S-expression comments
+
+#[test]
+fn sexpr_comment_simple() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#; 1"),
+        datum::number("2", pool.intern("2")),
+    ]));
+}
+
+#[test]
+fn sexpr_comment_complex() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#;(1 #(2) 3 . 4)"),
+        datum::number("5", pool.intern("5")),
+    ]));
+}
+
+#[test]
+fn sexpr_comment_nested_data() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#;[1 #; #(2 #;3) 4]"),
+        datum::vector(vec![
+            datum::ignored("#("),
+            datum::ignored("#; (5 6)"),
+            datum::ignored(" "),
+            datum::symbol("var", pool.intern("var")),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn sexpr_comment_nested_comments() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#; #; 1 2 "),
+        datum::number("3", pool.intern("3")),
+        datum::ignored("#; #;4 #;5 6"),
+        datum::number("7", pool.intern("7")),
+    ]));
+}
+
+#[test]
+fn sexpr_comment_masked_line_comments() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored(";#; ( in . valid ."),
+        datum::character("#\\x1234", '\u{1234}'),
+    ]));
+}
+
+#[test]
+fn sexpr_comment_masked_block_comments() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#|#;(in . valid .|#"),
+        datum::character("#\\x1234", '\u{1234}'),
+    ]));
+}
+
+#[test]
+fn sexpr_comment_interspersed_line_comments() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#;"),
+        datum::ignored("; test"),
+        datum::ignored("1"),
+        datum::number("2", pool.intern("2")),
+    ]));
+}
+
+#[test]
+fn sexpr_comment_interspersed_block_comments() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#;#||#5"),
+        datum::number("10", pool.intern("10")),
+    ]));
+}
+
+#[test]
+fn sexpr_comment_data_eof() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#; (1 2 3")
+            .diagnostic(3, 4, DiagnosticKind::fatal_parser_unterminated_delimiter),
+    ]));
+}
+
+#[test]
+fn sexpr_comment_missing_data_eof() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#;")
+            .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum),
+    ]));
+}
+
+#[test]
+fn sexpr_comment_missing_data_complex() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::number("1", pool.intern("1")),
+            datum::ignored(" "),
+            datum::ignored("#;")
+                .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn sexpr_comment_invalid_dots() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::dotted_list(vec![
+            datum::ignored("("),
+            datum::number("3", pool.intern("3")),
+            datum::ignored(" "),
+            datum::ignored("#;")
+                .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum),
+            datum::ignored(" . "),
+            datum::number("4", pool.intern("4")),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn sexpr_comment_errors_in_datum() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#; (\"\\xDEAD;\"]")
+            .diagnostic( 5, 12, DiagnosticKind::err_lexer_invalid_unicode_range)
+            .diagnostic(13, 14, DiagnosticKind::err_parser_mismatched_delimiter),
+    ]));
+}
+
+#[test]
+fn sexpr_comment_srfi_62_examples() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::symbol("+", pool.intern("+")),
+            datum::ignored(" "),
+            datum::number("1", pool.intern("1")),
+            datum::ignored(" "),
+            datum::ignored("#;(* 2 3)"),
+            datum::ignored(" "),
+            datum::number("4", pool.intern("4")),
+            datum::ignored(")"),
+        ]),
+
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::symbol("list", pool.intern("list")),
+            datum::ignored(" "),
+            datum::quote(vec![
+                datum::ignored("'"),
+                datum::symbol("x", pool.intern("x")),
+            ]),
+            datum::ignored(" "),
+            datum::ignored("#;'y"),
+            datum::ignored(" "),
+            datum::quote(vec![
+                datum::ignored("'"),
+                datum::symbol("z", pool.intern("z")),
+            ]),
+            datum::ignored(")"),
+        ]),
+
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::symbol("*", pool.intern("*")),
+            datum::ignored(" "),
+            datum::number("3", pool.intern("3")),
+            datum::ignored(" "),
+            datum::ignored("#;(+ 1 2)"),
+            datum::ignored(")"),
+        ]),
+
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::ignored("#;sqrt"),
+            datum::ignored(" "),
+            datum::symbol("abs", pool.intern("abs")),
+            datum::ignored(" "),
+            datum::number("-16", pool.intern("-16")),
+            datum::ignored(")"),
+        ]),
+
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::symbol("list", pool.intern("list")),
+            datum::ignored(" "),
+            datum::quote(vec![
+                datum::ignored("'"),
+                datum::symbol("a", pool.intern("a")),
+            ]),
+            datum::ignored(" "),
+            datum::ignored("#; #;'b 'c"),
+            datum::ignored(" "),
+            datum::quote(vec![
+                datum::ignored("'"),
+                datum::symbol("d", pool.intern("d")),
+            ]),
+            datum::ignored(")"),
+        ]),
+
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::symbol("list", pool.intern("list")),
+            datum::ignored(" "),
+            datum::quote(vec![
+                datum::ignored("'"),
+                datum::symbol("a", pool.intern("a")),
+            ]),
+            datum::ignored(" "),
+            datum::ignored("#;(list 'b #;c 'd)"),
+            datum::ignored(" "),
+            datum::quote(vec![
+                datum::ignored("'"),
+                datum::symbol("e", pool.intern("e")),
+            ]),
+            datum::ignored(")"),
+        ]),
+
+        datum::quote(vec![
+            datum::ignored("'"),
+            datum::dotted_list(vec![
+                datum::ignored("("),
+                datum::symbol("a", pool.intern("a")),
+                datum::ignored(" . "),
+                datum::ignored("#;b"),
+                datum::ignored(" "),
+                datum::symbol("c", pool.intern("c")),
+                datum::ignored(")"),
+            ]),
+        ]),
+
+        datum::quote(vec![
+            datum::ignored("'"),
+            datum::dotted_list(vec![
+                datum::ignored("("),
+                datum::symbol("a", pool.intern("a")),
+                datum::ignored(" . "),
+                datum::symbol("b", pool.intern("b")),
+                datum::ignored(" "),
+                datum::ignored("#;c"),
+                datum::ignored(")"),
+            ]),
+        ]),
+
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::ignored("#;a"),
+            datum::ignored(" "),
+            datum::ignored(".")
+                .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::symbol("b", pool.intern("b")),
+            datum::ignored(")"),
+        ]),
+
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::symbol("a", pool.intern("a")),
+            datum::ignored(" "),
+            datum::ignored(".")
+                .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::ignored("#;b"),
+            datum::ignored(")"),
+        ]),
+
+        datum::dotted_list(vec![
+            datum::ignored("("),
+            datum::symbol("a", pool.intern("a")),
+            datum::ignored(" "),
+            datum::ignored("#;")
+                .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum),
+            datum::ignored("."),
+            datum::ignored(" "),
+            datum::symbol("b", pool.intern("b")),
+            datum::ignored(")"),
+        ]),
+
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::ignored("#;x"),
+            datum::ignored(" "),
+            datum::ignored("#;y"),
+            datum::ignored(" "),
+            datum::ignored(".")
+                .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::symbol("z", pool.intern("z")),
+            datum::ignored(")"),
+        ]),
+
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::ignored("#; #;x #;y")
+                .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum),
+            datum::ignored(" "),
+            datum::ignored(".")
+                .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::symbol("z", pool.intern("z")),
+            datum::ignored(")"),
+        ]),
+
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::ignored("#; #;x")
+                .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum),
+            datum::ignored(" "),
+            datum::ignored(".")
+                .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(" "),
+            datum::symbol("z", pool.intern("z")),
             datum::ignored(")"),
         ]),
     ]));

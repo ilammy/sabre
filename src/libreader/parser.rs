@@ -203,15 +203,66 @@ impl<'a> Parser<'a> {
                 self.parse_labeled_datum(label)
             }
 
+            // Handle s-expression comments.
+            Token::CommentPrefix => {
+                self.parse_sexpr_comment()
+            }
+
             Token::Whitespace | Token::Comment | Token::Directive(_) | Token::Unrecognized
                 => unreachable!("atmosphere not handled before calling next_datum()"),
 
             Token::Eof
                 => unreachable!("EOF not handled before calling next_datum()"),
 
-            Token::CommentPrefix => unimplemented!(),
             Token::Close(_) => unimplemented!(),
         }
+    }
+
+    /// Parse an s-expression comment.
+    fn parse_sexpr_comment(&mut self) -> ParseResult {
+        assert!(match self.cur.tok {
+            Token::CommentPrefix => true,
+            _ => false,
+        });
+
+        // S-expression comments have a peculiar kind of parsing recursion due to the fact that
+        // 1) they are considered whitespace, and 2) whitespace delimits tokens. Thus, for example,
+        // in "#; #; (1) (2 3)" both s-expressions are commented out, with inner "#; (1)" being
+        // treated as intertoken space between the outer "#;" and "(2 3)" which form a comment
+        // of their own.
+
+        let mut start_spans = Vec::new();
+
+        // Remember locations of all consecutive comment prefixes.
+        while self.cur.tok == Token::CommentPrefix {
+            start_spans.push(self.cur.span);
+
+            self.bump();
+        }
+
+        // Then skip the same number of data.
+        while let Some(start_span) = start_spans.pop() {
+            loop {
+                match self.cur.tok {
+                    // Bail out if we cannot expect more data to follow. Treat dot as a terminator
+                    // because it marks the end of the current list element.
+                    Token::Close(_) | Token::Dot | Token::Eof => {
+                        self.diagnostic.report(DiagnosticKind::err_parser_missing_datum,
+                            Span::new(start_span.to, start_span.to));
+
+                        break;
+                    }
+
+                    _ => {
+                        if try!(self.next_datum()).is_some() {
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        return Ok(None);
     }
 
     /// Parse a bytevector literal.
