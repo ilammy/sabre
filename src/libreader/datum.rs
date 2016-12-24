@@ -54,6 +54,12 @@ pub enum DatumValue {
 
     /// Abbreviation.
     Abbreviation(AbbreviationKind, Box<ScannedDatum>),
+
+    /// Datum with a label attached to it.
+    LabeledDatum(Atom, Box<ScannedDatum>),
+
+    /// Reference to a labeled datum.
+    LabelReference(Atom),
 }
 
 /// Kinds of abbreviations.

@@ -12,6 +12,7 @@
 
 use datum::{ScannedDatum, DatumValue, AbbreviationKind};
 use diagnostics::{Span, Handler, DiagnosticKind};
+use intern_pool::{Atom};
 use lexer::{Scanner, ScannedToken};
 use tokens::{Token, ParenType};
 
@@ -187,6 +188,21 @@ impl<'a> Parser<'a> {
                 self.parse_abbreviation(AbbreviationKind::UnquoteSplicing)
             }
 
+            // Handle label references.
+            Token::LabelRef(label) => {
+                self.bump();
+
+                return Ok(Some(ScannedDatum {
+                    value: DatumValue::LabelReference(label),
+                    span: cur_span,
+                }));
+            }
+
+            // Handle labeled data.
+            Token::LabelMark(label) => {
+                self.parse_labeled_datum(label)
+            }
+
             Token::Whitespace | Token::Comment | Token::Directive(_) | Token::Unrecognized
                 => unreachable!("atmosphere not handled before calling next_datum()"),
 
@@ -194,7 +210,6 @@ impl<'a> Parser<'a> {
                 => unreachable!("EOF not handled before calling next_datum()"),
 
             Token::CommentPrefix => unimplemented!(),
-            Token::LabelMark(_) | Token::LabelRef(_) => unimplemented!(),
             Token::Close(_) => unimplemented!(),
         }
     }
@@ -415,7 +430,7 @@ impl<'a> Parser<'a> {
 
         match self.cur.tok {
             Token::Close(_) | Token::Dot | Token::Eof => {
-                self.diagnostic.report(DiagnosticKind::err_parser_missing_abbreviation_datum,
+                self.diagnostic.report(DiagnosticKind::err_parser_missing_datum,
                     Span::new(start_span.to, start_span.to));
 
                 return Ok(None);
@@ -426,6 +441,39 @@ impl<'a> Parser<'a> {
                     let datum_span = datum.span;
                     return Ok(Some(ScannedDatum {
                         value: DatumValue::Abbreviation(kind, Box::new(datum)),
+                        span: Span::new(start_span.from, datum_span.to),
+                    }));
+                } else {
+                    return Ok(None);
+                }
+            }
+        }
+    }
+
+    /// Parse a labeled datum.
+    fn parse_labeled_datum(&mut self, label: Atom) -> ParseResult {
+        assert!(match self.cur.tok {
+            Token::LabelMark(_) => true,
+            _ => false,
+        });
+
+        let start_span = self.cur.span;
+
+        self.bump();
+
+        match self.cur.tok {
+            Token::Close(_) | Token::Dot | Token::Eof => {
+                self.diagnostic.report(DiagnosticKind::err_parser_missing_datum,
+                    Span::new(start_span.to, start_span.to));
+
+                return Ok(None);
+            }
+
+            _ => {
+                if let Some(datum) = try!(self.next_datum()) {
+                    let datum_span = datum.span;
+                    return Ok(Some(ScannedDatum {
+                        value: DatumValue::LabeledDatum(label, Box::new(datum)),
                         span: Span::new(start_span.from, datum_span.to),
                     }));
                 } else {

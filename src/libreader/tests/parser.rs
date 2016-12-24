@@ -252,6 +252,11 @@ fn bytevector_invalid_elements() {
         // Abbreviations cannot be nested into bytevectors.
         datum::bytevector("#U8(1 '2 3)", vec![pool.intern("1"), pool.intern("3")])
             .diagnostic(6, 8, DiagnosticKind::err_parser_invalid_bytevector_element),
+
+        // Labels cannot be used inside bytevector.
+        datum::bytevector("#u8(#1=2 4 #8# 16)", vec![pool.intern("4"), pool.intern("16")])
+            .diagnostic( 4,  8, DiagnosticKind::err_parser_invalid_bytevector_element)
+            .diagnostic(11, 14, DiagnosticKind::err_parser_invalid_bytevector_element),
     ]));
 }
 
@@ -969,7 +974,7 @@ fn abbreviation_missing_data_eof() {
 
     check(&pool, datum::line_sequence(vec![
         datum::ignored("(1 '")
-            .diagnostic(4, 4, DiagnosticKind::err_parser_missing_abbreviation_datum)
+            .diagnostic(4, 4, DiagnosticKind::err_parser_missing_datum)
             .diagnostic(0, 1, DiagnosticKind::fatal_parser_unterminated_delimiter),
     ]));
 }
@@ -983,7 +988,7 @@ fn abbreviation_missing_data_complex() {
             datum::ignored("("),
             datum::number("2", pool.intern("2")),
             datum::ignored(" .',`")
-                .diagnostic(5, 5, DiagnosticKind::err_parser_missing_abbreviation_datum)
+                .diagnostic(5, 5, DiagnosticKind::err_parser_missing_datum)
                 .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot),
             datum::ignored(")"),
         ]),
@@ -1000,7 +1005,7 @@ fn abbreviation_invalid_dot() {
             datum::number("1", pool.intern("1")),
             datum::ignored(" "),
             datum::ignored("'")
-                .diagnostic(1, 1, DiagnosticKind::err_parser_missing_abbreviation_datum),
+                .diagnostic(1, 1, DiagnosticKind::err_parser_missing_datum),
             datum::ignored("."),
             datum::ignored(" "),
             datum::number("2", pool.intern("2")),
@@ -1012,7 +1017,7 @@ fn abbreviation_invalid_dot() {
             datum::number("1", pool.intern("1")),
             datum::ignored(" "),
             datum::ignored("'")
-                .diagnostic(1, 1, DiagnosticKind::err_parser_missing_abbreviation_datum),
+                .diagnostic(1, 1, DiagnosticKind::err_parser_missing_datum),
             datum::ignored(".")
                 .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
             datum::ignored(" "),
@@ -1034,9 +1039,119 @@ fn abbreviation_invalid_dot() {
         ]),
 
         datum::ignored("'.")
-            .diagnostic(1, 1, DiagnosticKind::err_parser_missing_abbreviation_datum)
+            .diagnostic(1, 1, DiagnosticKind::err_parser_missing_datum)
             .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot),
         datum::proper_list(vec![datum::ignored("()")]),
+    ]));
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Labels
+
+#[test]
+fn labels_simple() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::labeled(pool.intern("0"), vec![
+            datum::ignored("#0="),
+            datum::symbol("test", pool.intern("test")),
+        ]),
+
+        datum::labeled(pool.intern("1"), vec![
+            datum::ignored("#1= "),
+            datum::number("9", pool.intern("9")),
+        ]),
+
+        datum::labeled(pool.intern("2"), vec![
+            datum::ignored("#2= "),
+            datum::bytevector("#U8(3 4 5)", vec![
+                pool.intern("3"), pool.intern("4"), pool.intern("5"),
+            ]),
+        ]),
+
+        datum::label_ref("#59595#", pool.intern("59595")),
+
+        datum::labeled(pool.intern("9"), vec![
+            datum::ignored("#9="),
+            datum::label_ref("#9#", pool.intern("9")),
+        ]),
+    ]));
+}
+
+#[test]
+fn labels_complex() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::labeled(pool.intern("0"), vec![
+            datum::ignored("#0= "),
+            datum::labeled(pool.intern("1"), vec![
+                datum::ignored("#1="),
+                datum::dotted_list(vec![
+                    datum::ignored("("),
+                    datum::number("1", pool.intern("1")),
+                    datum::ignored(" . "),
+                    datum::label_ref("#1#", pool.intern("1")),
+                    datum::ignored(")"),
+                ]),
+            ]),
+        ]),
+    ]));
+}
+
+#[test]
+fn labels_data_eof() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#1=(2 ")
+            .diagnostic(3, 4, DiagnosticKind::fatal_parser_unterminated_delimiter),
+    ]));
+}
+
+#[test]
+fn labels_missing_data_eof() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#1=")
+            .diagnostic(3, 3, DiagnosticKind::err_parser_missing_datum),
+    ]));
+}
+
+#[test]
+fn labels_missing_data_complex() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::number("2", pool.intern("2")),
+            datum::ignored(" "),
+            datum::ignored("#0= ")
+                .diagnostic(3, 3, DiagnosticKind::err_parser_missing_datum),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn labels_invalid_dot() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::dotted_list(vec![
+            datum::ignored("("),
+            datum::number("3", pool.intern("3")),
+            datum::ignored(" "),
+            datum::ignored("#666=")
+                .diagnostic(5, 5, DiagnosticKind::err_parser_missing_datum),
+            datum::ignored("."),
+            datum::ignored(" "),
+            datum::proper_list(vec![datum::ignored("()")]),
+            datum::ignored(")"),
+        ]),
     ]));
 }
 

@@ -179,6 +179,29 @@ fn abbreviation<I: IntoIterator<Item=DataTest>>(kind: AbbreviationKind, tests: I
     };
 }
 
+/// Make a label reference.
+pub fn label_ref(text: &str, label: Atom) -> DataTest {
+    literal(text, DatumValue::LabelReference(label))
+}
+
+/// Make a labeled datum.
+pub fn labeled<I: IntoIterator<Item=DataTest>>(label: Atom, tests: I) -> DataTest {
+    let DataTest { text, mut data, diagnostics } = concatenate(tests);
+
+    assert!(data.len() == 1, "label marks must wrap exactly one datum");
+
+    let total_length = text.len();
+
+    return DataTest {
+        text: text,
+        data: vec![ScannedDatum {
+            value: DatumValue::LabeledDatum(label, Box::new(data.remove(0))),
+            span: Span::new(0, total_length),
+        }],
+        diagnostics: diagnostics,
+    };
+}
+
 /// Concatenate tests.
 fn concatenate<I: IntoIterator<Item=DataTest>>(tests: I) -> DataTest {
     let mut text = String::new();
@@ -223,12 +246,14 @@ fn offset_datum(value: DatumValue, offset: usize) -> DatumValue {
         DatumValue::Number(_) => value,
         DatumValue::String(_) => value,
         DatumValue::Symbol(_) => value,
+        DatumValue::LabelReference(_) => value,
 
         DatumValue::Vector(elements) => DatumValue::Vector(offset_data_vector(elements, offset)),
         DatumValue::ProperList(elements) => DatumValue::ProperList(offset_data_vector(elements, offset)),
         DatumValue::DottedList(elements) => DatumValue::DottedList(offset_data_vector(elements, offset)),
 
         DatumValue::Abbreviation(kind, datum) => DatumValue::Abbreviation(kind, Box::new(offset_scanned_datum(*datum, offset))),
+        DatumValue::LabeledDatum(label, datum) => DatumValue::LabeledDatum(label, Box::new(offset_scanned_datum(*datum, offset))),
     }
 }
 
@@ -771,6 +796,148 @@ mod tests {
                     }
                 )),
                 span: Span::new(0, 24),
+            },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
+    }
+
+    // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+    // Labels
+
+    #[test]
+    fn label_reference() {
+        let pool = InternPool::new();
+        let test = label_ref("#123#", pool.intern("123"));
+
+        assert_eq!(test.text, "#123#");
+        assert_eq!(test.data, vec![
+            ScannedDatum {
+                value: DatumValue::LabelReference(pool.intern("123")),
+                span: Span::new(0, 5),
+            },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn label_datum_empty() {
+        let pool = InternPool::new();
+        let _ = labeled(pool.intern("123"), vec![ignored("#123=")]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn label_datum_multiple() {
+        let pool = InternPool::new();
+        let _ = labeled(pool.intern("123"), vec![
+            number("1", pool.intern("1")), ignored(" "), number("2", pool.intern("2")),
+        ]);
+    }
+
+    #[test]
+    fn label_datum_simple() {
+        let pool = InternPool::new();
+        let test = labeled(pool.intern("123"), vec![
+            ignored("#123="),
+            number("456", pool.intern("456")),
+        ]);
+
+        assert_eq!(test.text, "#123=456");
+        assert_eq!(test.data, vec![
+            ScannedDatum {
+                value: DatumValue::LabeledDatum(pool.intern("123"), Box::new(
+                    ScannedDatum {
+                        value: DatumValue::Number(pool.intern("456")),
+                        span: Span::new(5, 8),
+                    }
+                )),
+                span: Span::new(0, 8),
+            },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
+    }
+
+    #[test]
+    fn label_datum_nested() {
+        let pool = InternPool::new();
+        let test =
+            labeled(pool.intern("0"), vec![
+                ignored("#0="),
+                labeled(pool.intern("1"), vec![
+                    ignored("#1="),
+                    proper_list(vec![
+                        ignored("("),
+                        labeled(pool.intern("2"), vec![
+                            ignored("#2="),
+                            symbol("cons", pool.intern("cons")),
+                        ]),
+                        ignored(" "),
+                        symbol("head", pool.intern("head")),
+                        ignored(" "),
+                        label_ref("#0#", pool.intern("0")),
+                        ignored(")"),
+                    ]),
+                ]),
+            ]);
+
+        assert_eq!(test.text, "#0=#1=(#2=cons head #0#)");
+        assert_eq!(test.data, vec![
+            ScannedDatum {
+                value: DatumValue::LabeledDatum(pool.intern("0"), Box::new(
+                    ScannedDatum {
+                        value: DatumValue::LabeledDatum(pool.intern("1"), Box::new(
+                            ScannedDatum {
+                                value: DatumValue::ProperList(vec![
+                                    ScannedDatum {
+                                        value: DatumValue::LabeledDatum(pool.intern("2"), Box::new(
+                                            ScannedDatum {
+                                                value: DatumValue::Symbol(pool.intern("cons")),
+                                                span: Span::new(10, 14),
+                                            }
+                                        )),
+                                        span: Span::new(7, 14),
+                                    },
+                                    ScannedDatum {
+                                        value: DatumValue::Symbol(pool.intern("head")),
+                                        span: Span::new(15, 19),
+                                    },
+                                    ScannedDatum {
+                                        value: DatumValue::LabelReference(pool.intern("0")),
+                                        span: Span::new(20, 23),
+                                    },
+                                ]),
+                                span: Span::new(6, 24),
+                            }
+                        )),
+                        span: Span::new(3, 24),
+                    }
+                )),
+                span: Span::new(0, 24),
+            },
+        ]);
+        assert_eq!(test.diagnostics, vec![]);
+    }
+
+    #[test]
+    fn label_datum_self_reference() {
+        let pool = InternPool::new();
+        let test =
+            labeled(pool.intern("0"), vec![
+                ignored("#0="),
+                label_ref("#0#", pool.intern("0")),
+            ]);
+
+        assert_eq!(test.text, "#0=#0#");
+        assert_eq!(test.data, vec![
+            ScannedDatum {
+                value: DatumValue::LabeledDatum(pool.intern("0"), Box::new(
+                    ScannedDatum {
+                        value: DatumValue::LabelReference(pool.intern("0")),
+                        span: Span::new(3, 6),
+                    }
+                )),
+                span: Span::new(0, 6),
             },
         ]);
         assert_eq!(test.diagnostics, vec![]);
