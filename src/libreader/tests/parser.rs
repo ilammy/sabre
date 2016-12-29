@@ -1571,6 +1571,63 @@ fn sexpr_comment_srfi_62_examples() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Unmatched closing parentheses
+
+#[test]
+fn unmatched_paren_alone() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored(")")
+            .diagnostic(0, 1, DiagnosticKind::err_parser_extra_delimiter),
+    ]));
+}
+
+#[test]
+fn unmatched_paren_after_normal_comments() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#|{|#"),
+        datum::ignored("}")
+            .diagnostic(0, 1, DiagnosticKind::err_parser_extra_delimiter),
+    ]));
+}
+
+#[test]
+fn unmatched_paren_after_sexpr_comment() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#;(9)"),
+        datum::ignored(")")
+            .diagnostic(0, 1, DiagnosticKind::err_parser_extra_delimiter),
+    ]));
+}
+
+#[test]
+fn unmatched_paren_after_sexpr_comment_with_missing_data() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored("#;)")
+            .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum)
+            .diagnostic(2, 3, DiagnosticKind::err_parser_extra_delimiter),
+    ]));
+}
+
+#[test]
+fn unmatched_paren_after_misplaced_dot() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::ignored(". )")
+            .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot)
+            .diagnostic(2, 3, DiagnosticKind::err_parser_extra_delimiter),
+    ]));
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
 use std::cell::RefCell;

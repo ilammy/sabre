@@ -159,6 +159,16 @@ impl<'a> Parser<'a> {
                 return Ok(None);
             }
 
+            // Closing parentheses should be paired with opening ones.
+            Token::Close(_) => {
+                self.diagnostic.report(DiagnosticKind::err_parser_extra_delimiter,
+                    self.cur.span);
+
+                self.bump();
+
+                return Ok(None);
+            }
+
             // Handle bytevectors.
             Token::OpenBytevector(paren) => {
                 self.parse_bytevector(paren)
@@ -213,8 +223,6 @@ impl<'a> Parser<'a> {
 
             Token::Eof
                 => unreachable!("EOF not handled before calling next_datum()"),
-
-            Token::Close(_) => unimplemented!(),
         }
     }
 

@@ -156,6 +156,9 @@ pub enum DiagnosticKind {
     /// Parser has encountered an opening delimiter without a matching closing one.
     fatal_parser_unterminated_delimiter,
 
+    /// Parser has encountered an extra closing delimiter without a matching opening one.
+    err_parser_extra_delimiter,
+
     /// Parser has encountered a non-number element in a bytevector.
     err_parser_invalid_bytevector_element,
 
