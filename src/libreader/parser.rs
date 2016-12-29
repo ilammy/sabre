@@ -218,6 +218,31 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parse next datum out of the token stream, ignoring parser recovery.
+    fn next_datum_required(&mut self, start_span: Span) -> ParseResult {
+        loop {
+            match self.cur.tok {
+                // All of these mean that we won't be able to parse a datum without skipping them.
+                // A closing parenthesis most likely marks the end of a list or a vector, a dot
+                // should be handled by the list-parsing code, and EOF is EOF. Either way, there
+                // is no data for us here, so complain and bail out.
+                Token::Close(_) | Token::Dot | Token::Eof => {
+                    self.diagnostic.report(DiagnosticKind::err_parser_missing_datum,
+                        Span::new(start_span.to, start_span.to));
+
+                    return Ok(None);
+                }
+
+                // If we have got Some data then return it. Otherwise keep parsing.
+                _ => {
+                    if let Some(datum) = self.next_datum()? {
+                        return Ok(Some(datum));
+                    }
+                }
+            }
+        }
+    }
+
     /// Parse an s-expression comment.
     fn parse_sexpr_comment(&mut self) -> ParseResult {
         assert!(match self.cur.tok {
@@ -242,24 +267,7 @@ impl<'a> Parser<'a> {
 
         // Then skip the same number of data.
         while let Some(start_span) = start_spans.pop() {
-            loop {
-                match self.cur.tok {
-                    // Bail out if we cannot expect more data to follow. Treat dot as a terminator
-                    // because it marks the end of the current list element.
-                    Token::Close(_) | Token::Dot | Token::Eof => {
-                        self.diagnostic.report(DiagnosticKind::err_parser_missing_datum,
-                            Span::new(start_span.to, start_span.to));
-
-                        break;
-                    }
-
-                    _ => {
-                        if try!(self.next_datum()).is_some() {
-                            break;
-                        }
-                    }
-                }
-            }
+            try!(self.next_datum_required(start_span));
         }
 
         return Ok(None);
@@ -479,26 +487,12 @@ impl<'a> Parser<'a> {
 
         self.bump();
 
-        match self.cur.tok {
-            Token::Close(_) | Token::Dot | Token::Eof => {
-                self.diagnostic.report(DiagnosticKind::err_parser_missing_datum,
-                    Span::new(start_span.to, start_span.to));
-
-                return Ok(None);
+        return self.next_datum_required(start_span).map(|result| result.map(|datum| {
+            ScannedDatum {
+                span: Span::new(start_span.from, datum.span.to),
+                value: DatumValue::Abbreviation(kind, Box::new(datum)),
             }
-
-            _ => {
-                if let Some(datum) = try!(self.next_datum()) {
-                    let datum_span = datum.span;
-                    return Ok(Some(ScannedDatum {
-                        value: DatumValue::Abbreviation(kind, Box::new(datum)),
-                        span: Span::new(start_span.from, datum_span.to),
-                    }));
-                } else {
-                    return Ok(None);
-                }
-            }
-        }
+        }));
     }
 
     /// Parse a labeled datum.
@@ -512,26 +506,12 @@ impl<'a> Parser<'a> {
 
         self.bump();
 
-        match self.cur.tok {
-            Token::Close(_) | Token::Dot | Token::Eof => {
-                self.diagnostic.report(DiagnosticKind::err_parser_missing_datum,
-                    Span::new(start_span.to, start_span.to));
-
-                return Ok(None);
+        return self.next_datum_required(start_span).map(|result| result.map(|datum| {
+            ScannedDatum {
+                span: Span::new(start_span.from, datum.span.to),
+                value: DatumValue::LabeledDatum(label, Box::new(datum)),
             }
-
-            _ => {
-                if let Some(datum) = try!(self.next_datum()) {
-                    let datum_span = datum.span;
-                    return Ok(Some(ScannedDatum {
-                        value: DatumValue::LabeledDatum(label, Box::new(datum)),
-                        span: Span::new(start_span.from, datum_span.to),
-                    }));
-                } else {
-                    return Ok(None);
-                }
-            }
-        }
+        }));
     }
 }
 

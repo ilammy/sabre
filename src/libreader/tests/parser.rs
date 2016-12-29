@@ -972,6 +972,19 @@ fn abbreviation_nested() {
 }
 
 #[test]
+fn abbreviation_interspersed_sexpr_comments() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::quasiquote(vec![
+            datum::ignored("`"),
+            datum::ignored("#;%^&*"),
+            datum::proper_list(vec![datum::ignored("()")]),
+        ]),
+    ]));
+}
+
+#[test]
 fn abbreviation_missing_data_eof() {
     let pool = InternPool::new();
 
@@ -992,7 +1005,28 @@ fn abbreviation_missing_data_complex() {
             datum::number("2", pool.intern("2")),
             datum::ignored(" .',`")
                 .diagnostic(5, 5, DiagnosticKind::err_parser_missing_datum)
+                .diagnostic(4, 4, DiagnosticKind::err_parser_missing_datum)
+                .diagnostic(3, 3, DiagnosticKind::err_parser_missing_datum)
                 .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn abbreviation_missing_data_after_sexpr_comments() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::number("8", pool.intern("8")),
+            datum::ignored(" "),
+            datum::ignored("',`#;")
+                .diagnostic(5, 5, DiagnosticKind::err_parser_missing_datum)
+                .diagnostic(3, 3, DiagnosticKind::err_parser_missing_datum)
+                .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum)
+                .diagnostic(1, 1, DiagnosticKind::err_parser_missing_datum),
             datum::ignored(")"),
         ]),
     ]));
@@ -1104,6 +1138,20 @@ fn labels_complex() {
 }
 
 #[test]
+fn labels_interspersed_sexpr_comments() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::labeled(pool.intern("0"), vec![
+            datum::ignored("#0= "),
+            datum::ignored("#;1 "),
+            datum::ignored("#;2 "),
+            datum::number("3", pool.intern("3")),
+        ]),
+    ]));
+}
+
+#[test]
 fn labels_data_eof() {
     let pool = InternPool::new();
 
@@ -1133,6 +1181,22 @@ fn labels_missing_data_complex() {
             datum::number("2", pool.intern("2")),
             datum::ignored(" "),
             datum::ignored("#0= ")
+                .diagnostic(3, 3, DiagnosticKind::err_parser_missing_datum),
+            datum::ignored(")"),
+        ]),
+    ]));
+}
+
+#[test]
+fn labels_missing_data_after_sexpr_comments() {
+    let pool = InternPool::new();
+
+    check(&pool, datum::line_sequence(vec![
+        datum::proper_list(vec![
+            datum::ignored("("),
+            datum::number("9", pool.intern("9")),
+            datum::ignored(" "),
+            datum::ignored("#0= #;1 #;2")
                 .diagnostic(3, 3, DiagnosticKind::err_parser_missing_datum),
             datum::ignored(")"),
         ]),
