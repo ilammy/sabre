@@ -1,0 +1,12 @@
+[package]
+name = "utils"
+version = "0.1.0"
+authors = ["ilammy <a.lozovsky@gmail.com>"]
+license = "MIT/Apache-2.0"
+
+[lib]
+name = "utils"
+path = "lib.rs"
+
+[dependencies]
+libreader = { path = "../..", version = "0.1.0" }

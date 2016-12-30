@@ -43,7 +43,7 @@ impl Span {
 //
 
 /// A reported diagnostic.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Diagnostic {
     /// The kind of a diagnostic.
     pub kind: DiagnosticKind,
@@ -63,7 +63,7 @@ pub trait Reporter {
 
 /// Kinds of repoted diagnostics.
 #[allow(non_camel_case_types)]
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum DiagnosticKind {
     /// Lexer has encountered a block comment without matching termination token.
     fatal_lexer_unterminated_comment,
@@ -149,6 +149,24 @@ pub enum DiagnosticKind {
 
     /// Lexer has encountered an escaped identifier without a closing vertical bar.
     fatal_lexer_unterminated_identifier,
+
+    /// Parser has encountered a mismatched closing delimiter (e.g., `(cons 1 2]`).
+    err_parser_mismatched_delimiter,
+
+    /// Parser has encountered an opening delimiter without a matching closing one.
+    fatal_parser_unterminated_delimiter,
+
+    /// Parser has encountered an extra closing delimiter without a matching opening one.
+    err_parser_extra_delimiter,
+
+    /// Parser has encountered a non-number element in a bytevector.
+    err_parser_invalid_bytevector_element,
+
+    /// Parser has encountered a dot outside of a list.
+    err_parser_misplaced_dot,
+
+    /// Parser has expected a datum here for an abbreviation, a label, or a datum comment.
+    err_parser_missing_datum,
 }
 
 /// Convenience wrapper for reporting diagnostics with known spans.

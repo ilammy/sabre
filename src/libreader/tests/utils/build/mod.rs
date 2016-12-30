@@ -5,10 +5,8 @@
 // at your option. This file may be copied, distributed, and modified only
 // in accordance with the terms specified by the chosen license.
 
-//! Tree utilities.
+//! Building stuff.
+//!
+//! Various code for building entities.
 
-/// Trait of tree nodes.
-pub trait TreeNode {
-    /// Returns references to child nodes of this node.
-    fn children<'a>(&'a self) -> Vec<&'a Self>;
-}
+pub mod datum;
