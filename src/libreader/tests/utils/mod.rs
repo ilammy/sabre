@@ -10,8 +10,6 @@
 //! Here we put various data structures and functions that prove to be useful for testing
 //! the `reader` crate.
 
-extern crate reader;
-
 pub mod build;
 pub mod diff;
 pub mod stubs;

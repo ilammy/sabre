@@ -10,14 +10,13 @@
 //! This verifies that the parser recognizes all expected expressions and errors.
 
 extern crate reader;
-extern crate utils;
 
 use reader::diagnostics::{Handler, DiagnosticKind};
 use reader::intern_pool::{InternPool};
 use reader::lexer::{StringScanner};
 use reader::parser::{Parser};
 
-use utils::build::datum::{self, DataTest};
+use reader::test_utils::build::datum::{self, DataTest};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Smoke test of test harness
@@ -1633,7 +1632,7 @@ fn unmatched_paren_after_misplaced_dot() {
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use utils::stubs::{SinkReporter};
+use reader::test_utils::stubs::{SinkReporter};
 
 /// Check whether the parser produces expected results and reports expected diagnostics
 /// when given a sequence of tokens produced from a given string by `StringScanner`.

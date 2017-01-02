@@ -9,9 +9,9 @@
 //!
 //! These are organized as easily extendable _combinators_.
 
-use reader::datum::{ScannedDatum, DatumValue, AbbreviationKind};
-use reader::diagnostics::{Span, Diagnostic, DiagnosticKind};
-use reader::intern_pool::{Atom};
+use datum::{ScannedDatum, DatumValue, AbbreviationKind};
+use diagnostics::{Span, Diagnostic, DiagnosticKind};
+use intern_pool::{Atom};
 
 /// Parser test data set.
 #[derive(Debug, Clone)]
@@ -282,9 +282,10 @@ fn offset_span(span: Span, offset: usize) -> Span {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reader::datum::{ScannedDatum, DatumValue, AbbreviationKind};
-    use reader::diagnostics::{Span, Diagnostic, DiagnosticKind};
-    use reader::intern_pool::{InternPool};
+
+    use datum::{ScannedDatum, DatumValue, AbbreviationKind};
+    use diagnostics::{Span, Diagnostic, DiagnosticKind};
+    use intern_pool::{InternPool};
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Primitives

@@ -10,7 +10,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use reader::diagnostics::{Reporter, Diagnostic};
+use diagnostics::{Reporter, Diagnostic};
 
 /// A simple Reporter collecting diagnostics.
 pub struct SinkReporter {
