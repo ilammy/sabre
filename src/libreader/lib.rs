@@ -18,3 +18,10 @@ pub mod intern_pool;
 pub mod lexer;
 pub mod parser;
 pub mod tokens;
+
+mod tests {
+    pub mod utils;
+}
+
+#[cfg_attr(not(test), doc(hidden))]
+pub use tests::utils as test_utils;

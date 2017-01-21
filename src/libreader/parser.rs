@@ -10,9 +10,9 @@
 //! This module contains definition of the _syntactical analyzer_ which constructs parsing trees
 //! out of token streams.
 
-use datum::{ScannedDatum, DatumValue, AbbreviationKind};
+use datum::{ScannedDatum, DatumValue};
 use diagnostics::{Span, Handler, DiagnosticKind};
-use intern_pool::{Atom};
+use intern_pool::{Atom, InternPool};
 use lexer::{Scanner, ScannedToken};
 use tokens::{Token, ParenType};
 
@@ -24,6 +24,9 @@ use tokens::{Token, ParenType};
 pub struct Parser<'a> {
     /// Our source of tokens.
     scanner: Box<Scanner + 'a>,
+
+    /// The pool used by the scanner.
+    pool: &'a InternPool,
 
     // Parsing state
     //
@@ -55,9 +58,12 @@ type ParseResult = Result<Option<ScannedDatum>, ()>;
 
 impl<'a> Parser<'a> {
     /// Construct a new parser that will use the given token stream.
-    pub fn new(scanner: Box<Scanner + 'a>, handler: &'a Handler) -> Parser<'a> {
+    pub fn new(scanner: Box<Scanner + 'a>, pool: &'a InternPool, handler: &'a Handler)
+        -> Parser<'a>
+    {
         let mut parser = Parser {
             scanner: scanner,
+            pool: pool,
             cur: ScannedToken { tok: Token::Eof, span: Span::new(0, 0) },
             diagnostic: handler,
         };
@@ -186,16 +192,16 @@ impl<'a> Parser<'a> {
 
             // Handle abbreviations.
             Token::Quote => {
-                self.parse_abbreviation(AbbreviationKind::Quote)
+                self.parse_abbreviation("'", "quote")
             }
             Token::Backquote => {
-                self.parse_abbreviation(AbbreviationKind::Quasiquote)
+                self.parse_abbreviation("`", "quasiquote")
             }
             Token::Comma => {
-                self.parse_abbreviation(AbbreviationKind::Unquote)
+                self.parse_abbreviation(",", "unquote")
             }
             Token::CommaSplicing => {
-                self.parse_abbreviation(AbbreviationKind::UnquoteSplicing)
+                self.parse_abbreviation(",@", "unquote-splicing")
             }
 
             // Handle label references.
@@ -485,7 +491,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Parse an abbreviation.
-    fn parse_abbreviation(&mut self, kind: AbbreviationKind) -> ParseResult {
+    fn parse_abbreviation(&mut self, sigil: &str, keyword: &str) -> ParseResult {
         assert!(match self.cur.tok {
             Token::Quote | Token::Backquote | Token::Comma | Token::CommaSplicing => true,
             _ => false,
@@ -498,7 +504,13 @@ impl<'a> Parser<'a> {
         return self.next_datum_required(start_span).map(|result| result.map(|datum| {
             ScannedDatum {
                 span: Span::new(start_span.from, datum.span.to),
-                value: DatumValue::Abbreviation(kind, Box::new(datum)),
+                value: DatumValue::ProperList(vec![
+                    ScannedDatum {
+                        value: DatumValue::Symbol(self.pool.intern(keyword)),
+                        span: Span::new(start_span.from, start_span.from + sigil.len()),
+                    },
+                    datum,
+                ]),
             }
         }));
     }

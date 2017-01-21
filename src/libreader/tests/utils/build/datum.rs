@@ -9,9 +9,9 @@
 //!
 //! These are organized as easily extendable _combinators_.
 
-use reader::datum::{ScannedDatum, DatumValue, AbbreviationKind};
-use reader::diagnostics::{Span, Diagnostic, DiagnosticKind};
-use reader::intern_pool::{Atom};
+use datum::{ScannedDatum, DatumValue};
+use diagnostics::{Span, Diagnostic, DiagnosticKind};
+use intern_pool::{Atom, InternPool};
 
 /// Parser test data set.
 #[derive(Debug, Clone)]
@@ -142,27 +142,29 @@ pub fn dotted_list<I: IntoIterator<Item=DataTest>>(elements: I) -> DataTest {
 }
 
 /// Make a quotation.
-pub fn quote<I: IntoIterator<Item=DataTest>>(tests: I) -> DataTest {
-    abbreviation(AbbreviationKind::Quote, tests)
+pub fn quote<I: IntoIterator<Item=DataTest>>(pool: &InternPool, tests: I) -> DataTest {
+    abbreviation(pool, tests, "'", "quote")
 }
 
 /// Make a quasiquotation.
-pub fn quasiquote<I: IntoIterator<Item=DataTest>>(tests: I) -> DataTest {
-    abbreviation(AbbreviationKind::Quasiquote, tests)
+pub fn quasiquote<I: IntoIterator<Item=DataTest>>(pool: &InternPool, tests: I) -> DataTest {
+    abbreviation(pool, tests, "`", "quasiquote")
 }
 
 /// Make an unquote.
-pub fn unquote<I: IntoIterator<Item=DataTest>>(tests: I) -> DataTest {
-    abbreviation(AbbreviationKind::Unquote, tests)
+pub fn unquote<I: IntoIterator<Item=DataTest>>(pool: &InternPool, tests: I) -> DataTest {
+    abbreviation(pool, tests, ",", "unquote")
 }
 
 /// Make a splicing unquote.
-pub fn unquote_splicing<I: IntoIterator<Item=DataTest>>(tests: I) -> DataTest {
-    abbreviation(AbbreviationKind::UnquoteSplicing, tests)
+pub fn unquote_splicing<I: IntoIterator<Item=DataTest>>(pool: &InternPool, tests: I) -> DataTest {
+    abbreviation(pool, tests, ",@", "unquote-splicing")
 }
 
 /// Make an abbreviation of the given kind.
-fn abbreviation<I: IntoIterator<Item=DataTest>>(kind: AbbreviationKind, tests: I) -> DataTest {
+fn abbreviation<I>(pool: &InternPool, tests: I, sigil: &str, keyword: &str) -> DataTest
+    where I: IntoIterator<Item=DataTest>
+{
     let DataTest { text, mut data, diagnostics } = concatenate(tests);
 
     assert!(data.len() == 1, "quotes must wrap exactly one datum");
@@ -172,7 +174,13 @@ fn abbreviation<I: IntoIterator<Item=DataTest>>(kind: AbbreviationKind, tests: I
     return DataTest {
         text: text,
         data: vec![ScannedDatum {
-            value: DatumValue::Abbreviation(kind, Box::new(data.remove(0))),
+            value: DatumValue::ProperList(vec![
+                ScannedDatum {
+                    value: DatumValue::Symbol(pool.intern(keyword)),
+                    span: Span::new(0, sigil.len()),
+                },
+                data.remove(0),
+            ]),
             span: Span::new(0, total_length),
         }],
         diagnostics: diagnostics,
@@ -252,7 +260,6 @@ fn offset_datum(value: DatumValue, offset: usize) -> DatumValue {
         DatumValue::ProperList(elements) => DatumValue::ProperList(offset_data_vector(elements, offset)),
         DatumValue::DottedList(elements) => DatumValue::DottedList(offset_data_vector(elements, offset)),
 
-        DatumValue::Abbreviation(kind, datum) => DatumValue::Abbreviation(kind, Box::new(offset_scanned_datum(*datum, offset))),
         DatumValue::LabeledDatum(label, datum) => DatumValue::LabeledDatum(label, Box::new(offset_scanned_datum(*datum, offset))),
     }
 }
@@ -282,9 +289,10 @@ fn offset_span(span: Span, offset: usize) -> Span {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use reader::datum::{ScannedDatum, DatumValue, AbbreviationKind};
-    use reader::diagnostics::{Span, Diagnostic, DiagnosticKind};
-    use reader::intern_pool::{InternPool};
+
+    use datum::{ScannedDatum, DatumValue};
+    use diagnostics::{Span, Diagnostic, DiagnosticKind};
+    use intern_pool::{InternPool};
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
     // Primitives
@@ -709,37 +717,41 @@ mod tests {
     #[test]
     #[should_panic]
     fn abbreviation_empty() {
-        let _ = quote(vec![ignored("#|comment|#")]);
+        let pool = InternPool::new();
+        let _ = quote(&pool, vec![ignored("#|comment|#")]);
     }
 
     #[test]
     #[should_panic]
     fn abbreviation_multiple() {
-        let _ = unquote_splicing(vec![character("#\\1", '1'), ignored(" "), character("#\\2", '2')]);
+        let pool = InternPool::new();
+        let _ = unquote_splicing(&pool,
+            vec![character("#\\1", '1'), ignored(" "), character("#\\2", '2')]
+        );
     }
 
     #[test]
     fn abbreviation_nested() {
         let pool = InternPool::new();
         let test =
-            quasiquote(vec![
+            quasiquote(&pool, vec![
                 ignored("`"),
                 dotted_list(vec![
                     ignored("("),
                     symbol("x", pool.intern("x")),
                     ignored(" "),
-                    unquote(vec![
+                    unquote(&pool, vec![
                         ignored(","),
                         symbol("y", pool.intern("y")),
                     ]),
                     ignored(" "),
-                    quote(vec![
+                    quote(&pool, vec![
                         ignored("'"),
                         dotted_list(vec![
                             ignored("("),
                             number("0", pool.intern("0")),
                             ignored(" . "),
-                            quote(vec![
+                            quote(&pool, vec![
                                 ignored("'"),
                                 proper_list(vec![ignored("()")]),
                             ]),
@@ -747,7 +759,7 @@ mod tests {
                         ]),
                     ]),
                     ignored(" . "),
-                    unquote_splicing(vec![
+                    unquote_splicing(&pool, vec![
                         ignored(",@"),
                         symbol("z", pool.intern("z")),
                     ]),
@@ -758,43 +770,48 @@ mod tests {
         assert_eq!(test.text, "`(x ,y '(0 . '()) . ,@z)");
         assert_eq!(test.data, vec![
             ScannedDatum {
-                value: DatumValue::Abbreviation(AbbreviationKind::Quasiquote, Box::new(
+                value: DatumValue::ProperList(vec![
+                    ScannedDatum { value: DatumValue::Symbol(pool.intern("quasiquote")), span: Span::new(0, 1) },
                     ScannedDatum {
                         value: DatumValue::DottedList(vec![
                             ScannedDatum { value: DatumValue::Symbol(pool.intern("x")), span: Span::new(2, 3) },
                             ScannedDatum {
-                                value: DatumValue::Abbreviation(AbbreviationKind::Unquote, Box::new(
+                                value: DatumValue::ProperList(vec![
+                                    ScannedDatum { value: DatumValue::Symbol(pool.intern("unquote")), span: Span::new(4, 5) },
                                     ScannedDatum { value: DatumValue::Symbol(pool.intern("y")), span: Span::new(5, 6) },
-                                )),
+                                ]),
                                 span: Span::new(4, 6),
                             },
                             ScannedDatum {
-                                value: DatumValue::Abbreviation(AbbreviationKind::Quote, Box::new(
+                                value: DatumValue::ProperList(vec![
+                                    ScannedDatum { value: DatumValue::Symbol(pool.intern("quote")), span: Span::new(7, 8) },
                                     ScannedDatum {
                                         value: DatumValue::DottedList(vec![
                                             ScannedDatum { value: DatumValue::Number(pool.intern("0")), span: Span::new(9, 10) },
                                             ScannedDatum {
-                                                value: DatumValue::Abbreviation(AbbreviationKind::Quote, Box::new(
+                                                value: DatumValue::ProperList(vec![
+                                                    ScannedDatum { value: DatumValue::Symbol(pool.intern("quote")), span: Span::new(13, 14) },
                                                     ScannedDatum { value: DatumValue::ProperList(vec![]), span: Span::new(14, 16) },
-                                                )),
+                                                ]),
                                                 span: Span::new(13, 16),
                                             },
                                         ]),
                                         span: Span::new(8, 17),
                                     },
-                                )),
+                                ]),
                                 span: Span::new(7, 17),
                             },
                             ScannedDatum {
-                                value: DatumValue::Abbreviation(AbbreviationKind::UnquoteSplicing, Box::new(
+                                value: DatumValue::ProperList(vec![
+                                    ScannedDatum { value: DatumValue::Symbol(pool.intern("unquote-splicing")), span: Span::new(20, 22) },
                                     ScannedDatum { value: DatumValue::Symbol(pool.intern("z")), span: Span::new(22, 23) },
-                                )),
+                                ]),
                                 span: Span::new(20, 23),
                             },
                         ]),
                         span: Span::new(1, 24),
                     }
-                )),
+                ]),
                 span: Span::new(0, 24),
             },
         ]);

@@ -10,7 +10,6 @@
 //! This verifies that the lexer recognizes all expected tokens and errors.
 
 extern crate reader;
-extern crate utils;
 
 use reader::diagnostics::{Span, Handler, Diagnostic, DiagnosticKind};
 use reader::intern_pool::{InternPool};
@@ -3926,8 +3925,8 @@ use std::cell::RefCell;
 use std::fmt::Write;
 use std::rc::Rc;
 
-use utils::diff::sequence::{self, Diff};
-use utils::stubs::{SinkReporter};
+use reader::test_utils::diff::sequence::{self, Diff};
+use reader::test_utils::stubs::{SinkReporter};
 
 struct ScannerTestDiagnostic {
     pub from: usize,

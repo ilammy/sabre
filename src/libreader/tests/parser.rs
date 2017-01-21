@@ -10,14 +10,13 @@
 //! This verifies that the parser recognizes all expected expressions and errors.
 
 extern crate reader;
-extern crate utils;
 
 use reader::diagnostics::{Handler, DiagnosticKind};
 use reader::intern_pool::{InternPool};
 use reader::lexer::{StringScanner};
 use reader::parser::{Parser};
 
-use utils::build::datum::{self, DataTest};
+use reader::test_utils::build::datum::{self, DataTest};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Smoke test of test harness
@@ -869,19 +868,19 @@ fn abbreviation_simple() {
     let pool = InternPool::new();
 
     check(&pool, datum::line_sequence(vec![
-        datum::quote(vec![
+        datum::quote(&pool, vec![
             datum::ignored("'"),
             datum::string("\"a string\"", pool.intern("a string")),
         ]),
-        datum::quasiquote(vec![
+        datum::quasiquote(&pool, vec![
             datum::ignored("`"),
             datum::bytevector("#u8(0 0 7)", vec![pool.intern("0"), pool.intern("0"), pool.intern("7")]),
         ]),
-        datum::unquote(vec![
+        datum::unquote(&pool, vec![
             datum::ignored(","),
             datum::symbol("var", pool.intern("var")),
         ]),
-        datum::unquote_splicing(vec![
+        datum::unquote_splicing(&pool, vec![
             datum::ignored(",@"),
             datum::symbol("another", pool.intern("another")),
         ]),
@@ -893,11 +892,11 @@ fn abbreviation_complex() {
     let pool = InternPool::new();
 
     check(&pool, datum::line_sequence(vec![
-        datum::quasiquote(vec![
+        datum::quasiquote(&pool, vec![
             datum::ignored("`"),
             datum::dotted_list(vec![
                 datum::ignored("("),
-                datum::unquote(vec![
+                datum::unquote(&pool, vec![
                     datum::ignored(","),
                     datum::proper_list(vec![
                         datum::ignored("("),
@@ -910,7 +909,7 @@ fn abbreviation_complex() {
                     ]),
                 ]),
                 datum::ignored(" "),
-                datum::quote(vec![
+                datum::quote(&pool, vec![
                     datum::ignored("'"),
                     datum::vector(vec![
                         datum::ignored("#["),
@@ -921,7 +920,7 @@ fn abbreviation_complex() {
                     ]),
                 ]),
                 datum::ignored(" . "),
-                datum::unquote_splicing(vec![
+                datum::unquote_splicing(&pool, vec![
                     datum::ignored(",@"),
                     datum::symbol("dumb-list", pool.intern("dumb-list")),
                 ]),
@@ -936,23 +935,23 @@ fn abbreviation_nested() {
     let pool = InternPool::new();
 
     check(&pool, datum::line_sequence(vec![
-        datum::quote(vec![
+        datum::quote(&pool, vec![
             datum::ignored("'"),
-            datum::quote(vec![
+            datum::quote(&pool, vec![
                 datum::ignored("'"),
-                datum::quasiquote(vec![
+                datum::quasiquote(&pool, vec![
                     datum::ignored("`"),
-                    datum::quasiquote(vec![
+                    datum::quasiquote(&pool, vec![
                         datum::ignored("`"),
-                        datum::unquote(vec![
+                        datum::unquote(&pool, vec![
                             datum::ignored(","),
-                            datum::unquote_splicing(vec![
+                            datum::unquote_splicing(&pool, vec![
                                 datum::ignored(",@"),
-                                datum::unquote(vec![
+                                datum::unquote(&pool, vec![
                                     datum::ignored(","),
-    /********************/          datum::unquote_splicing(vec![
+    /********************/          datum::unquote_splicing(&pool, vec![
     /*                  */              datum::ignored(",@"),
-    /*   YOUR AD HERE   */              datum::quote(vec![
+    /*   YOUR AD HERE   */              datum::quote(&pool, vec![
     /*                  */                  datum::ignored("'"),
     /********************/                  datum::proper_list(vec![
              /**/                               datum::ignored("("),
@@ -976,7 +975,7 @@ fn abbreviation_interspersed_sexpr_comments() {
     let pool = InternPool::new();
 
     check(&pool, datum::line_sequence(vec![
-        datum::quasiquote(vec![
+        datum::quasiquote(&pool, vec![
             datum::ignored("`"),
             datum::ignored("#;%^&*"),
             datum::proper_list(vec![datum::ignored("()")]),
@@ -1067,7 +1066,7 @@ fn abbreviation_invalid_dot() {
             datum::number("1", pool.intern("1")),
             datum::ignored(" "),
             datum::ignored("."),
-            datum::quote(vec![
+            datum::quote(&pool, vec![
                 datum::ignored("'"),
                 datum::ignored(" "),
                 datum::number("2", pool.intern("2")),
@@ -1401,14 +1400,14 @@ fn sexpr_comment_srfi_62_examples() {
             datum::ignored("("),
             datum::symbol("list", pool.intern("list")),
             datum::ignored(" "),
-            datum::quote(vec![
+            datum::quote(&pool, vec![
                 datum::ignored("'"),
                 datum::symbol("x", pool.intern("x")),
             ]),
             datum::ignored(" "),
             datum::ignored("#;'y"),
             datum::ignored(" "),
-            datum::quote(vec![
+            datum::quote(&pool, vec![
                 datum::ignored("'"),
                 datum::symbol("z", pool.intern("z")),
             ]),
@@ -1439,14 +1438,14 @@ fn sexpr_comment_srfi_62_examples() {
             datum::ignored("("),
             datum::symbol("list", pool.intern("list")),
             datum::ignored(" "),
-            datum::quote(vec![
+            datum::quote(&pool, vec![
                 datum::ignored("'"),
                 datum::symbol("a", pool.intern("a")),
             ]),
             datum::ignored(" "),
             datum::ignored("#; #;'b 'c"),
             datum::ignored(" "),
-            datum::quote(vec![
+            datum::quote(&pool, vec![
                 datum::ignored("'"),
                 datum::symbol("d", pool.intern("d")),
             ]),
@@ -1457,21 +1456,21 @@ fn sexpr_comment_srfi_62_examples() {
             datum::ignored("("),
             datum::symbol("list", pool.intern("list")),
             datum::ignored(" "),
-            datum::quote(vec![
+            datum::quote(&pool, vec![
                 datum::ignored("'"),
                 datum::symbol("a", pool.intern("a")),
             ]),
             datum::ignored(" "),
             datum::ignored("#;(list 'b #;c 'd)"),
             datum::ignored(" "),
-            datum::quote(vec![
+            datum::quote(&pool, vec![
                 datum::ignored("'"),
                 datum::symbol("e", pool.intern("e")),
             ]),
             datum::ignored(")"),
         ]),
 
-        datum::quote(vec![
+        datum::quote(&pool, vec![
             datum::ignored("'"),
             datum::dotted_list(vec![
                 datum::ignored("("),
@@ -1484,7 +1483,7 @@ fn sexpr_comment_srfi_62_examples() {
             ]),
         ]),
 
-        datum::quote(vec![
+        datum::quote(&pool, vec![
             datum::ignored("'"),
             datum::dotted_list(vec![
                 datum::ignored("("),
@@ -1633,7 +1632,7 @@ fn unmatched_paren_after_misplaced_dot() {
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use utils::stubs::{SinkReporter};
+use reader::test_utils::stubs::{SinkReporter};
 
 /// Check whether the parser produces expected results and reports expected diagnostics
 /// when given a sequence of tokens produced from a given string by `StringScanner`.
@@ -1650,7 +1649,7 @@ fn check(pool: &InternPool, test: DataTest) {
         let parser_reporter = SinkReporter::new(diagnostics.clone());
         let parser_handler = Handler::with_reporter(Box::new(parser_reporter));
 
-        let mut parser = Parser::new(scanner, &parser_handler);
+        let mut parser = Parser::new(scanner, pool, &parser_handler);
 
         let all_data = parser.parse_all_data();
 
