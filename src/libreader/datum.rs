@@ -52,28 +52,9 @@ pub enum DatumValue {
     /// Dotted list.
     DottedList(Vec<ScannedDatum>),
 
-    /// Abbreviation.
-    Abbreviation(AbbreviationKind, Box<ScannedDatum>),
-
     /// Datum with a label attached to it.
     LabeledDatum(Atom, Box<ScannedDatum>),
 
     /// Reference to a labeled datum.
     LabelReference(Atom),
-}
-
-/// Kinds of abbreviations.
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum AbbreviationKind {
-    /// Quotation.
-    Quote,
-
-    /// Quasiquotation.
-    Quasiquote,
-
-    /// Unquoting in quasiquotation.
-    Unquote,
-
-    /// Unquoting with splicing in quasiquotation.
-    UnquoteSplicing,
 }
