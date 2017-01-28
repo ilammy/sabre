@@ -9,9 +9,10 @@
 //!
 //! This verifies that the parser recognizes all expected expressions and errors.
 
+extern crate locus;
 extern crate reader;
 
-use reader::diagnostics::{Handler, DiagnosticKind};
+use locus::diagnostics::{Handler, DiagnosticKind};
 use reader::intern_pool::{InternPool};
 use reader::lexer::{StringScanner};
 use reader::parser::{Parser};

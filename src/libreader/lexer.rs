@@ -12,7 +12,8 @@
 
 use std::char;
 
-use diagnostics::{Span, Handler, DiagnosticKind};
+use locus::diagnostics::{Span, Handler, DiagnosticKind};
+
 use intern_pool::{InternPool};
 use tokens::{Token, ParenType};
 

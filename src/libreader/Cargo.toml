@@ -13,4 +13,5 @@ name = "reader"
 path = "lib.rs"
 
 [dependencies]
+liblocus = { path = "../liblocus", version = "0.1.0" }
 libunicode = { path = "../libunicode", version = "0.1.0", optional = true }

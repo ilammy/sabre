@@ -9,9 +9,10 @@
 //!
 //! This verifies that the lexer recognizes all expected tokens and errors.
 
+extern crate locus;
 extern crate reader;
 
-use reader::diagnostics::{Span, Handler, Diagnostic, DiagnosticKind};
+use locus::diagnostics::{Span, Handler, Diagnostic, DiagnosticKind};
 use reader::intern_pool::{InternPool};
 use reader::lexer::{ScannedToken, StringScanner, Scanner};
 use reader::tokens::{Token, ParenType};
