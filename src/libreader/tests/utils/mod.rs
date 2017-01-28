@@ -12,4 +12,3 @@
 
 pub mod build;
 pub mod diff;
-pub mod stubs;

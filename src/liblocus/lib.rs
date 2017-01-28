@@ -12,3 +12,4 @@
 
 pub mod diagnostics;
 mod diagnostic_kinds;
+pub mod utils;

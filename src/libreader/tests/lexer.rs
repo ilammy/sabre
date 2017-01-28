@@ -12,7 +12,7 @@
 extern crate locus;
 extern crate reader;
 
-use locus::diagnostics::{Span, Handler, Diagnostic, DiagnosticKind};
+use locus::diagnostics::{Span, Diagnostic, DiagnosticKind};
 use reader::intern_pool::{InternPool};
 use reader::lexer::{ScannedToken, StringScanner, Scanner};
 use reader::tokens::{Token, ParenType};
@@ -3922,12 +3922,9 @@ fn no_unicode_numbers_no_normalization() {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use std::cell::RefCell;
 use std::fmt::Write;
-use std::rc::Rc;
 
 use reader::test_utils::diff::sequence::{self, Diff};
-use reader::test_utils::stubs::{SinkReporter};
 
 struct ScannerTestDiagnostic {
     pub from: usize,
@@ -4027,13 +4024,11 @@ fn compute_expected_results(test_slices: &[ScannerTestSlice]) -> ScannerTestResu
 
 /// Scan over the string and remember all produced tokens and diagnostics.
 fn compute_scanning_results(string: &str, pool: &InternPool) -> ScannerTestResults {
-    let diagnostics = Rc::new(RefCell::new(Vec::new()));
-    let mut tokens = Vec::new();
-    {
-        let reporter = SinkReporter::new(diagnostics.clone());
-        let handler = Handler::with_reporter(Box::new(reporter));
+    use locus::utils::collect_diagnostics;
 
-        let mut scanner = StringScanner::new(string, &handler, pool);
+    let (tokens, diagnostics) = collect_diagnostics(|handler| {
+        let mut tokens = Vec::new();
+        let mut scanner = StringScanner::new(string, handler, pool);
 
         loop {
             let token = scanner.next_token();
@@ -4043,10 +4038,13 @@ fn compute_scanning_results(string: &str, pool: &InternPool) -> ScannerTestResul
         }
 
         assert!(scanner.at_eof());
-    }
+
+        return tokens;
+    });
+
     return ScannerTestResults {
         tokens: tokens,
-        diagnostics: Rc::try_unwrap(diagnostics).unwrap().into_inner(),
+        diagnostics: diagnostics,
     };
 }
 
