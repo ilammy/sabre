@@ -1,0 +1,13 @@
+[package]
+name = "libeval"
+version = "0.1.0"
+authors = ["Sabre developers"]
+license = "MIT/Apache-2.0"
+
+[lib]
+name = "eval"
+path = "lib.rs"
+
+[dependencies]
+liblocus = { path = "../liblocus", version = "0.1.0" }
+libreader = { path = "../libreader", version = "0.1.0" }

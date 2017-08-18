@@ -115,4 +115,25 @@ pub enum DiagnosticKind {
 
     /// Parser has expected a datum here for an abbreviation, a label, or a datum comment.
     err_parser_missing_datum,
+
+    /// Expander has encountered a datum label outside of literal data.
+    err_expand_datum_label,
+
+    /// Expander has encountered an invalid `quote` special form.
+    err_expand_invalid_quote,
+
+    /// Expander has encountered an invalid `begin` special form.
+    err_expand_invalid_begin,
+
+    /// Expander has encountered an invalid `if` special form.
+    err_expand_invalid_if,
+
+    /// Expander has encountered an invalid `set!` special form.
+    err_expand_invalid_set,
+
+    /// Expander has encountered an invalid `lambda` special form.
+    err_expand_invalid_lambda,
+
+    /// Expander has encountered an invalid procedure call.
+    err_expand_invalid_application,
 }
