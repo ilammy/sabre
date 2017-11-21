@@ -9,9 +9,10 @@
 //!
 //! This verifies that the parser recognizes all expected expressions and errors.
 
+extern crate locus;
 extern crate reader;
 
-use reader::diagnostics::{Handler, DiagnosticKind};
+use locus::diagnostics::{DiagnosticKind};
 use reader::intern_pool::{InternPool};
 use reader::lexer::{StringScanner};
 use reader::parser::{Parser};
@@ -1629,38 +1630,21 @@ fn unmatched_paren_after_misplaced_dot() {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
-use reader::test_utils::stubs::{SinkReporter};
-
 /// Check whether the parser produces expected results and reports expected diagnostics
 /// when given a sequence of tokens produced from a given string by `StringScanner`.
 /// Panic if this is not true.
 fn check(pool: &InternPool, test: DataTest) {
-    let diagnostics = Rc::new(RefCell::new(Vec::new()));
+    use locus::utils::collect_diagnostics;
 
-    let data = {
-        let scanner_reporter = SinkReporter::new(diagnostics.clone());
-        let scanner_handler = Handler::with_reporter(Box::new(scanner_reporter));
-
-        let scanner = Box::new(StringScanner::new(&test.text, &scanner_handler, pool));
-
-        let parser_reporter = SinkReporter::new(diagnostics.clone());
-        let parser_handler = Handler::with_reporter(Box::new(parser_reporter));
-
-        let mut parser = Parser::new(scanner, pool, &parser_handler);
+    let (data, diagnostics) = collect_diagnostics(|handler| {
+        let scanner = Box::new(StringScanner::new(&test.text, handler, pool));
+        let mut parser = Parser::new(scanner, pool, handler);
 
         let all_data = parser.parse_all_data();
-
         assert!(parser.parse_all_data().is_empty(), "parser did not consume the whole stream");
-
         all_data
-    };
-
-    let diagnostics = Rc::try_unwrap(diagnostics).unwrap().into_inner();
+    });
 
     assert_eq!(data, test.data);
-
     assert_eq!(diagnostics, test.diagnostics);
 }

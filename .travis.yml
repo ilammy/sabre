@@ -5,5 +5,7 @@ branches:
     - /^wip\/.*$/
 
 script:
+- cargo test --verbose --manifest-path=src/liblocus/Cargo.toml
 - cargo test --verbose --manifest-path=src/libunicode/Cargo.toml
 - cargo test --verbose --manifest-path=src/libreader/Cargo.toml
+- cargo test --verbose --manifest-path=src/libeval/Cargo.toml

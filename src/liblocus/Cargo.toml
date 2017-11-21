@@ -1,9 +1,9 @@
 [package]
-name = "libunicode"
+name = "liblocus"
 version = "0.1.0"
 authors = ["Sabre developers"]
 license = "MIT/Apache-2.0"
 
 [lib]
-name = "unicode"
+name = "locus"
 path = "lib.rs"

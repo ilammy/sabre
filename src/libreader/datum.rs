@@ -9,7 +9,8 @@
 //!
 //! This module contains definitions of data recognized and processed by Scheme reader.
 
-use diagnostics::{Span};
+use locus::diagnostics::{Span};
+
 use intern_pool::Atom;
 
 /// A scanned datum with extents information. An AST node, if you with.

@@ -9,8 +9,9 @@
 //!
 //! These are organized as easily extendable _combinators_.
 
+use locus::diagnostics::{Span, Diagnostic, DiagnosticKind};
+
 use datum::{ScannedDatum, DatumValue};
-use diagnostics::{Span, Diagnostic, DiagnosticKind};
 use intern_pool::{Atom, InternPool};
 
 /// Parser test data set.
@@ -290,8 +291,9 @@ fn offset_span(span: Span, offset: usize) -> Span {
 mod tests {
     use super::*;
 
+    use locus::diagnostics::{Span, Diagnostic, DiagnosticKind};
+
     use datum::{ScannedDatum, DatumValue};
-    use diagnostics::{Span, Diagnostic, DiagnosticKind};
     use intern_pool::{InternPool};
 
     // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
