@@ -114,6 +114,30 @@ fn reference_global() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Alternative
+
+#[test]
+fn alternative() {
+    check("(if #t 1 0)",
+        "(Alternative (Constant #t) (Constant 1) (Constant 0))");
+
+    check("(if *global* car cdr)",
+        "(Alternative (GlobalReference 0)
+            (ImportedReference 0)
+            (ImportedReference 1))");
+}
+
+#[test]
+fn alternative_nested() {
+    check("(if (if #f 1 #f) 1 0)",
+        "(Alternative (Alternative (Constant #f)
+                          (Constant 1)
+                          (Constant #f))
+            (Constant 1)
+            (Constant 0))");
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
 use reader::datum::{ScannedDatum};
@@ -189,6 +213,8 @@ fn pretty_print(pool: &InternPool, meaning: &Meaning) -> String {
         MeaningKind::DeepArgumentReference(depth, index) => pretty_print_deep_reference(depth, index),
         MeaningKind::GlobalReference(index) => pretty_print_global_reference(index),
         MeaningKind::ImportedReference(index) => pretty_print_imported_reference(index),
+        MeaningKind::Alternative(ref condition, ref consequent, ref alternate) =>
+            pretty_print_alternative(pool, condition, consequent, alternate),
     }
 }
 
@@ -215,6 +241,16 @@ fn pretty_print_global_reference(index: usize) -> String {
 
 fn pretty_print_imported_reference(index: usize) -> String {
     format!("(ImportedReference {})", index)
+}
+
+fn pretty_print_alternative(pool: &InternPool, condition: &Meaning, consequent: &Meaning,
+    alternate: &Meaning) -> String
+{
+    format!("(Alternative {} {} {})",
+        pretty_print(pool, condition),
+        pretty_print(pool, consequent),
+        pretty_print(pool, alternate)
+    )
 }
 
 fn trim_space(sexpr: &str) -> String {
@@ -244,7 +280,7 @@ fn trim_space(sexpr: &str) -> String {
             }
         }
         previous_whitespace = c.is_whitespace();
-        result.push(c);
+        result.push(if previous_whitespace { ' ' } else { c });
     }
 
     return result;

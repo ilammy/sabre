@@ -45,6 +45,7 @@ pub enum MeaningKind {
     DeepArgumentReference(usize, usize),
     GlobalReference(usize),
     ImportedReference(usize),
+    Alternative(Box<Meaning>, Box<Meaning>, Box<Meaning>),
 }
 
 pub enum Value {
@@ -59,6 +60,8 @@ pub fn meaning(expression: &Expression, environment: &Environment) -> Meaning {
         ExpressionKind::Literal(ref value) => meaning_literal(value, &expression.span),
         ExpressionKind::Quotation(ref datum) => meaning_quote(datum, &expression.span),
         ExpressionKind::Reference(name) => meaning_reference(name, environment, &expression.span),
+        ExpressionKind::Alternative(ref condition, ref consequent, ref alternate) =>
+            meaning_alternative(condition, consequent, alternate, environment, &expression.span),
         _ => unimplemented!(),
     }
 }
@@ -115,6 +118,19 @@ fn meaning_reference(name: Atom, environment: &Environment, span: &Option<Span>)
                 unimplemented!()
             }
         },
+        span: span.clone(),
+    }
+}
+
+fn meaning_alternative(condition: &Expression, consequent: &Expression, alternate: &Expression,
+    environment: &Environment, span: &Option<Span>) -> Meaning
+{
+    Meaning {
+        kind: MeaningKind::Alternative(
+            Box::new(meaning(condition, environment)),
+            Box::new(meaning(consequent, environment)),
+            Box::new(meaning(alternate, environment)),
+        ),
         span: span.clone(),
     }
 }
