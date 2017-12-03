@@ -147,6 +147,21 @@ fn assignment_global() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Sequence
+
+#[test]
+fn sequence() {
+    check("(begin 1 2 3)", "(Sequence (Constant 1) (Constant 2) (Constant 3))");
+    check("(begin (begin #f #f #t) (if #f 1 2) (begin 9))",
+        "(Sequence
+            (Sequence (Constant #f) (Constant #f) (Constant #t))
+            (Alternative (Constant #f)
+                (Constant 1)
+                (Constant 2))
+            (Sequence (Constant 9)))");
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
 use reader::datum::{ScannedDatum};
@@ -230,6 +245,8 @@ fn pretty_print(pool: &InternPool, meaning: &Meaning) -> String {
             pretty_print_deep_set(pool, depth, index, value.as_ref()),
         MeaningKind::GlobalSet(index, ref value) =>
             pretty_print_global_set(pool, index, value.as_ref()),
+        MeaningKind::Sequence(ref computations) =>
+            pretty_print_sequence(pool, computations),
     }
 }
 
@@ -278,6 +295,17 @@ fn pretty_print_deep_set(pool: &InternPool, depth: usize, index: usize, value: &
 
 fn pretty_print_global_set(pool: &InternPool, index: usize, value: &Meaning) -> String {
     format!("(GlobalSet {} {})", index, pretty_print(pool, value))
+}
+
+fn pretty_print_sequence(pool: &InternPool, computations: &[Meaning]) -> String {
+    let mut s = String::new();
+    s.push_str("(Sequence");
+    for c in computations {
+        s.push_str(" ");
+        s.push_str(&pretty_print(pool, c));
+    }
+    s.push_str(")");
+    return s;
 }
 
 fn trim_space(sexpr: &str) -> String {

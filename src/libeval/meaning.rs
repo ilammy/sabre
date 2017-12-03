@@ -49,6 +49,7 @@ pub enum MeaningKind {
     ShallowArgumentSet(usize, Box<Meaning>),
     DeepArgumentSet(usize, usize, Box<Meaning>),
     GlobalSet(usize, Box<Meaning>),
+    Sequence(Vec<Meaning>),
 }
 
 pub enum Value {
@@ -67,6 +68,8 @@ pub fn meaning(expression: &Expression, environment: &Environment) -> Meaning {
             meaning_alternative(condition, consequent, alternate, environment, &expression.span),
         ExpressionKind::Assignment(ref variable, ref value) =>
             meaning_assignment(variable, value.as_ref(), environment, &expression.span),
+        ExpressionKind::Sequence(ref expressions) =>
+            meaning_sequence(expressions, environment, &expression.span),
         _ => unimplemented!(),
     }
 }
@@ -169,6 +172,23 @@ fn meaning_assignment(variable: &Variable, value: &Expression, environment: &Env
                 unimplemented!()
             }
         },
+        span: span.clone(),
+    }
+}
+
+fn meaning_sequence(expressions: &[Expression], environment: &Environment, span: &Option<Span>)
+    -> Meaning
+{
+    if expressions.len() == 0 {
+        panic!("BUG: (begin) not handled");
+    }
+
+    Meaning {
+        kind: MeaningKind::Sequence(
+            expressions.iter()
+                       .map(|e| meaning(e, environment))
+                       .collect()
+        ),
         span: span.clone(),
     }
 }
