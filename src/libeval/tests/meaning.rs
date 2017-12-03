@@ -53,6 +53,14 @@ fn literals() {
     check("\"string\"", "(Constant \"string\")");
 }
 
+#[test]
+fn quote_literals() {
+    check("'123",           "(Constant 123)");
+    check("(quote #\\!)",   "(Constant #\\!)");
+    check("'#t",            "(Constant #t)");
+    check("(quote \"\")",   "(Constant \"\")");
+}
+
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
