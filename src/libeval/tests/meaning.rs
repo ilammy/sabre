@@ -162,6 +162,42 @@ fn sequence() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Abstraction
+
+#[test]
+fn lambda_no_arguments() {
+    check("(lambda () #t)",     "(ClosureFixed 0 (Sequence (Constant #t)))");
+    check("(lambda () 1 2 3)",  "(ClosureFixed 0 (Sequence (Constant 1) (Constant 2) (Constant 3)))");
+}
+
+#[test]
+fn lambda_fixed_arguments() {
+    check("(lambda (n) (if n (begin 2 3) #f))",
+        "(ClosureFixed 1
+            (Sequence
+                (Alternative (ShallowArgumentReference 0)
+                    (Sequence (Constant 2) (Constant 3))
+                    (Constant #f))))");
+}
+
+#[test]
+fn lambda_fixed_arguments_nested() {
+    check(
+        "(lambda (a b n)
+           (if n
+             (lambda (x) x a)
+             (lambda (x) x b)))",
+        "(ClosureFixed 3
+            (Sequence
+                (Alternative (ShallowArgumentReference 2)
+                    (ClosureFixed 1
+                        (Sequence (ShallowArgumentReference 0) (DeepArgumentReference 1 0)))
+                    (ClosureFixed 1
+                        (Sequence (ShallowArgumentReference 0) (DeepArgumentReference 1 1))))))"
+    );
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
 use reader::datum::{ScannedDatum};
@@ -247,6 +283,8 @@ fn pretty_print(pool: &InternPool, meaning: &Meaning) -> String {
             pretty_print_global_set(pool, index, value.as_ref()),
         MeaningKind::Sequence(ref computations) =>
             pretty_print_sequence(pool, computations),
+        MeaningKind::ClosureFixed(arg_count, ref body) =>
+            pretty_print_closure_fixed(pool, arg_count, body.as_ref()),
     }
 }
 
@@ -306,6 +344,10 @@ fn pretty_print_sequence(pool: &InternPool, computations: &[Meaning]) -> String 
     }
     s.push_str(")");
     return s;
+}
+
+fn pretty_print_closure_fixed(pool: &InternPool, args_count: usize, body: &Meaning) -> String {
+    format!("(ClosureFixed {} {})", args_count, pretty_print(pool, body))
 }
 
 fn trim_space(sexpr: &str) -> String {

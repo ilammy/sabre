@@ -14,7 +14,7 @@ use locus::diagnostics::{Span};
 use reader::datum::{ScannedDatum, DatumValue};
 use reader::intern_pool::{Atom};
 
-use expression::{Expression, ExpressionKind, Literal, Variable};
+use expression::{Expression, ExpressionKind, Literal, Variable, Arguments};
 
 pub trait Environment {
     fn resolve_variable(&self, name: Atom) -> VariableKind;
@@ -50,6 +50,7 @@ pub enum MeaningKind {
     DeepArgumentSet(usize, usize, Box<Meaning>),
     GlobalSet(usize, Box<Meaning>),
     Sequence(Vec<Meaning>),
+    ClosureFixed(usize, Box<Meaning>),
 }
 
 pub enum Value {
@@ -70,6 +71,8 @@ pub fn meaning(expression: &Expression, environment: &Environment) -> Meaning {
             meaning_assignment(variable, value.as_ref(), environment, &expression.span),
         ExpressionKind::Sequence(ref expressions) =>
             meaning_sequence(expressions, environment, &expression.span),
+        ExpressionKind::Abstraction(ref arguments, ref body) =>
+            meaning_abstraction(arguments, body, environment, &expression.span),
         _ => unimplemented!(),
     }
 }
@@ -190,5 +193,68 @@ fn meaning_sequence(expressions: &[Expression], environment: &Environment, span:
                        .collect()
         ),
         span: span.clone(),
+    }
+}
+
+fn meaning_abstraction(arguments: &Arguments, body: &[Expression], environment: &Environment,
+    span: &Option<Span>) -> Meaning
+{
+    Meaning {
+        kind: match *arguments {
+            Arguments::Fixed(ref variables) =>
+                MeaningKind::ClosureFixed(variables.len(),
+                    Box::new(meaning_abstraction_fixed(variables, body, environment))
+                ),
+        },
+        span: span.clone(),
+    }
+}
+
+fn meaning_abstraction_fixed(arguments: &[Variable], body: &[Expression],
+    environment: &Environment) -> Meaning
+{
+    let new_environment = FixedVariableEnvironment::new(arguments, environment);
+
+    let body_begin = body.first().unwrap().span;
+    let body_end = body.last().unwrap().span;
+    let body_span =
+        if let (Some(span_begin), Some(span_end)) = (body_begin, body_end) {
+            Some(Span::new(span_begin.from, span_end.to))
+        } else {
+            None
+        };
+
+    return meaning_sequence(body, &new_environment, &body_span);
+}
+
+struct FixedVariableEnvironment<'a> {
+    variables: &'a [Variable],
+    upper: &'a Environment,
+}
+
+impl<'a> FixedVariableEnvironment<'a> {
+    fn new(variables: &'a [Variable], upper: &'a Environment) -> FixedVariableEnvironment<'a> {
+        FixedVariableEnvironment {
+            variables: variables,
+            upper: upper,
+        }
+    }
+}
+
+impl<'a> Environment for FixedVariableEnvironment<'a> {
+    fn resolve_variable(&self, name: Atom) -> VariableKind {
+        for (index, local) in self.variables.iter().enumerate() {
+            if name == local.name {
+                return VariableKind::Local { depth: 0, index: index };
+            }
+        }
+
+        let upper_result = self.upper.resolve_variable(name);
+
+        return if let VariableKind::Local { depth, index } = upper_result {
+            VariableKind::Local { depth: depth + 1, index: index }
+        } else {
+            upper_result
+        };
     }
 }
