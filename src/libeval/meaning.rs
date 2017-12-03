@@ -11,20 +11,47 @@
 //! This is the finish line of the front-end.
 
 use locus::diagnostics::{Span};
+use reader::intern_pool::{Atom};
 
-use expression::{Expression};
+use expression::{Expression, ExpressionKind, Literal};
 
 pub trait Environment {
 }
 
 pub struct Meaning {
-    kind: MeaningKind,
-    span: Option<Span>,
+    pub kind: MeaningKind,
+    pub span: Option<Span>,
 }
 
 pub enum MeaningKind {
+    Constant(Value),
+}
+
+pub enum Value {
+    Boolean(bool),
+    Number(Atom),
+    Character(char),
+    String(Atom),
 }
 
 pub fn meaning(expression: &Expression, environment: &Environment) -> Meaning {
-    unimplemented!()
+    match expression.kind {
+        ExpressionKind::Literal(ref value) => meaning_literal(value, &expression.span),
+        _ => unimplemented!(),
+    }
+}
+
+fn meaning_literal(value: &Literal, span: &Option<Span>) -> Meaning {
+    Meaning {
+        kind: MeaningKind::Constant(
+            match *value {
+                Literal::Boolean(value) => Value::Boolean(value),
+                Literal::Number(value) => Value::Number(value),
+                Literal::Character(value) => Value::Character(value),
+                Literal::String(value) => Value::String(value),
+                _ => unimplemented!(),
+            }
+        ),
+        span: span.clone(),
+    }
 }

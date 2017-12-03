@@ -13,7 +13,7 @@ extern crate eval;
 extern crate locus;
 extern crate reader;
 
-use eval::meaning::{meaning, Meaning, MeaningKind};
+use eval::meaning::{meaning, Meaning, MeaningKind, Value};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Tested expanders and environments
@@ -37,7 +37,20 @@ fn standard_scheme<'a>(pool: &'a InternPool, handler: &'a Handler) -> Box<Expand
 }
 
 fn basic_scheme_environment() -> Box<Environment> {
-    unimplemented!()
+    struct NoEnvironment;
+    impl Environment for NoEnvironment {}
+    return Box::new(NoEnvironment);
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Constants
+
+#[test]
+fn literals() {
+    check("42",         "(Constant 42)");
+    check("#\\x",       "(Constant #\\x)");
+    check("#false",     "(Constant #f)");
+    check("\"string\"", "(Constant \"string\")");
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -57,7 +70,9 @@ fn check(input: &str, output: &str) {
     let expression = expand(&pool, &datum);
     let meaning = treat(&expression);
 
-    assert_eq!(trim_space(&pretty_print(&meaning)), trim_space(output));
+    let actual = pretty_print(&pool, &meaning);
+
+    assert_eq!(trim_space(&actual), trim_space(output));
 }
 
 fn parse(pool: &InternPool, input: &str) -> ScannedDatum {
@@ -107,10 +122,50 @@ fn treat(expression: &Expression) -> Meaning {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Pretty-printing meanings
 
-fn pretty_print(meaning: &Meaning) -> String {
-    unimplemented!()
+fn pretty_print(pool: &InternPool, meaning: &Meaning) -> String {
+    match meaning.kind {
+        MeaningKind::Constant(ref value) => pretty_print_constant(pool, value),
+    }
+}
+
+fn pretty_print_constant(pool: &InternPool, value: &Value) -> String {
+    match *value {
+        Value::Boolean(value) => format!("(Constant {})", if value { "#t" } else { "#f" }),
+        Value::Character(value) => format!("(Constant #\\{})", value),
+        Value::Number(value) => format!("(Constant {})", pool.get(value)),
+        Value::String(value) => format!("(Constant \"{}\")", pool.get(value)), // TODO: escape quotes
+    }
 }
 
 fn trim_space(sexpr: &str) -> String {
-    unimplemented!()
+    enum State {
+        InString,
+        Other,
+    }
+    let mut state = State::Other;
+    let mut previous_whitespace = false;
+
+    let mut result = String::with_capacity(sexpr.len());
+
+    for c in sexpr.chars() {
+        match state {
+            State::InString => {
+                if c == '"' {
+                    state = State::Other;
+                }
+            }
+            State::Other => {
+                if c == '"' {
+                    state = State::InString;
+                }
+                if previous_whitespace && c.is_whitespace() {
+                    continue;
+                }
+            }
+        }
+        previous_whitespace = c.is_whitespace();
+        result.push(c);
+    }
+
+    return result;
 }
