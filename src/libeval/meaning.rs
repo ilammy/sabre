@@ -17,6 +17,21 @@ use reader::intern_pool::{Atom};
 use expression::{Expression, ExpressionKind, Literal};
 
 pub trait Environment {
+    fn resolve_variable(&self, name: Atom) -> VariableKind;
+}
+
+pub enum VariableKind {
+    Local {
+        depth: usize,
+        index: usize,
+    },
+    Global {
+        index: usize,
+    },
+    Imported {
+        index: usize,
+    },
+    Unresolved,
 }
 
 pub struct Meaning {
@@ -26,6 +41,10 @@ pub struct Meaning {
 
 pub enum MeaningKind {
     Constant(Value),
+    ShallowArgumentReference(usize),
+    DeepArgumentReference(usize, usize),
+    GlobalReference(usize),
+    ImportedReference(usize),
 }
 
 pub enum Value {
@@ -39,6 +58,7 @@ pub fn meaning(expression: &Expression, environment: &Environment) -> Meaning {
     match expression.kind {
         ExpressionKind::Literal(ref value) => meaning_literal(value, &expression.span),
         ExpressionKind::Quotation(ref datum) => meaning_quote(datum, &expression.span),
+        ExpressionKind::Reference(name) => meaning_reference(name, environment, &expression.span),
         _ => unimplemented!(),
     }
 }
@@ -69,6 +89,32 @@ fn meaning_quote(datum: &ScannedDatum, span: &Option<Span>) -> Meaning {
                 _ => unimplemented!(),
             }
         ),
+        span: span.clone(),
+    }
+}
+
+fn meaning_reference(name: Atom, environment: &Environment, span: &Option<Span>) -> Meaning {
+    Meaning {
+        kind: match environment.resolve_variable(name)  {
+            VariableKind::Local { depth, index } => {
+                if depth == 0 {
+                    MeaningKind::ShallowArgumentReference(index)
+                } else {
+                    MeaningKind::DeepArgumentReference(depth, index)
+                }
+            }
+            VariableKind::Global { index } => {
+                MeaningKind::GlobalReference(index)
+            }
+            VariableKind::Imported { index } => {
+                MeaningKind::ImportedReference(index)
+            }
+            VariableKind::Unresolved => {
+                // report error
+                // provide suggestions
+                unimplemented!()
+            }
+        },
         span: span.clone(),
     }
 }

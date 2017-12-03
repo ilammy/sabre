@@ -20,9 +20,9 @@ use eval::meaning::{meaning, Meaning, MeaningKind, Value};
 
 use eval::expanders::{Expander, ExpanderStack, BasicExpander, ApplicationExpander,
     QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
-use eval::meaning::{Environment};
+use eval::meaning::{Environment, VariableKind};
 use locus::diagnostics::{Handler};
-use reader::intern_pool::{InternPool};
+use reader::intern_pool::{InternPool, Atom};
 
 fn standard_scheme<'a>(pool: &'a InternPool, handler: &'a Handler) -> Box<Expander +'a> {
     Box::new(
@@ -36,10 +36,47 @@ fn standard_scheme<'a>(pool: &'a InternPool, handler: &'a Handler) -> Box<Expand
     )
 }
 
-fn basic_scheme_environment() -> Box<Environment> {
-    struct NoEnvironment;
-    impl Environment for NoEnvironment {}
-    return Box::new(NoEnvironment);
+struct BasicSchemeEnvironment {
+    car: Atom,
+    cdr: Atom,
+    cons: Atom,
+    global: Atom,
+}
+
+impl BasicSchemeEnvironment {
+    fn new(pool: &InternPool) -> BasicSchemeEnvironment {
+        BasicSchemeEnvironment {
+            car: pool.intern("car"),
+            cdr: pool.intern("cdr"),
+            cons: pool.intern("cons"),
+            global: pool.intern("*global*"),
+        }
+    }
+}
+
+impl Environment for BasicSchemeEnvironment {
+    fn resolve_variable(&self, name: Atom) -> VariableKind {
+        // Imported variables
+        if name == self.car {
+            return VariableKind::Imported { index: 0 };
+        }
+        if name == self.cdr {
+            return VariableKind::Imported { index: 1 };
+        }
+        if name == self.cons {
+            return VariableKind::Imported { index: 2 };
+        }
+        // Global variables
+        if name == self.global {
+            return VariableKind::Global { index: 0 };
+        }
+        // Anything else
+        return VariableKind::Unresolved;
+    }
+}
+
+fn basic_scheme_environment(pool: &InternPool) -> Box<Environment> {
+    Box::new(BasicSchemeEnvironment::new(pool))
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -62,6 +99,21 @@ fn quote_literals() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Global and imported variables
+
+#[test]
+fn reference_imported() {
+    check("car",    "(ImportedReference 0)");
+    check("cdr",    "(ImportedReference 1)");
+    check("cons",   "(ImportedReference 2)");
+}
+
+#[test]
+fn reference_global() {
+    check("*global*",   "(GlobalReference 0)");
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
 use reader::datum::{ScannedDatum};
@@ -76,7 +128,7 @@ fn check(input: &str, output: &str) {
 
     let datum = parse(&pool, input);
     let expression = expand(&pool, &datum);
-    let meaning = treat(&expression);
+    let meaning = treat(&pool, &expression);
 
     let actual = pretty_print(&pool, &meaning);
 
@@ -121,8 +173,8 @@ fn expand(pool: &InternPool, datum: &ScannedDatum) -> Expression {
     panic!("expander did not produce an expression");
 }
 
-fn treat(expression: &Expression) -> Meaning {
-    let environment = basic_scheme_environment();
+fn treat(pool: &InternPool, expression: &Expression) -> Meaning {
+    let environment = basic_scheme_environment(pool);
 
     return meaning(expression, environment.as_ref());
 }
@@ -133,6 +185,10 @@ fn treat(expression: &Expression) -> Meaning {
 fn pretty_print(pool: &InternPool, meaning: &Meaning) -> String {
     match meaning.kind {
         MeaningKind::Constant(ref value) => pretty_print_constant(pool, value),
+        MeaningKind::ShallowArgumentReference(index) => pretty_print_shallow_reference(index),
+        MeaningKind::DeepArgumentReference(depth, index) => pretty_print_deep_reference(depth, index),
+        MeaningKind::GlobalReference(index) => pretty_print_global_reference(index),
+        MeaningKind::ImportedReference(index) => pretty_print_imported_reference(index),
     }
 }
 
@@ -143,6 +199,22 @@ fn pretty_print_constant(pool: &InternPool, value: &Value) -> String {
         Value::Number(value) => format!("(Constant {})", pool.get(value)),
         Value::String(value) => format!("(Constant \"{}\")", pool.get(value)), // TODO: escape quotes
     }
+}
+
+fn pretty_print_shallow_reference(index: usize) -> String {
+    format!("(ShallowArgumentReference {})", index)
+}
+
+fn pretty_print_deep_reference(depth: usize, index: usize) -> String {
+    format!("(DeepArgumentReference {} {})", depth, index)
+}
+
+fn pretty_print_global_reference(index: usize) -> String {
+    format!("(GlobalReference {})", index)
+}
+
+fn pretty_print_imported_reference(index: usize) -> String {
+    format!("(ImportedReference {})", index)
 }
 
 fn trim_space(sexpr: &str) -> String {
