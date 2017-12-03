@@ -31,7 +31,7 @@ fn standard_scheme<'a>(pool: &'a InternPool, handler: &'a Handler) -> Box<Expand
             .push(Box::new( QuoteExpander::new(pool.intern("quote"),  handler)))
             .push(Box::new( BeginExpander::new(pool.intern("begin"),  handler)))
             .push(Box::new(    IfExpander::new(pool.intern("if"),     handler)))
-            .push(Box::new(   SetExpander::new(pool.intern("set"),    handler)))
+            .push(Box::new(   SetExpander::new(pool.intern("set!"),   handler)))
             .push(Box::new(LambdaExpander::new(pool.intern("lambda"), handler)))
     )
 }
@@ -138,6 +138,15 @@ fn alternative_nested() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Assignment
+
+#[test]
+fn assignment_global() {
+    check("(set! *global* car)",        "(GlobalSet 0 (ImportedReference 0))");
+    check("(set! *global* *global*)",   "(GlobalSet 0 (GlobalReference 0))");
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
 use reader::datum::{ScannedDatum};
@@ -215,6 +224,12 @@ fn pretty_print(pool: &InternPool, meaning: &Meaning) -> String {
         MeaningKind::ImportedReference(index) => pretty_print_imported_reference(index),
         MeaningKind::Alternative(ref condition, ref consequent, ref alternate) =>
             pretty_print_alternative(pool, condition, consequent, alternate),
+        MeaningKind::ShallowArgumentSet(index, ref value) =>
+            pretty_print_shallow_set(pool, index, value.as_ref()),
+        MeaningKind::DeepArgumentSet(depth, index, ref value) =>
+            pretty_print_deep_set(pool, depth, index, value.as_ref()),
+        MeaningKind::GlobalSet(index, ref value) =>
+            pretty_print_global_set(pool, index, value.as_ref()),
     }
 }
 
@@ -251,6 +266,18 @@ fn pretty_print_alternative(pool: &InternPool, condition: &Meaning, consequent: 
         pretty_print(pool, consequent),
         pretty_print(pool, alternate)
     )
+}
+
+fn pretty_print_shallow_set(pool: &InternPool, index: usize, value: &Meaning) -> String {
+    format!("(ShallowArgumentSet {} {})", index, pretty_print(pool, value))
+}
+
+fn pretty_print_deep_set(pool: &InternPool, depth: usize, index: usize, value: &Meaning) -> String {
+    format!("(DeepArgumentSet {} {} {})", depth, index, pretty_print(pool, value))
+}
+
+fn pretty_print_global_set(pool: &InternPool, index: usize, value: &Meaning) -> String {
+    format!("(GlobalSet {} {})", index, pretty_print(pool, value))
 }
 
 fn trim_space(sexpr: &str) -> String {

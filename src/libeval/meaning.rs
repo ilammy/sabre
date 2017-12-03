@@ -14,7 +14,7 @@ use locus::diagnostics::{Span};
 use reader::datum::{ScannedDatum, DatumValue};
 use reader::intern_pool::{Atom};
 
-use expression::{Expression, ExpressionKind, Literal};
+use expression::{Expression, ExpressionKind, Literal, Variable};
 
 pub trait Environment {
     fn resolve_variable(&self, name: Atom) -> VariableKind;
@@ -46,6 +46,9 @@ pub enum MeaningKind {
     GlobalReference(usize),
     ImportedReference(usize),
     Alternative(Box<Meaning>, Box<Meaning>, Box<Meaning>),
+    ShallowArgumentSet(usize, Box<Meaning>),
+    DeepArgumentSet(usize, usize, Box<Meaning>),
+    GlobalSet(usize, Box<Meaning>),
 }
 
 pub enum Value {
@@ -62,6 +65,8 @@ pub fn meaning(expression: &Expression, environment: &Environment) -> Meaning {
         ExpressionKind::Reference(name) => meaning_reference(name, environment, &expression.span),
         ExpressionKind::Alternative(ref condition, ref consequent, ref alternate) =>
             meaning_alternative(condition, consequent, alternate, environment, &expression.span),
+        ExpressionKind::Assignment(ref variable, ref value) =>
+            meaning_assignment(variable, value.as_ref(), environment, &expression.span),
         _ => unimplemented!(),
     }
 }
@@ -131,6 +136,39 @@ fn meaning_alternative(condition: &Expression, consequent: &Expression, alternat
             Box::new(meaning(consequent, environment)),
             Box::new(meaning(alternate, environment)),
         ),
+        span: span.clone(),
+    }
+}
+
+fn meaning_assignment(variable: &Variable, value: &Expression, environment: &Environment,
+    span: &Option<Span>) -> Meaning
+{
+    // Note that we use the same environment, not extended with the variable name.
+    let new_value = Box::new(meaning(value, environment));
+
+    Meaning {
+        kind: match environment.resolve_variable(variable.name) {
+            VariableKind::Local { depth, index } => {
+                if depth == 0 {
+                    MeaningKind::ShallowArgumentSet(index, new_value)
+                } else {
+                    MeaningKind::DeepArgumentSet(depth, index, new_value)
+                }
+            }
+            VariableKind::Global { index } => {
+                MeaningKind::GlobalSet(index, new_value)
+            }
+            VariableKind::Imported { index } => {
+                // report error
+                // provide suggestions?
+                unimplemented!()
+            }
+            VariableKind::Unresolved => {
+                // report error
+                // provide suggestions
+                unimplemented!()
+            }
+        },
         span: span.clone(),
     }
 }
