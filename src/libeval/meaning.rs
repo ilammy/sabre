@@ -62,153 +62,134 @@ pub enum Value {
 }
 
 pub fn meaning(expression: &Expression, environment: &Environment) -> Meaning {
-    match expression.kind {
-        ExpressionKind::Literal(ref value) => meaning_literal(value, &expression.span),
-        ExpressionKind::Quotation(ref datum) => meaning_quote(datum, &expression.span),
-        ExpressionKind::Reference(name) => meaning_reference(name, environment, &expression.span),
-        ExpressionKind::Alternative(ref condition, ref consequent, ref alternate) =>
-            meaning_alternative(condition, consequent, alternate, environment, &expression.span),
-        ExpressionKind::Assignment(ref variable, ref value) =>
-            meaning_assignment(variable, value.as_ref(), environment, &expression.span),
-        ExpressionKind::Sequence(ref expressions) =>
-            meaning_sequence(expressions, environment, &expression.span),
-        ExpressionKind::Abstraction(ref arguments, ref body) =>
-            meaning_abstraction(arguments, body, environment, &expression.span),
-        ExpressionKind::Application(ref terms) =>
-            meaning_application(terms, environment, &expression.span),
-    }
-}
-
-fn meaning_literal(value: &Literal, span: &Option<Span>) -> Meaning {
     Meaning {
-        kind: MeaningKind::Constant(
-            match *value {
-                Literal::Boolean(value) => Value::Boolean(value),
-                Literal::Number(value) => Value::Number(value),
-                Literal::Character(value) => Value::Character(value),
-                Literal::String(value) => Value::String(value),
-                _ => unimplemented!(),
-            }
-        ),
-        span: span.clone(),
-    }
-}
-
-fn meaning_quote(datum: &ScannedDatum, span: &Option<Span>) -> Meaning {
-    Meaning {
-        kind: MeaningKind::Constant(
-            match datum.value {
-                DatumValue::Boolean(value) => Value::Boolean(value),
-                DatumValue::Number(value) => Value::Number(value),
-                DatumValue::Character(value) => Value::Character(value),
-                DatumValue::String(value) => Value::String(value),
-                _ => unimplemented!(),
-            }
-        ),
-        span: span.clone(),
-    }
-}
-
-fn meaning_reference(name: Atom, environment: &Environment, span: &Option<Span>) -> Meaning {
-    Meaning {
-        kind: match environment.resolve_variable(name)  {
-            VariableKind::Local { depth, index } => {
-                if depth == 0 {
-                    MeaningKind::ShallowArgumentReference(index)
-                } else {
-                    MeaningKind::DeepArgumentReference(depth, index)
-                }
-            }
-            VariableKind::Global { index } => {
-                MeaningKind::GlobalReference(index)
-            }
-            VariableKind::Imported { index } => {
-                MeaningKind::ImportedReference(index)
-            }
-            VariableKind::Unresolved => {
-                // report error
-                // provide suggestions
-                unimplemented!()
-            }
+        kind: match expression.kind {
+            ExpressionKind::Literal(ref value) =>
+                meaning_literal(value),
+            ExpressionKind::Quotation(ref datum) =>
+                meaning_quote(datum),
+            ExpressionKind::Reference(name) =>
+                meaning_reference(name, environment),
+            ExpressionKind::Alternative(ref condition, ref consequent, ref alternate) =>
+                meaning_alternative(condition, consequent, alternate, environment),
+            ExpressionKind::Assignment(ref variable, ref value) =>
+                meaning_assignment(variable, value.as_ref(), environment),
+            ExpressionKind::Sequence(ref expressions) =>
+                meaning_sequence(expressions, environment),
+            ExpressionKind::Abstraction(ref arguments, ref body) =>
+                meaning_abstraction(arguments, body, environment),
+            ExpressionKind::Application(ref terms) =>
+                meaning_application(terms, environment),
         },
-        span: span.clone(),
+        span: expression.span.clone(),
+    }
+}
+
+fn meaning_literal(value: &Literal) -> MeaningKind {
+    MeaningKind::Constant(
+        match *value {
+            Literal::Boolean(value) => Value::Boolean(value),
+            Literal::Number(value) => Value::Number(value),
+            Literal::Character(value) => Value::Character(value),
+            Literal::String(value) => Value::String(value),
+            _ => unimplemented!(),
+        }
+    )
+}
+
+fn meaning_quote(datum: &ScannedDatum) -> MeaningKind {
+    MeaningKind::Constant(
+        match datum.value {
+            DatumValue::Boolean(value) => Value::Boolean(value),
+            DatumValue::Number(value) => Value::Number(value),
+            DatumValue::Character(value) => Value::Character(value),
+            DatumValue::String(value) => Value::String(value),
+            _ => unimplemented!(),
+        }
+    )
+}
+
+fn meaning_reference(name: Atom, environment: &Environment) -> MeaningKind {
+    match environment.resolve_variable(name)  {
+        VariableKind::Local { depth, index } => {
+            if depth == 0 {
+                MeaningKind::ShallowArgumentReference(index)
+            } else {
+                MeaningKind::DeepArgumentReference(depth, index)
+            }
+        }
+        VariableKind::Global { index } => {
+            MeaningKind::GlobalReference(index)
+        }
+        VariableKind::Imported { index } => {
+            MeaningKind::ImportedReference(index)
+        }
+        VariableKind::Unresolved => {
+            // report error
+            // provide suggestions
+            unimplemented!()
+        }
     }
 }
 
 fn meaning_alternative(condition: &Expression, consequent: &Expression, alternate: &Expression,
-    environment: &Environment, span: &Option<Span>) -> Meaning
+    environment: &Environment) -> MeaningKind
 {
-    Meaning {
-        kind: MeaningKind::Alternative(
-            Box::new(meaning(condition, environment)),
-            Box::new(meaning(consequent, environment)),
-            Box::new(meaning(alternate, environment)),
-        ),
-        span: span.clone(),
-    }
+    MeaningKind::Alternative(
+        Box::new(meaning(condition, environment)),
+        Box::new(meaning(consequent, environment)),
+        Box::new(meaning(alternate, environment)),
+    )
 }
 
-fn meaning_assignment(variable: &Variable, value: &Expression, environment: &Environment,
-    span: &Option<Span>) -> Meaning
+fn meaning_assignment(variable: &Variable, value: &Expression,
+    environment: &Environment) -> MeaningKind
 {
     // Note that we use the same environment, not extended with the variable name.
     let new_value = Box::new(meaning(value, environment));
 
-    Meaning {
-        kind: match environment.resolve_variable(variable.name) {
-            VariableKind::Local { depth, index } => {
-                if depth == 0 {
-                    MeaningKind::ShallowArgumentSet(index, new_value)
-                } else {
-                    MeaningKind::DeepArgumentSet(depth, index, new_value)
-                }
+    match environment.resolve_variable(variable.name) {
+        VariableKind::Local { depth, index } => {
+            if depth == 0 {
+                MeaningKind::ShallowArgumentSet(index, new_value)
+            } else {
+                MeaningKind::DeepArgumentSet(depth, index, new_value)
             }
-            VariableKind::Global { index } => {
-                MeaningKind::GlobalSet(index, new_value)
-            }
-            VariableKind::Imported { index } => {
-                // report error
-                // provide suggestions?
-                unimplemented!()
-            }
-            VariableKind::Unresolved => {
-                // report error
-                // provide suggestions
-                unimplemented!()
-            }
-        },
-        span: span.clone(),
+        }
+        VariableKind::Global { index } => {
+            MeaningKind::GlobalSet(index, new_value)
+        }
+        VariableKind::Imported { index } => {
+            // report error
+            // provide suggestions?
+            unimplemented!()
+        }
+        VariableKind::Unresolved => {
+            // report error
+            // provide suggestions
+            unimplemented!()
+        }
     }
 }
 
-fn meaning_sequence(expressions: &[Expression], environment: &Environment, span: &Option<Span>)
-    -> Meaning
-{
-    if expressions.len() == 0 {
-        panic!("BUG: (begin) not handled");
-    }
+fn meaning_sequence(expressions: &[Expression], environment: &Environment) -> MeaningKind {
+    assert!(expressions.len() >= 1, "BUG: (begin) not handled");
 
-    Meaning {
-        kind: MeaningKind::Sequence(
-            expressions.iter()
-                       .map(|e| meaning(e, environment))
-                       .collect()
-        ),
-        span: span.clone(),
-    }
+    MeaningKind::Sequence(
+        expressions.iter()
+                    .map(|e| meaning(e, environment))
+                    .collect()
+    )
 }
 
-fn meaning_abstraction(arguments: &Arguments, body: &[Expression], environment: &Environment,
-    span: &Option<Span>) -> Meaning
+fn meaning_abstraction(arguments: &Arguments, body: &[Expression],
+    environment: &Environment) -> MeaningKind
 {
-    Meaning {
-        kind: match *arguments {
-            Arguments::Fixed(ref variables) =>
-                MeaningKind::ClosureFixed(variables.len(),
-                    Box::new(meaning_abstraction_fixed(variables, body, environment))
-                ),
-        },
-        span: span.clone(),
+    match *arguments {
+        Arguments::Fixed(ref variables) =>
+            MeaningKind::ClosureFixed(variables.len(),
+                Box::new(meaning_abstraction_fixed(variables, body, environment))
+            ),
     }
 }
 
@@ -226,7 +207,10 @@ fn meaning_abstraction_fixed(arguments: &[Variable], body: &[Expression],
             None
         };
 
-    return meaning_sequence(body, &new_environment, &body_span);
+    return Meaning {
+        kind: meaning_sequence(body, &new_environment),
+        span: body_span,
+    };
 }
 
 struct FixedVariableEnvironment<'a> {
@@ -261,16 +245,11 @@ impl<'a> Environment for FixedVariableEnvironment<'a> {
     }
 }
 
-fn meaning_application(terms: &[Expression], environment: &Environment, span: &Option<Span>)
-    -> Meaning
-{
+fn meaning_application(terms: &[Expression], environment: &Environment) -> MeaningKind {
     assert!(terms.len() >= 1, "BUG: empty application");
 
     let procedure = Box::new(meaning(&terms[0], environment));
     let arguments = terms[1..].iter().map(|e| meaning(e, environment)).collect();
 
-    Meaning {
-        kind: MeaningKind::ProcedureCall(procedure, arguments),
-        span: span.clone(),
-    }
+    return MeaningKind::ProcedureCall(procedure, arguments);
 }
