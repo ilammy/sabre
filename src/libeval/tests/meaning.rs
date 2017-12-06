@@ -198,6 +198,34 @@ fn lambda_fixed_arguments_nested() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Application
+
+#[test]
+fn application_simple() {
+    check("(cons 1 2)", "(ProcedureCall (ImportedReference 2) (Constant 1) (Constant 2))");
+}
+
+#[test]
+fn application_nested() {
+    check("(car (cons 1 2))",
+        "(ProcedureCall (ImportedReference 0)
+            (ProcedureCall (ImportedReference 2) (Constant 1) (Constant 2)))");
+}
+
+#[test]
+fn application_closed() {
+    check("((lambda (a b) (cons a b)) 1 2)",
+        "(ProcedureCall
+            (ClosureFixed 2
+                (Sequence
+                    (ProcedureCall (ImportedReference 2)
+                        (ShallowArgumentReference 0)
+                        (ShallowArgumentReference 1))))
+            (Constant 1)
+            (Constant 2))");
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
 use reader::datum::{ScannedDatum};
@@ -285,6 +313,8 @@ fn pretty_print(pool: &InternPool, meaning: &Meaning) -> String {
             pretty_print_sequence(pool, computations),
         MeaningKind::ClosureFixed(arg_count, ref body) =>
             pretty_print_closure_fixed(pool, arg_count, body.as_ref()),
+        MeaningKind::ProcedureCall(ref procedure, ref args) =>
+            pretty_print_procedure_call(pool, procedure.as_ref(), args.as_ref()),
     }
 }
 
@@ -348,6 +378,18 @@ fn pretty_print_sequence(pool: &InternPool, computations: &[Meaning]) -> String 
 
 fn pretty_print_closure_fixed(pool: &InternPool, args_count: usize, body: &Meaning) -> String {
     format!("(ClosureFixed {} {})", args_count, pretty_print(pool, body))
+}
+
+fn pretty_print_procedure_call(pool: &InternPool, procedure: &Meaning, args: &[Meaning]) -> String {
+    let mut s = String::new();
+    s.push_str("(ProcedureCall ");
+    s.push_str(&pretty_print(pool, procedure));
+    for a in args {
+        s.push_str(" ");
+        s.push_str(&pretty_print(pool, a));
+    }
+    s.push_str(")");
+    return s;
 }
 
 fn trim_space(sexpr: &str) -> String {

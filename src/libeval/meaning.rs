@@ -51,6 +51,7 @@ pub enum MeaningKind {
     GlobalSet(usize, Box<Meaning>),
     Sequence(Vec<Meaning>),
     ClosureFixed(usize, Box<Meaning>),
+    ProcedureCall(Box<Meaning>, Vec<Meaning>),
 }
 
 pub enum Value {
@@ -73,7 +74,8 @@ pub fn meaning(expression: &Expression, environment: &Environment) -> Meaning {
             meaning_sequence(expressions, environment, &expression.span),
         ExpressionKind::Abstraction(ref arguments, ref body) =>
             meaning_abstraction(arguments, body, environment, &expression.span),
-        _ => unimplemented!(),
+        ExpressionKind::Application(ref terms) =>
+            meaning_application(terms, environment, &expression.span),
     }
 }
 
@@ -256,5 +258,19 @@ impl<'a> Environment for FixedVariableEnvironment<'a> {
         } else {
             upper_result
         };
+    }
+}
+
+fn meaning_application(terms: &[Expression], environment: &Environment, span: &Option<Span>)
+    -> Meaning
+{
+    assert!(terms.len() >= 1, "BUG: empty application");
+
+    let procedure = Box::new(meaning(&terms[0], environment));
+    let arguments = terms[1..].iter().map(|e| meaning(e, environment)).collect();
+
+    Meaning {
+        kind: MeaningKind::ProcedureCall(procedure, arguments),
+        span: span.clone(),
     }
 }
