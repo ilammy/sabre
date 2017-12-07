@@ -18,11 +18,14 @@ use eval::meaning::{meaning, Meaning, MeaningKind, Value};
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Tested expanders and environments
 
+use std::rc::{Rc};
+
 use eval::expanders::{Expander, ExpanderStack, BasicExpander, ApplicationExpander,
     QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
-use eval::meaning::{Environment, VariableKind};
+use eval::expression::{Variable};
+use eval::meaning::{Environment};
 use locus::diagnostics::{Handler};
-use reader::intern_pool::{InternPool, Atom};
+use reader::intern_pool::{InternPool};
 
 fn standard_scheme<'a>(pool: &'a InternPool, handler: &'a Handler) -> Box<Expander +'a> {
     Box::new(
@@ -36,47 +39,20 @@ fn standard_scheme<'a>(pool: &'a InternPool, handler: &'a Handler) -> Box<Expand
     )
 }
 
-struct BasicSchemeEnvironment {
-    car: Atom,
-    cdr: Atom,
-    cons: Atom,
-    global: Atom,
-}
+fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
+    let imported_vars = [
+        Variable { name: pool.intern("car"), span: None },
+        Variable { name: pool.intern("cdr"), span: None },
+        Variable { name: pool.intern("cons"), span: None },
+    ];
+    let global_vars = [
+        Variable { name: pool.intern("*global*"), span: None },
+    ];
 
-impl BasicSchemeEnvironment {
-    fn new(pool: &InternPool) -> BasicSchemeEnvironment {
-        BasicSchemeEnvironment {
-            car: pool.intern("car"),
-            cdr: pool.intern("cdr"),
-            cons: pool.intern("cons"),
-            global: pool.intern("*global*"),
-        }
-    }
-}
+    let imported_env = Environment::new_imported(&imported_vars);
+    let global_env = Environment::new_global(&global_vars, &imported_env);
 
-impl Environment for BasicSchemeEnvironment {
-    fn resolve_variable(&self, name: Atom) -> VariableKind {
-        // Imported variables
-        if name == self.car {
-            return VariableKind::Imported { index: 0 };
-        }
-        if name == self.cdr {
-            return VariableKind::Imported { index: 1 };
-        }
-        if name == self.cons {
-            return VariableKind::Imported { index: 2 };
-        }
-        // Global variables
-        if name == self.global {
-            return VariableKind::Global { index: 0 };
-        }
-        // Anything else
-        return VariableKind::Unresolved;
-    }
-}
-
-fn basic_scheme_environment(pool: &InternPool) -> Box<Environment> {
-    Box::new(BasicSchemeEnvironment::new(pool))
+    return global_env;
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -288,7 +264,7 @@ fn expand(pool: &InternPool, datum: &ScannedDatum) -> Expression {
 fn treat(pool: &InternPool, expression: &Expression) -> Meaning {
     let environment = basic_scheme_environment(pool);
 
-    return meaning(expression, environment.as_ref());
+    return meaning(expression, &environment);
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
