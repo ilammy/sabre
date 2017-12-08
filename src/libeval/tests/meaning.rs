@@ -24,7 +24,7 @@ use eval::expanders::{Expander, ExpanderStack, BasicExpander, ApplicationExpande
     QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
 use eval::expression::{Variable};
 use eval::meaning::{Environment};
-use locus::diagnostics::{Handler};
+use locus::diagnostics::{Diagnostic, DiagnosticKind, Handler, Span};
 use reader::intern_pool::{InternPool};
 
 fn standard_scheme<'a>(pool: &'a InternPool, handler: &'a Handler) -> Box<Expander +'a> {
@@ -60,18 +60,18 @@ fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
 
 #[test]
 fn literals() {
-    check("42",         "(Constant 42)");
-    check("#\\x",       "(Constant #\\x)");
-    check("#false",     "(Constant #f)");
-    check("\"string\"", "(Constant \"string\")");
+    check("42",         "(Constant 42)",            &[]);
+    check("#\\x",       "(Constant #\\x)",          &[]);
+    check("#false",     "(Constant #f)",            &[]);
+    check("\"string\"", "(Constant \"string\")",    &[]);
 }
 
 #[test]
 fn quote_literals() {
-    check("'123",           "(Constant 123)");
-    check("(quote #\\!)",   "(Constant #\\!)");
-    check("'#t",            "(Constant #t)");
-    check("(quote \"\")",   "(Constant \"\")");
+    check("'123",           "(Constant 123)",   &[]);
+    check("(quote #\\!)",   "(Constant #\\!)",  &[]);
+    check("'#t",            "(Constant #t)",    &[]);
+    check("(quote \"\")",   "(Constant \"\")",  &[]);
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -79,14 +79,24 @@ fn quote_literals() {
 
 #[test]
 fn reference_imported() {
-    check("car",    "(ImportedReference 0)");
-    check("cdr",    "(ImportedReference 1)");
-    check("cons",   "(ImportedReference 2)");
+    check("car",    "(ImportedReference 0)",    &[]);
+    check("cdr",    "(ImportedReference 1)",    &[]);
+    check("cons",   "(ImportedReference 2)",    &[]);
 }
 
 #[test]
 fn reference_global() {
-    check("*global*",   "(GlobalReference 0)");
+    check("*global*",   "(GlobalReference 0)",  &[]);
+}
+
+#[test]
+fn reference_undefined() {
+    check("@@UNDEFINED_VARIABLE@@", "(Undefined)", &[
+        Diagnostic {
+            kind: DiagnosticKind::err_meaning_unresolved_variable,
+            loc: Some(Span::new(0, 22)),
+        },
+    ]);
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -95,12 +105,15 @@ fn reference_global() {
 #[test]
 fn alternative() {
     check("(if #t 1 0)",
-        "(Alternative (Constant #t) (Constant 1) (Constant 0))");
-
+        "(Alternative (Constant #t) (Constant 1) (Constant 0))",
+        &[]
+    );
     check("(if *global* car cdr)",
         "(Alternative (GlobalReference 0)
             (ImportedReference 0)
-            (ImportedReference 1))");
+            (ImportedReference 1))",
+        &[]
+    );
 }
 
 #[test]
@@ -110,7 +123,9 @@ fn alternative_nested() {
                           (Constant 1)
                           (Constant #f))
             (Constant 1)
-            (Constant 0))");
+            (Constant 0))",
+        &[]
+    );
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -118,8 +133,57 @@ fn alternative_nested() {
 
 #[test]
 fn assignment_global() {
-    check("(set! *global* car)",        "(GlobalSet 0 (ImportedReference 0))");
-    check("(set! *global* *global*)",   "(GlobalSet 0 (GlobalReference 0))");
+    check("(set! *global* car)",
+        "(GlobalSet 0 (ImportedReference 0))",
+        &[]
+    );
+    check("(set! *global* *global*)",
+        "(GlobalSet 0 (GlobalReference 0))",
+        &[]
+    );
+}
+
+#[test]
+fn assignment_undefined() {
+    check("(set! undefined 1)",
+        "(Constant 1)",
+        &[
+            Diagnostic {
+                kind: DiagnosticKind::err_meaning_unresolved_variable,
+                loc: Some(Span::new(6, 15)),
+            },
+        ]
+    );
+    check("(set! undefined (undefined undefined))",
+        "(ProcedureCall (Undefined) (Undefined))",
+        &[
+            Diagnostic {
+                kind: DiagnosticKind::err_meaning_unresolved_variable,
+                loc: Some(Span::new(6, 15)),
+            },
+            Diagnostic {
+                kind: DiagnosticKind::err_meaning_unresolved_variable,
+                loc: Some(Span::new(17, 26)),
+            },
+            Diagnostic {
+                kind: DiagnosticKind::err_meaning_unresolved_variable,
+                loc: Some(Span::new(27, 36)),
+            },
+        ]
+    );
+}
+
+#[test]
+fn assignment_imported() {
+    check("(set! car cdr)",
+        "(ImportedReference 1)",
+        &[
+            Diagnostic {
+                kind: DiagnosticKind::err_meaning_assign_to_imported_binding,
+                loc: Some(Span::new(6, 9)),
+            },
+        ]
+    );
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -127,14 +191,19 @@ fn assignment_global() {
 
 #[test]
 fn sequence() {
-    check("(begin 1 2 3)", "(Sequence (Constant 1) (Constant 2) (Constant 3))");
+    check("(begin 1 2 3)",
+        "(Sequence (Constant 1) (Constant 2) (Constant 3))",
+        &[]
+    );
     check("(begin (begin #f #f #t) (if #f 1 2) (begin 9))",
         "(Sequence
             (Sequence (Constant #f) (Constant #f) (Constant #t))
             (Alternative (Constant #f)
                 (Constant 1)
                 (Constant 2))
-            (Sequence (Constant 9)))");
+            (Sequence (Constant 9)))",
+        &[]
+    );
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -142,8 +211,14 @@ fn sequence() {
 
 #[test]
 fn lambda_no_arguments() {
-    check("(lambda () #t)",     "(ClosureFixed 0 (Sequence (Constant #t)))");
-    check("(lambda () 1 2 3)",  "(ClosureFixed 0 (Sequence (Constant 1) (Constant 2) (Constant 3)))");
+    check("(lambda () #t)",
+        "(ClosureFixed 0 (Sequence (Constant #t)))",
+        &[]
+    );
+    check("(lambda () 1 2 3)",
+        "(ClosureFixed 0 (Sequence (Constant 1) (Constant 2) (Constant 3)))",
+        &[]
+    );
 }
 
 #[test]
@@ -153,7 +228,9 @@ fn lambda_fixed_arguments() {
             (Sequence
                 (Alternative (ShallowArgumentReference 0)
                     (Sequence (Constant 2) (Constant 3))
-                    (Constant #f))))");
+                    (Constant #f))))",
+        &[]
+    );
 }
 
 #[test]
@@ -169,7 +246,23 @@ fn lambda_fixed_arguments_nested() {
                     (ClosureFixed 1
                         (Sequence (ShallowArgumentReference 0) (DeepArgumentReference 1 0)))
                     (ClosureFixed 1
-                        (Sequence (ShallowArgumentReference 0) (DeepArgumentReference 1 1))))))"
+                        (Sequence (ShallowArgumentReference 0) (DeepArgumentReference 1 1))))))",
+        &[]
+    );
+}
+
+#[test]
+fn lambda_undefined_locals() {
+    check("(lambda (x) y)",
+        "(ClosureFixed 1
+            (Sequence
+                (Undefined)))",
+        &[
+            Diagnostic {
+                kind: DiagnosticKind::err_meaning_unresolved_variable,
+                loc: Some(Span::new(12, 13)),
+            },
+        ]
     );
 }
 
@@ -178,14 +271,19 @@ fn lambda_fixed_arguments_nested() {
 
 #[test]
 fn application_simple() {
-    check("(cons 1 2)", "(ProcedureCall (ImportedReference 2) (Constant 1) (Constant 2))");
+    check("(cons 1 2)",
+        "(ProcedureCall (ImportedReference 2) (Constant 1) (Constant 2))",
+        &[]
+    );
 }
 
 #[test]
 fn application_nested() {
     check("(car (cons 1 2))",
         "(ProcedureCall (ImportedReference 0)
-            (ProcedureCall (ImportedReference 2) (Constant 1) (Constant 2)))");
+            (ProcedureCall (ImportedReference 2) (Constant 1) (Constant 2)))",
+        &[]
+    );
 }
 
 #[test]
@@ -198,7 +296,9 @@ fn application_closed() {
                         (ShallowArgumentReference 0)
                         (ShallowArgumentReference 1))))
             (Constant 1)
-            (Constant 2))");
+            (Constant 2))",
+        &[]
+    );
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -211,16 +311,17 @@ use eval::expanders::{ExpansionResult};
 use eval::expression::{Expression};
 
 /// TODO
-fn check(input: &str, output: &str) {
+fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic]) {
     let pool = InternPool::new();
 
     let datum = parse(&pool, input);
     let expression = expand(&pool, &datum);
-    let meaning = treat(&pool, &expression);
+    let (meaning, diagnostics) = treat(&pool, &expression);
 
     let actual = pretty_print(&pool, &meaning);
 
     assert_eq!(trim_space(&actual), trim_space(output));
+    assert_eq!(diagnostics, expected_diagnostics);
 }
 
 fn parse(pool: &InternPool, input: &str) -> ScannedDatum {
@@ -261,10 +362,14 @@ fn expand(pool: &InternPool, datum: &ScannedDatum) -> Expression {
     panic!("expander did not produce an expression");
 }
 
-fn treat(pool: &InternPool, expression: &Expression) -> Meaning {
+fn treat(pool: &InternPool, expression: &Expression) -> (Meaning, Vec<Diagnostic>) {
+    use locus::utils::collect_diagnostics;
+
     let environment = basic_scheme_environment(pool);
 
-    return meaning(expression, &environment);
+    collect_diagnostics(|handler| {
+        return meaning(handler, expression, &environment);
+    })
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -272,6 +377,7 @@ fn treat(pool: &InternPool, expression: &Expression) -> Meaning {
 
 fn pretty_print(pool: &InternPool, meaning: &Meaning) -> String {
     match meaning.kind {
+        MeaningKind::Undefined => pretty_print_undefined(),
         MeaningKind::Constant(ref value) => pretty_print_constant(pool, value),
         MeaningKind::ShallowArgumentReference(index) => pretty_print_shallow_reference(index),
         MeaningKind::DeepArgumentReference(depth, index) => pretty_print_deep_reference(depth, index),
@@ -292,6 +398,10 @@ fn pretty_print(pool: &InternPool, meaning: &Meaning) -> String {
         MeaningKind::ProcedureCall(ref procedure, ref args) =>
             pretty_print_procedure_call(pool, procedure.as_ref(), args.as_ref()),
     }
+}
+
+fn pretty_print_undefined() -> String {
+    format!("(Undefined)")
 }
 
 fn pretty_print_constant(pool: &InternPool, value: &Value) -> String {

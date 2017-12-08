@@ -136,4 +136,10 @@ pub enum DiagnosticKind {
 
     /// Expander has encountered an invalid procedure call.
     err_expand_invalid_application,
+
+    /// Semantic analysis has found an undefined variable reference.
+    err_meaning_unresolved_variable,
+
+    /// Semantic analysis has found an assignment to an imported variable.
+    err_meaning_assign_to_imported_binding,
 }
