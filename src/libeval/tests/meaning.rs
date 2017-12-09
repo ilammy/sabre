@@ -13,7 +13,7 @@ extern crate eval;
 extern crate locus;
 extern crate reader;
 
-use eval::meaning::{meaning, Meaning, MeaningKind, Value};
+use eval::meaning::{meaning, Meaning, MeaningResult, MeaningKind, Value};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Tested expanders and environments
@@ -60,18 +60,18 @@ fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
 
 #[test]
 fn literals() {
-    check("42",         "(Constant 42)",            &[]);
-    check("#\\x",       "(Constant #\\x)",          &[]);
-    check("#false",     "(Constant #f)",            &[]);
-    check("\"string\"", "(Constant \"string\")",    &[]);
+    check("42",         "(Sequence (Constant 42))",         &[]);
+    check("#\\x",       "(Sequence (Constant #\\x))",       &[]);
+    check("#false",     "(Sequence (Constant #f))",         &[]);
+    check("\"string\"", "(Sequence (Constant \"string\"))", &[]);
 }
 
 #[test]
 fn quote_literals() {
-    check("'123",           "(Constant 123)",   &[]);
-    check("(quote #\\!)",   "(Constant #\\!)",  &[]);
-    check("'#t",            "(Constant #t)",    &[]);
-    check("(quote \"\")",   "(Constant \"\")",  &[]);
+    check("'123",         "(Sequence (Constant 123))",  &[]);
+    check("(quote #\\!)", "(Sequence (Constant #\\!))", &[]);
+    check("'#t",          "(Sequence (Constant #t))",   &[]);
+    check("(quote \"\")", "(Sequence (Constant \"\"))", &[]);
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -79,19 +79,19 @@ fn quote_literals() {
 
 #[test]
 fn reference_imported() {
-    check("car",    "(ImportedReference 0)",    &[]);
-    check("cdr",    "(ImportedReference 1)",    &[]);
-    check("cons",   "(ImportedReference 2)",    &[]);
+    check("car",  "(Sequence (ImportedReference 0))", &[]);
+    check("cdr",  "(Sequence (ImportedReference 1))", &[]);
+    check("cons", "(Sequence (ImportedReference 2))", &[]);
 }
 
 #[test]
 fn reference_global() {
-    check("*global*",   "(GlobalReference 0)",  &[]);
+    check("*global*", "(Sequence (GlobalReference 0))", &[]);
 }
 
 #[test]
 fn reference_undefined() {
-    check("@@UNDEFINED_VARIABLE@@", "(Undefined)", &[
+    check("@@UNDEFINED_VARIABLE@@", "(Sequence (Undefined))", &[
         Diagnostic {
             kind: DiagnosticKind::err_meaning_unresolved_variable,
             loc: Some(Span::new(0, 22)),
@@ -105,13 +105,14 @@ fn reference_undefined() {
 #[test]
 fn alternative() {
     check("(if #t 1 0)",
-        "(Alternative (Constant #t) (Constant 1) (Constant 0))",
+        "(Sequence (Alternative (Constant #t) (Constant 1) (Constant 0)))",
         &[]
     );
     check("(if *global* car cdr)",
-        "(Alternative (GlobalReference 0)
-            (ImportedReference 0)
-            (ImportedReference 1))",
+        "(Sequence
+            (Alternative (GlobalReference 0)
+                (ImportedReference 0)
+                (ImportedReference 1)))",
         &[]
     );
 }
@@ -119,11 +120,12 @@ fn alternative() {
 #[test]
 fn alternative_nested() {
     check("(if (if #f 1 #f) 1 0)",
-        "(Alternative (Alternative (Constant #f)
-                          (Constant 1)
-                          (Constant #f))
-            (Constant 1)
-            (Constant 0))",
+        "(Sequence
+            (Alternative (Alternative (Constant #f)
+                            (Constant 1)
+                            (Constant #f))
+                (Constant 1)
+                (Constant 0)))",
         &[]
     );
 }
@@ -134,11 +136,11 @@ fn alternative_nested() {
 #[test]
 fn assignment_global() {
     check("(set! *global* car)",
-        "(GlobalSet 0 (ImportedReference 0))",
+        "(Sequence (GlobalSet 0 (ImportedReference 0)))",
         &[]
     );
     check("(set! *global* *global*)",
-        "(GlobalSet 0 (GlobalReference 0))",
+        "(Sequence (GlobalSet 0 (GlobalReference 0)))",
         &[]
     );
 }
@@ -146,7 +148,7 @@ fn assignment_global() {
 #[test]
 fn assignment_undefined() {
     check("(set! undefined 1)",
-        "(Constant 1)",
+        "(Sequence (Constant 1))",
         &[
             Diagnostic {
                 kind: DiagnosticKind::err_meaning_unresolved_variable,
@@ -155,7 +157,7 @@ fn assignment_undefined() {
         ]
     );
     check("(set! undefined (undefined undefined))",
-        "(ProcedureCall (Undefined) (Undefined))",
+        "(Sequence (ProcedureCall (Undefined) (Undefined)))",
         &[
             Diagnostic {
                 kind: DiagnosticKind::err_meaning_unresolved_variable,
@@ -176,7 +178,7 @@ fn assignment_undefined() {
 #[test]
 fn assignment_imported() {
     check("(set! car cdr)",
-        "(ImportedReference 1)",
+        "(Sequence (ImportedReference 1))",
         &[
             Diagnostic {
                 kind: DiagnosticKind::err_meaning_assign_to_imported_binding,
@@ -190,18 +192,26 @@ fn assignment_imported() {
 // Sequence
 
 #[test]
-fn sequence() {
+fn sequence_simple() {
     check("(begin 1 2 3)",
-        "(Sequence (Constant 1) (Constant 2) (Constant 3))",
+        "(Sequence (Sequence (Constant 1) (Constant 2) (Constant 3)))",
         &[]
     );
+}
+
+#[test]
+fn sequence_nested() {
     check("(begin (begin #f #f #t) (if #f 1 2) (begin 9))",
         "(Sequence
-            (Sequence (Constant #f) (Constant #f) (Constant #t))
-            (Alternative (Constant #f)
-                (Constant 1)
-                (Constant 2))
-            (Sequence (Constant 9)))",
+            (Sequence
+                (Sequence
+                    (Constant #f)
+                    (Constant #f)
+                    (Constant #t))
+                (Alternative (Constant #f)
+                    (Constant 1)
+                    (Constant 2))
+                (Sequence (Constant 9))))",
         &[]
     );
 }
@@ -212,11 +222,11 @@ fn sequence() {
 #[test]
 fn lambda_no_arguments() {
     check("(lambda () #t)",
-        "(ClosureFixed 0 (Sequence (Constant #t)))",
+        "(Sequence (ClosureFixed 0 (Sequence (Constant #t))))",
         &[]
     );
     check("(lambda () 1 2 3)",
-        "(ClosureFixed 0 (Sequence (Constant 1) (Constant 2) (Constant 3)))",
+        "(Sequence (ClosureFixed 0 (Sequence (Constant 1) (Constant 2) (Constant 3))))",
         &[]
     );
 }
@@ -224,11 +234,12 @@ fn lambda_no_arguments() {
 #[test]
 fn lambda_fixed_arguments() {
     check("(lambda (n) (if n (begin 2 3) #f))",
-        "(ClosureFixed 1
-            (Sequence
-                (Alternative (ShallowArgumentReference 0)
-                    (Sequence (Constant 2) (Constant 3))
-                    (Constant #f))))",
+        "(Sequence
+            (ClosureFixed 1
+                (Sequence
+                    (Alternative (ShallowArgumentReference 0)
+                        (Sequence (Constant 2) (Constant 3))
+                        (Constant #f)))))",
         &[]
     );
 }
@@ -240,13 +251,16 @@ fn lambda_fixed_arguments_nested() {
            (if n
              (lambda (x) x a)
              (lambda (x) x b)))",
-        "(ClosureFixed 3
-            (Sequence
-                (Alternative (ShallowArgumentReference 2)
-                    (ClosureFixed 1
-                        (Sequence (ShallowArgumentReference 0) (DeepArgumentReference 1 0)))
-                    (ClosureFixed 1
-                        (Sequence (ShallowArgumentReference 0) (DeepArgumentReference 1 1))))))",
+        "(Sequence
+            (ClosureFixed 3
+                (Sequence
+                    (Alternative (ShallowArgumentReference 2)
+                        (ClosureFixed 1
+                            (Sequence (ShallowArgumentReference 0)
+                                      (DeepArgumentReference 1 0)))
+                        (ClosureFixed 1
+                            (Sequence (ShallowArgumentReference 0)
+                                      (DeepArgumentReference 1 1)))))))",
         &[]
     );
 }
@@ -254,9 +268,10 @@ fn lambda_fixed_arguments_nested() {
 #[test]
 fn lambda_undefined_locals() {
     check("(lambda (x) y)",
-        "(ClosureFixed 1
-            (Sequence
-                (Undefined)))",
+        "(Sequence
+            (ClosureFixed 1
+                (Sequence
+                    (Undefined))))",
         &[
             Diagnostic {
                 kind: DiagnosticKind::err_meaning_unresolved_variable,
@@ -272,7 +287,8 @@ fn lambda_undefined_locals() {
 #[test]
 fn application_simple() {
     check("(cons 1 2)",
-        "(ProcedureCall (ImportedReference 2) (Constant 1) (Constant 2))",
+        "(Sequence
+            (ProcedureCall (ImportedReference 2) (Constant 1) (Constant 2)))",
         &[]
     );
 }
@@ -280,8 +296,9 @@ fn application_simple() {
 #[test]
 fn application_nested() {
     check("(car (cons 1 2))",
-        "(ProcedureCall (ImportedReference 0)
-            (ProcedureCall (ImportedReference 2) (Constant 1) (Constant 2)))",
+        "(Sequence
+            (ProcedureCall (ImportedReference 0)
+                (ProcedureCall (ImportedReference 2) (Constant 1) (Constant 2))))",
         &[]
     );
 }
@@ -289,14 +306,15 @@ fn application_nested() {
 #[test]
 fn application_closed() {
     check("((lambda (a b) (cons a b)) 1 2)",
-        "(ProcedureCall
-            (ClosureFixed 2
-                (Sequence
-                    (ProcedureCall (ImportedReference 2)
-                        (ShallowArgumentReference 0)
-                        (ShallowArgumentReference 1))))
-            (Constant 1)
-            (Constant 2))",
+        "(Sequence
+            (ProcedureCall
+                (ClosureFixed 2
+                    (Sequence
+                        (ProcedureCall (ImportedReference 2)
+                            (ShallowArgumentReference 0)
+                            (ShallowArgumentReference 1))))
+                (Constant 1)
+                (Constant 2)))",
         &[]
     );
 }
@@ -314,61 +332,62 @@ use eval::expression::{Expression};
 fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic]) {
     let pool = InternPool::new();
 
-    let datum = parse(&pool, input);
-    let expression = expand(&pool, &datum);
-    let (meaning, diagnostics) = treat(&pool, &expression);
+    let data = parse(&pool, input);
+    let expressions = expand(&pool, &data);
+    let (meaning, diagnostics) = treat(&pool, &expressions);
 
-    let actual = pretty_print(&pool, &meaning);
+    let actual = pretty_print(&pool, &meaning.sequence);
 
     assert_eq!(trim_space(&actual), trim_space(output));
     assert_eq!(diagnostics, expected_diagnostics);
 }
 
-fn parse(pool: &InternPool, input: &str) -> ScannedDatum {
+fn parse(pool: &InternPool, input: &str) -> Vec<ScannedDatum> {
     use locus::utils::collect_diagnostics;
 
-    let (datum, parsing_diagnostics) = collect_diagnostics(|handler| {
+    let (data, parsing_diagnostics) = collect_diagnostics(|handler| {
         let scanner = Box::new(StringScanner::new(input, handler, pool));
         let mut parser = Parser::new(scanner, pool, handler);
 
-        let mut all_data = parser.parse_all_data();
+        let all_data = parser.parse_all_data();
 
         assert!(parser.parse_all_data().is_empty(), "parser did not consume the whole stream");
-        assert!(all_data.len() == 1, "input must describe exactly one datum");
 
-        return all_data.pop().unwrap();
+        return all_data;
     });
 
     assert!(parsing_diagnostics.is_empty(), "parsing produced diagnostics");
 
-    return datum;
+    return data;
 }
 
-fn expand(pool: &InternPool, datum: &ScannedDatum) -> Expression {
+fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
     use locus::utils::collect_diagnostics;
 
     let (expansion_result, expansion_diagnostics) = collect_diagnostics(|handler| {
         let expander = standard_scheme(pool, handler);
 
-        return expander.expand(&datum, expander.as_ref());
+        return data.iter()
+            .map(|d| expander.expand(d, expander.as_ref()))
+            .map(|e| match e {
+                ExpansionResult::Some(e) => e,
+                _ => panic!("expander did not produce an expression"),
+            })
+            .collect();
     });
 
     assert!(expansion_diagnostics.is_empty(), "expander produced diagnostics");
 
-    if let ExpansionResult::Some(expression) = expansion_result {
-        return expression;
-    }
-
-    panic!("expander did not produce an expression");
+    return expansion_result;
 }
 
-fn treat(pool: &InternPool, expression: &Expression) -> (Meaning, Vec<Diagnostic>) {
+fn treat(pool: &InternPool, expressions: &[Expression]) -> (MeaningResult, Vec<Diagnostic>) {
     use locus::utils::collect_diagnostics;
 
     let environment = basic_scheme_environment(pool);
 
     collect_diagnostics(|handler| {
-        return meaning(handler, expression, &environment);
+        return meaning(handler, expressions, &environment);
     })
 }
 

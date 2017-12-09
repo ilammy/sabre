@@ -126,7 +126,28 @@ pub enum Value {
     String(Atom),
 }
 
+pub struct MeaningResult {
+    pub sequence: Meaning,
+}
+
 pub fn meaning(
+    diagnostic: &Handler,
+    expressions: &[Expression],
+    environment: &Rc<Environment>) -> MeaningResult
+{
+    let sequence = expressions.iter()
+        .map(|e| meaning_expression(diagnostic, e, environment))
+        .collect();
+
+    MeaningResult {
+        sequence: Meaning {
+            kind: MeaningKind::Sequence(sequence),
+            span: None,
+        },
+    }
+}
+
+fn meaning_expression(
     diagnostic: &Handler,
     expression: &Expression,
     environment: &Rc<Environment>) -> Meaning
@@ -214,9 +235,9 @@ fn meaning_alternative(
     environment: &Rc<Environment>) -> MeaningKind
 {
     MeaningKind::Alternative(
-        Box::new(meaning(diagnostic, condition, environment)),
-        Box::new(meaning(diagnostic, consequent, environment)),
-        Box::new(meaning(diagnostic, alternate, environment)),
+        Box::new(meaning_expression(diagnostic, condition, environment)),
+        Box::new(meaning_expression(diagnostic, consequent, environment)),
+        Box::new(meaning_expression(diagnostic, alternate, environment)),
     )
 }
 
@@ -240,7 +261,7 @@ fn meaning_assignment(
     }
 
     // Note that we use the same environment, not extended with the variable name.
-    let new_value = Box::new(meaning(diagnostic, value, environment));
+    let new_value = Box::new(meaning_expression(diagnostic, value, environment));
 
     match variable_kind {
         VariableKind::Local { depth, index } => {
@@ -271,7 +292,7 @@ fn meaning_sequence(
 
     MeaningKind::Sequence(
         expressions.iter()
-                    .map(|e| meaning(diagnostic, e, environment))
+                    .map(|e| meaning_expression(diagnostic, e, environment))
                     .collect()
     )
 }
@@ -318,8 +339,8 @@ fn meaning_application(
 {
     assert!(terms.len() >= 1, "BUG: empty application");
 
-    let procedure = Box::new(meaning(diagnostic, &terms[0], environment));
-    let arguments = terms[1..].iter().map(|e| meaning(diagnostic, e, environment)).collect();
+    let procedure = Box::new(meaning_expression(diagnostic, &terms[0], environment));
+    let arguments = terms[1..].iter().map(|e| meaning_expression(diagnostic, e, environment)).collect();
 
     return MeaningKind::ProcedureCall(procedure, arguments);
 }
