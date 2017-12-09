@@ -194,24 +194,47 @@ fn assignment_imported() {
 #[test]
 fn sequence_simple() {
     check("(begin 1 2 3)",
-        "(Sequence (Sequence (Constant 1) (Constant 2) (Constant 3)))",
+        "(Sequence (Constant 1) (Constant 2) (Constant 3))",
         &[]
     );
 }
 
 #[test]
-fn sequence_nested() {
+fn sequence_splicing_toplevel() {
     check("(begin (begin #f #f #t) (if #f 1 2) (begin 9))",
         "(Sequence
-            (Sequence
+            (Constant #f)
+            (Constant #f)
+            (Constant #t)
+            (Alternative (Constant #f)
+                (Constant 1)
+                (Constant 2))
+            (Constant 9))",
+        &[]
+    );
+}
+
+#[test]
+fn sequence_splicing_inner() {
+    check("(lambda () (begin #f #f #t) (begin (begin 1)))",
+        "(Sequence
+            (ClosureFixed 0
                 (Sequence
                     (Constant #f)
                     (Constant #f)
-                    (Constant #t))
-                (Alternative (Constant #f)
-                    (Constant 1)
-                    (Constant 2))
-                (Sequence (Constant 9))))",
+                    (Constant #t)
+                    (Constant 1))))",
+        &[]
+    );
+}
+
+#[test]
+fn sequence_nonsplicing() {
+    check("(if *global* (begin 1 2) (begin 3))",
+        "(Sequence
+            (Alternative (GlobalReference 0)
+                (Sequence (Constant 1) (Constant 2))
+                (Sequence (Constant 3))))",
         &[]
     );
 }
