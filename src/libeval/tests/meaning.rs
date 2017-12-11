@@ -60,18 +60,18 @@ fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
 
 #[test]
 fn literals() {
-    check("42",         "(Sequence (Constant 42))",         &[]);
-    check("#\\x",       "(Sequence (Constant #\\x))",       &[]);
-    check("#false",     "(Sequence (Constant #f))",         &[]);
-    check("\"string\"", "(Sequence (Constant \"string\"))", &[]);
+    check("42",         "(Sequence (Constant 0))", &[]);
+    check("#\\x",       "(Sequence (Constant 0))", &[]);
+    check("#false",     "(Sequence (Constant 0))", &[]);
+    check("\"string\"", "(Sequence (Constant 0))", &[]);
 }
 
 #[test]
 fn quote_literals() {
-    check("'123",         "(Sequence (Constant 123))",  &[]);
-    check("(quote #\\!)", "(Sequence (Constant #\\!))", &[]);
-    check("'#t",          "(Sequence (Constant #t))",   &[]);
-    check("(quote \"\")", "(Sequence (Constant \"\"))", &[]);
+    check("'123",         "(Sequence (Constant 0))", &[]);
+    check("(quote #\\!)", "(Sequence (Constant 0))", &[]);
+    check("'#t",          "(Sequence (Constant 0))", &[]);
+    check("(quote \"\")", "(Sequence (Constant 0))", &[]);
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -104,8 +104,8 @@ fn reference_undefined() {
 
 #[test]
 fn alternative() {
-    check("(if #t 1 0)",
-        "(Sequence (Alternative (Constant #t) (Constant 1) (Constant 0)))",
+    check("(if #t 111 222)",
+        "(Sequence (Alternative (Constant 0) (Constant 1) (Constant 2)))",
         &[]
     );
     check("(if *global* car cdr)",
@@ -119,13 +119,13 @@ fn alternative() {
 
 #[test]
 fn alternative_nested() {
-    check("(if (if #f 1 #f) 1 0)",
+    check("(if (if #f 111 #t) 222 333)",
         "(Sequence
-            (Alternative (Alternative (Constant #f)
+            (Alternative (Alternative (Constant 0)
                             (Constant 1)
-                            (Constant #f))
-                (Constant 1)
-                (Constant 0)))",
+                            (Constant 2))
+                (Constant 3)
+                (Constant 4)))",
         &[]
     );
 }
@@ -147,8 +147,8 @@ fn assignment_global() {
 
 #[test]
 fn assignment_undefined() {
-    check("(set! undefined 1)",
-        "(Sequence (Constant 1))",
+    check("(set! undefined 111)",
+        "(Sequence (Constant 0))",
         &[
             Diagnostic {
                 kind: DiagnosticKind::err_meaning_unresolved_variable,
@@ -193,8 +193,8 @@ fn assignment_imported() {
 
 #[test]
 fn sequence_simple() {
-    check("(begin 1 2 3)",
-        "(Sequence (Constant 1) (Constant 2) (Constant 3))",
+    check("(begin 111 222 333)",
+        "(Sequence (Constant 0) (Constant 1) (Constant 2))",
         &[]
     );
 }
@@ -203,13 +203,13 @@ fn sequence_simple() {
 fn sequence_splicing_toplevel() {
     check("(begin (begin #f #f #t) (if #f 1 2) (begin 9))",
         "(Sequence
-            (Constant #f)
-            (Constant #f)
-            (Constant #t)
-            (Alternative (Constant #f)
-                (Constant 1)
-                (Constant 2))
-            (Constant 9))",
+            (Constant 0)
+            (Constant 1)
+            (Constant 2)
+            (Alternative (Constant 3)
+                (Constant 4)
+                (Constant 5))
+            (Constant 6))",
         &[]
     );
 }
@@ -220,10 +220,10 @@ fn sequence_splicing_inner() {
         "(Sequence
             (ClosureFixed 0
                 (Sequence
-                    (Constant #f)
-                    (Constant #f)
-                    (Constant #t)
-                    (Constant 1))))",
+                    (Constant 0)
+                    (Constant 1)
+                    (Constant 2)
+                    (Constant 3))))",
         &[]
     );
 }
@@ -233,8 +233,8 @@ fn sequence_nonsplicing() {
     check("(if *global* (begin 1 2) (begin 3))",
         "(Sequence
             (Alternative (GlobalReference 0)
-                (Sequence (Constant 1) (Constant 2))
-                (Sequence (Constant 3))))",
+                (Sequence (Constant 0) (Constant 1))
+                (Sequence (Constant 2))))",
         &[]
     );
 }
@@ -245,11 +245,11 @@ fn sequence_nonsplicing() {
 #[test]
 fn lambda_no_arguments() {
     check("(lambda () #t)",
-        "(Sequence (ClosureFixed 0 (Sequence (Constant #t))))",
+        "(Sequence (ClosureFixed 0 (Sequence (Constant 0))))",
         &[]
     );
     check("(lambda () 1 2 3)",
-        "(Sequence (ClosureFixed 0 (Sequence (Constant 1) (Constant 2) (Constant 3))))",
+        "(Sequence (ClosureFixed 0 (Sequence (Constant 0) (Constant 1) (Constant 2))))",
         &[]
     );
 }
@@ -261,8 +261,8 @@ fn lambda_fixed_arguments() {
             (ClosureFixed 1
                 (Sequence
                     (Alternative (ShallowArgumentReference 0)
-                        (Sequence (Constant 2) (Constant 3))
-                        (Constant #f)))))",
+                        (Sequence (Constant 0) (Constant 1))
+                        (Constant 2)))))",
         &[]
     );
 }
@@ -309,26 +309,26 @@ fn lambda_undefined_locals() {
 
 #[test]
 fn application_simple() {
-    check("(cons 1 2)",
+    check("(cons 111 222)",
         "(Sequence
-            (ProcedureCall (ImportedReference 2) (Constant 1) (Constant 2)))",
+            (ProcedureCall (ImportedReference 2) (Constant 0) (Constant 1)))",
         &[]
     );
 }
 
 #[test]
 fn application_nested() {
-    check("(car (cons 1 2))",
+    check("(car (cons 111 222))",
         "(Sequence
             (ProcedureCall (ImportedReference 0)
-                (ProcedureCall (ImportedReference 2) (Constant 1) (Constant 2))))",
+                (ProcedureCall (ImportedReference 2) (Constant 0) (Constant 1))))",
         &[]
     );
 }
 
 #[test]
 fn application_closed() {
-    check("((lambda (a b) (cons a b)) 1 2)",
+    check("((lambda (a b) (cons a b)) 111 222)",
         "(Sequence
             (ProcedureCall
                 (ClosureFixed 2
@@ -336,8 +336,8 @@ fn application_closed() {
                         (ProcedureCall (ImportedReference 2)
                             (ShallowArgumentReference 0)
                             (ShallowArgumentReference 1))))
-                (Constant 1)
-                (Constant 2)))",
+                (Constant 0)
+                (Constant 1)))",
         &[]
     );
 }
@@ -359,7 +359,7 @@ fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic]) {
     let expressions = expand(&pool, &data);
     let (meaning, diagnostics) = treat(&pool, &expressions);
 
-    let actual = pretty_print(&pool, &meaning.sequence);
+    let actual = pretty_print(&meaning.sequence);
 
     assert_eq!(trim_space(&actual), trim_space(output));
     assert_eq!(diagnostics, expected_diagnostics);
@@ -417,28 +417,28 @@ fn treat(pool: &InternPool, expressions: &[Expression]) -> (MeaningResult, Vec<D
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Pretty-printing meanings
 
-fn pretty_print(pool: &InternPool, meaning: &Meaning) -> String {
+fn pretty_print(meaning: &Meaning) -> String {
     match meaning.kind {
         MeaningKind::Undefined => pretty_print_undefined(),
-        MeaningKind::Constant(ref value) => pretty_print_constant(pool, value),
+        MeaningKind::Constant(index) => pretty_print_constant(index),
         MeaningKind::ShallowArgumentReference(index) => pretty_print_shallow_reference(index),
         MeaningKind::DeepArgumentReference(depth, index) => pretty_print_deep_reference(depth, index),
         MeaningKind::GlobalReference(index) => pretty_print_global_reference(index),
         MeaningKind::ImportedReference(index) => pretty_print_imported_reference(index),
         MeaningKind::Alternative(ref condition, ref consequent, ref alternate) =>
-            pretty_print_alternative(pool, condition, consequent, alternate),
+            pretty_print_alternative(condition, consequent, alternate),
         MeaningKind::ShallowArgumentSet(index, ref value) =>
-            pretty_print_shallow_set(pool, index, value.as_ref()),
+            pretty_print_shallow_set(index, value.as_ref()),
         MeaningKind::DeepArgumentSet(depth, index, ref value) =>
-            pretty_print_deep_set(pool, depth, index, value.as_ref()),
+            pretty_print_deep_set(depth, index, value.as_ref()),
         MeaningKind::GlobalSet(index, ref value) =>
-            pretty_print_global_set(pool, index, value.as_ref()),
+            pretty_print_global_set(index, value.as_ref()),
         MeaningKind::Sequence(ref computations) =>
-            pretty_print_sequence(pool, computations),
+            pretty_print_sequence(computations),
         MeaningKind::ClosureFixed(arg_count, ref body) =>
-            pretty_print_closure_fixed(pool, arg_count, body.as_ref()),
+            pretty_print_closure_fixed(arg_count, body.as_ref()),
         MeaningKind::ProcedureCall(ref procedure, ref args) =>
-            pretty_print_procedure_call(pool, procedure.as_ref(), args.as_ref()),
+            pretty_print_procedure_call(procedure.as_ref(), args.as_ref()),
     }
 }
 
@@ -446,13 +446,8 @@ fn pretty_print_undefined() -> String {
     format!("(Undefined)")
 }
 
-fn pretty_print_constant(pool: &InternPool, value: &Value) -> String {
-    match *value {
-        Value::Boolean(value) => format!("(Constant {})", if value { "#t" } else { "#f" }),
-        Value::Character(value) => format!("(Constant #\\{})", value),
-        Value::Number(value) => format!("(Constant {})", pool.get(value)),
-        Value::String(value) => format!("(Constant \"{}\")", pool.get(value)), // TODO: escape quotes
-    }
+fn pretty_print_constant(index: usize) -> String {
+    format!("(Constant {})", index)
 }
 
 fn pretty_print_shallow_reference(index: usize) -> String {
@@ -471,50 +466,50 @@ fn pretty_print_imported_reference(index: usize) -> String {
     format!("(ImportedReference {})", index)
 }
 
-fn pretty_print_alternative(pool: &InternPool, condition: &Meaning, consequent: &Meaning,
+fn pretty_print_alternative(condition: &Meaning, consequent: &Meaning,
     alternate: &Meaning) -> String
 {
     format!("(Alternative {} {} {})",
-        pretty_print(pool, condition),
-        pretty_print(pool, consequent),
-        pretty_print(pool, alternate)
+        pretty_print(condition),
+        pretty_print(consequent),
+        pretty_print(alternate)
     )
 }
 
-fn pretty_print_shallow_set(pool: &InternPool, index: usize, value: &Meaning) -> String {
-    format!("(ShallowArgumentSet {} {})", index, pretty_print(pool, value))
+fn pretty_print_shallow_set(index: usize, value: &Meaning) -> String {
+    format!("(ShallowArgumentSet {} {})", index, pretty_print(value))
 }
 
-fn pretty_print_deep_set(pool: &InternPool, depth: usize, index: usize, value: &Meaning) -> String {
-    format!("(DeepArgumentSet {} {} {})", depth, index, pretty_print(pool, value))
+fn pretty_print_deep_set(depth: usize, index: usize, value: &Meaning) -> String {
+    format!("(DeepArgumentSet {} {} {})", depth, index, pretty_print(value))
 }
 
-fn pretty_print_global_set(pool: &InternPool, index: usize, value: &Meaning) -> String {
-    format!("(GlobalSet {} {})", index, pretty_print(pool, value))
+fn pretty_print_global_set(index: usize, value: &Meaning) -> String {
+    format!("(GlobalSet {} {})", index, pretty_print(value))
 }
 
-fn pretty_print_sequence(pool: &InternPool, computations: &[Meaning]) -> String {
+fn pretty_print_sequence(computations: &[Meaning]) -> String {
     let mut s = String::new();
     s.push_str("(Sequence");
     for c in computations {
         s.push_str(" ");
-        s.push_str(&pretty_print(pool, c));
+        s.push_str(&pretty_print(c));
     }
     s.push_str(")");
     return s;
 }
 
-fn pretty_print_closure_fixed(pool: &InternPool, args_count: usize, body: &Meaning) -> String {
-    format!("(ClosureFixed {} {})", args_count, pretty_print(pool, body))
+fn pretty_print_closure_fixed(args_count: usize, body: &Meaning) -> String {
+    format!("(ClosureFixed {} {})", args_count, pretty_print(body))
 }
 
-fn pretty_print_procedure_call(pool: &InternPool, procedure: &Meaning, args: &[Meaning]) -> String {
+fn pretty_print_procedure_call(procedure: &Meaning, args: &[Meaning]) -> String {
     let mut s = String::new();
     s.push_str("(ProcedureCall ");
-    s.push_str(&pretty_print(pool, procedure));
+    s.push_str(&pretty_print(procedure));
     for a in args {
         s.push_str(" ");
-        s.push_str(&pretty_print(pool, a));
+        s.push_str(&pretty_print(a));
     }
     s.push_str(")");
     return s;

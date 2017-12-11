@@ -106,7 +106,7 @@ pub struct Meaning {
 
 pub enum MeaningKind {
     Undefined,
-    Constant(Value),
+    Constant(usize),
     ShallowArgumentReference(usize),
     DeepArgumentReference(usize, usize),
     GlobalReference(usize),
@@ -129,6 +129,7 @@ pub enum Value {
 
 pub struct MeaningResult {
     pub sequence: Meaning,
+    pub constants: Vec<Value>, // TODO: use actual Scheme values
 }
 
 struct SequenceSplicingIterator<'a> {
@@ -209,20 +210,25 @@ pub fn meaning(
     expressions: &[Expression],
     environment: &Rc<Environment>) -> MeaningResult
 {
+    let mut constants = Vec::new();
+    let body_sequence = meaning_body(diagnostic, expressions, environment, &mut constants);
+
     MeaningResult {
-        sequence: meaning_body(diagnostic, expressions, environment),
+        sequence: body_sequence,
+        constants: constants,
     }
 }
 
 fn meaning_body(
     diagnostic: &Handler,
     expressions: &[Expression],
-    environment: &Rc<Environment>) -> Meaning
+    environment: &Rc<Environment>,
+    constants: &mut Vec<Value>) -> Meaning
 {
     Meaning {
         kind: MeaningKind::Sequence(
             splice_in_sequences(expressions)
-                .map(|e| meaning_expression(diagnostic, e, &environment))
+                .map(|e| meaning_expression(diagnostic, e, environment, constants))
                 .collect()
         ),
         span: expressions_span(expressions),
@@ -243,53 +249,58 @@ fn expressions_span(expressions: &[Expression]) -> Option<Span> {
 fn meaning_expression(
     diagnostic: &Handler,
     expression: &Expression,
-    environment: &Rc<Environment>) -> Meaning
+    environment: &Rc<Environment>,
+    constants: &mut Vec<Value>) -> Meaning
 {
     Meaning {
         kind: match expression.kind {
             ExpressionKind::Literal(ref value) =>
-                meaning_literal(value),
+                meaning_literal(value, constants),
             ExpressionKind::Quotation(ref datum) =>
-                meaning_quote(datum),
+                meaning_quote(datum, constants),
             ExpressionKind::Reference(name) =>
                 meaning_reference(diagnostic, name, &expression.span, environment),
             ExpressionKind::Alternative(ref condition, ref consequent, ref alternate) =>
-                meaning_alternative(diagnostic, condition, consequent, alternate, environment),
+                meaning_alternative(diagnostic, condition, consequent, alternate, environment, constants),
             ExpressionKind::Assignment(ref variable, ref value) =>
-                meaning_assignment(diagnostic, variable, value.as_ref(), environment),
+                meaning_assignment(diagnostic, variable, value.as_ref(), environment, constants),
             ExpressionKind::Sequence(ref expressions) =>
-                meaning_sequence(diagnostic, expressions, environment),
+                meaning_sequence(diagnostic, expressions, environment, constants),
             ExpressionKind::Abstraction(ref arguments, ref body) =>
-                meaning_abstraction(diagnostic, arguments, body, environment),
+                meaning_abstraction(diagnostic, arguments, body, environment, constants),
             ExpressionKind::Application(ref terms) =>
-                meaning_application(diagnostic, terms, environment),
+                meaning_application(diagnostic, terms, environment, constants),
         },
         span: expression.span.clone(),
     }
 }
 
-fn meaning_literal(value: &Literal) -> MeaningKind {
-    MeaningKind::Constant(
-        match *value {
-            Literal::Boolean(value) => Value::Boolean(value),
-            Literal::Number(value) => Value::Number(value),
-            Literal::Character(value) => Value::Character(value),
-            Literal::String(value) => Value::String(value),
-            _ => unimplemented!(),
-        }
-    )
+fn meaning_literal(value: &Literal, constants: &mut Vec<Value>) -> MeaningKind {
+    let index = constants.len();
+
+    constants.push(match *value {
+        Literal::Boolean(value) => Value::Boolean(value),
+        Literal::Number(value) => Value::Number(value),
+        Literal::Character(value) => Value::Character(value),
+        Literal::String(value) => Value::String(value),
+        _ => unimplemented!(),
+    });
+
+    return MeaningKind::Constant(index);
 }
 
-fn meaning_quote(datum: &ScannedDatum) -> MeaningKind {
-    MeaningKind::Constant(
-        match datum.value {
-            DatumValue::Boolean(value) => Value::Boolean(value),
-            DatumValue::Number(value) => Value::Number(value),
-            DatumValue::Character(value) => Value::Character(value),
-            DatumValue::String(value) => Value::String(value),
-            _ => unimplemented!(),
-        }
-    )
+fn meaning_quote(datum: &ScannedDatum, constants: &mut Vec<Value>) -> MeaningKind {
+    let index = constants.len();
+
+    constants.push(match datum.value {
+        DatumValue::Boolean(value) => Value::Boolean(value),
+        DatumValue::Number(value) => Value::Number(value),
+        DatumValue::Character(value) => Value::Character(value),
+        DatumValue::String(value) => Value::String(value),
+        _ => unimplemented!(),
+    });
+
+    return MeaningKind::Constant(index);
 }
 
 fn meaning_reference(
@@ -325,19 +336,21 @@ fn meaning_reference(
 fn meaning_alternative(
     diagnostic: &Handler,
     condition: &Expression, consequent: &Expression, alternate: &Expression,
-    environment: &Rc<Environment>) -> MeaningKind
+    environment: &Rc<Environment>,
+    constants: &mut Vec<Value>) -> MeaningKind
 {
     MeaningKind::Alternative(
-        Box::new(meaning_expression(diagnostic, condition, environment)),
-        Box::new(meaning_expression(diagnostic, consequent, environment)),
-        Box::new(meaning_expression(diagnostic, alternate, environment)),
+        Box::new(meaning_expression(diagnostic, condition, environment, constants)),
+        Box::new(meaning_expression(diagnostic, consequent, environment, constants)),
+        Box::new(meaning_expression(diagnostic, alternate, environment, constants)),
     )
 }
 
 fn meaning_assignment(
     diagnostic: &Handler,
     variable: &Variable, value: &Expression,
-    environment: &Rc<Environment>) -> MeaningKind
+    environment: &Rc<Environment>,
+    constants: &mut Vec<Value>) -> MeaningKind
 {
     let variable_kind = environment.resolve_variable(variable.name);
 
@@ -354,7 +367,7 @@ fn meaning_assignment(
     }
 
     // Note that we use the same environment, not extended with the variable name.
-    let new_value = Box::new(meaning_expression(diagnostic, value, environment));
+    let new_value = Box::new(meaning_expression(diagnostic, value, environment, constants));
 
     match variable_kind {
         VariableKind::Local { depth, index } => {
@@ -379,13 +392,14 @@ fn meaning_assignment(
 fn meaning_sequence(
     diagnostic: &Handler,
     expressions: &[Expression],
-    environment: &Rc<Environment>) -> MeaningKind
+    environment: &Rc<Environment>,
+    constants: &mut Vec<Value>) -> MeaningKind
 {
     assert!(expressions.len() >= 1, "BUG: (begin) not handled");
 
     MeaningKind::Sequence(
         expressions.iter()
-                    .map(|e| meaning_expression(diagnostic, e, environment))
+                    .map(|e| meaning_expression(diagnostic, e, environment, constants))
                     .collect()
     )
 }
@@ -393,12 +407,13 @@ fn meaning_sequence(
 fn meaning_abstraction(
     diagnostic: &Handler,
     arguments: &Arguments, body: &[Expression],
-    environment: &Rc<Environment>) -> MeaningKind
+    environment: &Rc<Environment>,
+    constants: &mut Vec<Value>) -> MeaningKind
 {
     match *arguments {
         Arguments::Fixed(ref variables) =>
             MeaningKind::ClosureFixed(variables.len(),
-                Box::new(meaning_abstraction_fixed(diagnostic, variables, body, environment))
+                Box::new(meaning_abstraction_fixed(diagnostic, variables, body, environment, constants))
             ),
     }
 }
@@ -406,22 +421,26 @@ fn meaning_abstraction(
 fn meaning_abstraction_fixed(
     diagnostic: &Handler,
     arguments: &[Variable], body: &[Expression],
-    environment: &Rc<Environment>) -> Meaning
+    environment: &Rc<Environment>,
+    constants: &mut Vec<Value>) -> Meaning
 {
     let new_environment = Environment::new_local(arguments, environment);
 
-    meaning_body(diagnostic, body, &new_environment)
+    meaning_body(diagnostic, body, &new_environment, constants)
 }
 
 fn meaning_application(
     diagnostic: &Handler,
     terms: &[Expression],
-    environment: &Rc<Environment>) -> MeaningKind
+    environment: &Rc<Environment>,
+    constants: &mut Vec<Value>) -> MeaningKind
 {
     assert!(terms.len() >= 1, "BUG: empty application");
 
-    let procedure = Box::new(meaning_expression(diagnostic, &terms[0], environment));
-    let arguments = terms[1..].iter().map(|e| meaning_expression(diagnostic, e, environment)).collect();
+    let procedure = Box::new(meaning_expression(diagnostic, &terms[0], environment, constants));
+    let arguments = terms[1..].iter()
+        .map(|e| meaning_expression(diagnostic, e, environment, constants))
+        .collect();
 
     return MeaningKind::ProcedureCall(procedure, arguments);
 }
