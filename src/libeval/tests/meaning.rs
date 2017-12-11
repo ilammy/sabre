@@ -13,7 +13,7 @@ extern crate eval;
 extern crate locus;
 extern crate reader;
 
-use eval::meaning::{meaning, Meaning, MeaningResult, MeaningKind, Value};
+use eval::meaning::{meaning, MeaningResult, Value};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Tested expanders and environments
@@ -359,7 +359,7 @@ fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic]) {
     let expressions = expand(&pool, &data);
     let (meaning, diagnostics) = treat(&pool, &expressions);
 
-    let actual = pretty_print(&meaning.sequence);
+    let actual = format!("{:?}", meaning.sequence);
 
     assert_eq!(trim_space(&actual), trim_space(output));
     assert_eq!(diagnostics, expected_diagnostics);
@@ -416,104 +416,6 @@ fn treat(pool: &InternPool, expressions: &[Expression]) -> (MeaningResult, Vec<D
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Pretty-printing meanings
-
-fn pretty_print(meaning: &Meaning) -> String {
-    match meaning.kind {
-        MeaningKind::Undefined => pretty_print_undefined(),
-        MeaningKind::Constant(index) => pretty_print_constant(index),
-        MeaningKind::ShallowArgumentReference(index) => pretty_print_shallow_reference(index),
-        MeaningKind::DeepArgumentReference(depth, index) => pretty_print_deep_reference(depth, index),
-        MeaningKind::GlobalReference(index) => pretty_print_global_reference(index),
-        MeaningKind::ImportedReference(index) => pretty_print_imported_reference(index),
-        MeaningKind::Alternative(ref condition, ref consequent, ref alternate) =>
-            pretty_print_alternative(condition, consequent, alternate),
-        MeaningKind::ShallowArgumentSet(index, ref value) =>
-            pretty_print_shallow_set(index, value.as_ref()),
-        MeaningKind::DeepArgumentSet(depth, index, ref value) =>
-            pretty_print_deep_set(depth, index, value.as_ref()),
-        MeaningKind::GlobalSet(index, ref value) =>
-            pretty_print_global_set(index, value.as_ref()),
-        MeaningKind::Sequence(ref computations) =>
-            pretty_print_sequence(computations),
-        MeaningKind::ClosureFixed(arg_count, ref body) =>
-            pretty_print_closure_fixed(arg_count, body.as_ref()),
-        MeaningKind::ProcedureCall(ref procedure, ref args) =>
-            pretty_print_procedure_call(procedure.as_ref(), args.as_ref()),
-    }
-}
-
-fn pretty_print_undefined() -> String {
-    format!("(Undefined)")
-}
-
-fn pretty_print_constant(index: usize) -> String {
-    format!("(Constant {})", index)
-}
-
-fn pretty_print_shallow_reference(index: usize) -> String {
-    format!("(ShallowArgumentReference {})", index)
-}
-
-fn pretty_print_deep_reference(depth: usize, index: usize) -> String {
-    format!("(DeepArgumentReference {} {})", depth, index)
-}
-
-fn pretty_print_global_reference(index: usize) -> String {
-    format!("(GlobalReference {})", index)
-}
-
-fn pretty_print_imported_reference(index: usize) -> String {
-    format!("(ImportedReference {})", index)
-}
-
-fn pretty_print_alternative(condition: &Meaning, consequent: &Meaning,
-    alternate: &Meaning) -> String
-{
-    format!("(Alternative {} {} {})",
-        pretty_print(condition),
-        pretty_print(consequent),
-        pretty_print(alternate)
-    )
-}
-
-fn pretty_print_shallow_set(index: usize, value: &Meaning) -> String {
-    format!("(ShallowArgumentSet {} {})", index, pretty_print(value))
-}
-
-fn pretty_print_deep_set(depth: usize, index: usize, value: &Meaning) -> String {
-    format!("(DeepArgumentSet {} {} {})", depth, index, pretty_print(value))
-}
-
-fn pretty_print_global_set(index: usize, value: &Meaning) -> String {
-    format!("(GlobalSet {} {})", index, pretty_print(value))
-}
-
-fn pretty_print_sequence(computations: &[Meaning]) -> String {
-    let mut s = String::new();
-    s.push_str("(Sequence");
-    for c in computations {
-        s.push_str(" ");
-        s.push_str(&pretty_print(c));
-    }
-    s.push_str(")");
-    return s;
-}
-
-fn pretty_print_closure_fixed(args_count: usize, body: &Meaning) -> String {
-    format!("(ClosureFixed {} {})", args_count, pretty_print(body))
-}
-
-fn pretty_print_procedure_call(procedure: &Meaning, args: &[Meaning]) -> String {
-    let mut s = String::new();
-    s.push_str("(ProcedureCall ");
-    s.push_str(&pretty_print(procedure));
-    for a in args {
-        s.push_str(" ");
-        s.push_str(&pretty_print(a));
-    }
-    s.push_str(")");
-    return s;
-}
 
 fn trim_space(sexpr: &str) -> String {
     enum State {

@@ -10,6 +10,7 @@
 //! Here we transform core Scheme expressions into their meaning based on the semantics of Scheme.
 //! This is the finish line of the front-end.
 
+use std::fmt;
 use std::rc::{Rc};
 use std::slice;
 
@@ -118,6 +119,51 @@ pub enum MeaningKind {
     Sequence(Vec<Meaning>),
     ClosureFixed(usize, Box<Meaning>),
     ProcedureCall(Box<Meaning>, Vec<Meaning>),
+}
+
+impl fmt::Debug for Meaning {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.kind {
+            MeaningKind::Undefined =>
+                write!(f, "(Undefined)"),
+            MeaningKind::Constant(index) =>
+                write!(f, "(Constant {})", index),
+            MeaningKind::ShallowArgumentReference(index) =>
+                write!(f, "(ShallowArgumentReference {})", index),
+            MeaningKind::DeepArgumentReference(depth, index) =>
+                write!(f, "(DeepArgumentReference {} {})", depth, index),
+            MeaningKind::GlobalReference(index) =>
+                write!(f, "(GlobalReference {})", index),
+            MeaningKind::ImportedReference(index) =>
+                write!(f, "(ImportedReference {})", index),
+            MeaningKind::Alternative(ref condition, ref consequent, ref alternate) =>
+                write!(f, "(Alternative {:?} {:?} {:?})", condition, consequent, alternate),
+            MeaningKind::ShallowArgumentSet(index, ref value) =>
+                write!(f, "(ShallowArgumentSet {} {:?})", index, value),
+            MeaningKind::DeepArgumentSet(depth, index, ref value) =>
+                write!(f, "(DeepArgumentSet {} {} {:?})", depth, index, value),
+            MeaningKind::GlobalSet(index, ref value) =>
+                write!(f, "(GlobalSet {} {:?})", index, value),
+            MeaningKind::Sequence(ref computations) => {
+                try!(write!(f, "(Sequence"));
+                for c in computations {
+                    try!(write!(f, " {:?}", c));
+                }
+                try!(write!(f, ")"));
+                Ok(())
+            }
+            MeaningKind::ClosureFixed(arg_count, ref body) =>
+                write!(f, "(ClosureFixed {} {:?})", arg_count, body),
+            MeaningKind::ProcedureCall(ref procedure, ref args) => {
+                try!(write!(f, "(ProcedureCall {:?}", procedure));
+                for a in args {
+                    try!(write!(f, " {:?}", a));
+                }
+                try!(write!(f, ")"));
+                Ok(())
+            }
+        }
+    }
 }
 
 pub enum Value {
