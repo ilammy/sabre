@@ -60,18 +60,48 @@ fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
 
 #[test]
 fn literals() {
-    TestCase::new().input("42")        .meaning("(Sequence (Constant 0))").check();
-    TestCase::new().input("#\\x")      .meaning("(Sequence (Constant 0))").check();
-    TestCase::new().input("#false")    .meaning("(Sequence (Constant 0))").check();
-    TestCase::new().input("\"string\"").meaning("(Sequence (Constant 0))").check();
+    TestCase::new()
+        .input("42 #\\x #false \"string\"")
+        .meaning("(Sequence (Constant 0) (Constant 1) (Constant 2) (Constant 3))")
+        .constants(|pool| vec![
+            Value::Number(pool.intern("42")),
+            Value::Character('x'),
+            Value::Boolean(false),
+            Value::String(pool.intern("string")),
+        ])
+        .check();
 }
 
 #[test]
 fn quote_literals() {
-    TestCase::new().input("'123")        .meaning("(Sequence (Constant 0))").check();
-    TestCase::new().input("(quote #\\!)").meaning("(Sequence (Constant 0))").check();
-    TestCase::new().input("'#t")         .meaning("(Sequence (Constant 0))").check();
-    TestCase::new().input("(quote \"\")").meaning("(Sequence (Constant 0))").check();
+    TestCase::new()
+        .input("'123 (quote #\\!) '#t (quote \"\")")
+        .meaning("(Sequence (Constant 0) (Constant 1) (Constant 2) (Constant 3))")
+        .constants(|pool| vec![
+            Value::Number(pool.intern("123")),
+            Value::Character('!'),
+            Value::Boolean(true),
+            Value::String(pool.intern("")),
+        ])
+        .check();
+}
+
+#[test]
+fn constants_are_duplicated() {
+    TestCase::new()
+        .input("(begin 1 2 3 1 2 3 1)")
+        .meaning("(Sequence (Constant 0) (Constant 1) (Constant 2) (Constant 3)
+            (Constant 4) (Constant 5) (Constant 6))")
+        .constants(|pool| vec![
+            Value::Number(pool.intern("1")),
+            Value::Number(pool.intern("2")),
+            Value::Number(pool.intern("3")),
+            Value::Number(pool.intern("1")),
+            Value::Number(pool.intern("2")),
+            Value::Number(pool.intern("3")),
+            Value::Number(pool.intern("1")),
+        ])
+        .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -377,6 +407,7 @@ use eval::expression::{Expression};
 struct TestCase {
     input: Option<String>,
     expected_meaning: Option<String>,
+    constant_generator: Option<Box<Fn(&InternPool) -> Vec<Value>>>,
     expected_diagnostics: Option<Vec<Diagnostic>>,
 }
 
@@ -397,6 +428,14 @@ impl TestCase {
         self
     }
 
+    fn constants<F>(mut self, generator: F) -> Self
+        where F: Fn(&InternPool) -> Vec<Value> + 'static
+    {
+        assert!(self.constant_generator.is_none(), "don't set constants twice");
+        self.constant_generator = Some(Box::new(generator));
+        self
+    }
+
     fn diagnostics(mut self, diagnostics: &[Diagnostic]) -> Self {
         assert!(self.expected_diagnostics.is_none(), "don't set diagnostics twice");
         self.expected_diagnostics = Some(diagnostics.to_vec());
@@ -407,13 +446,16 @@ impl TestCase {
         let input = self.input.expect("input not set");
         let expected_meaning = self.expected_meaning.expect("meaning not set");
         let expected_diagnostics = self.expected_diagnostics.unwrap_or_default();
+        let constants = self.constant_generator.as_ref().map(|g| g.as_ref());
 
-        check(&input, &expected_meaning, &expected_diagnostics);
+        check(&input, &expected_meaning, &expected_diagnostics, constants);
     }
 }
 
 /// TODO
-fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic]) {
+fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic],
+    constant_generator: Option<&Fn(&InternPool) -> Vec<Value>>)
+{
     let pool = InternPool::new();
 
     let data = parse(&pool, input);
@@ -423,6 +465,10 @@ fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic]) {
     let actual = format!("{:?}", meaning.sequence);
 
     assert_eq!(trim_space(&actual), trim_space(output));
+    if let Some(generate_constants) = constant_generator {
+        let expected_constants = generate_constants(&pool);
+        assert_eq!(meaning.constants, expected_constants);
+    }
     assert_eq!(diagnostics, expected_diagnostics);
 }
 

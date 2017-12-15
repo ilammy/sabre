@@ -166,6 +166,7 @@ impl fmt::Debug for Meaning {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum Value {
     Boolean(bool),
     Number(Atom),
