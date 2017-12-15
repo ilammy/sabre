@@ -72,7 +72,7 @@ pub enum Literal {
 }
 
 /// Standalone variable reference.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Variable {
     /// Name of the variable.
     pub name: Atom,
