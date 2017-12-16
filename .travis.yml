@@ -4,8 +4,41 @@ branches:
   except:
     - /^wip\/.*$/
 
+addons:
+  apt:
+    packages:
+    - cmake
+    - curl
+    - gcc
+    - g++
+    - pkg-config
+    - binutils-dev
+    - libcurl4-openssl-dev
+    - zlib1g-dev
+    - libdw-dev
+
+install:
+- ./tools/install-kcov && source ~/.profile && kcov --version
+
 script:
-- cargo test --verbose --manifest-path=src/liblocus/Cargo.toml
-- cargo test --verbose --manifest-path=src/libunicode/Cargo.toml
-- cargo test --verbose --manifest-path=src/libreader/Cargo.toml
-- cargo test --verbose --manifest-path=src/libeval/Cargo.toml
+- |
+  set -e
+
+  libraries="
+    src/libeval
+    src/liblocus
+    src/libreader
+    src/libunicode
+  "
+  for library in $libraries
+  do
+      cargo test --verbose --manifest-path="$library"/Cargo.toml --no-run
+
+      for test_binary in $(find "$library"/target/debug -maxdepth 1 -type f -executable)
+      do
+          kcov --verify \
+              --coveralls-id="$TRAVIS_JOB_ID" \
+              --strip-path="$PWD" \
+              "$PWD"/kcov "$test_binary"
+      done
+  done
