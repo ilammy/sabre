@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.org/ilammy/sabre.svg?branch=master)](https://travis-ci.org/ilammy/sabre) [![Coverage Status](https://coveralls.io/repos/github/ilammy/sabre/badge.svg)](https://coveralls.io/github/ilammy/sabre)
+
 Sabre
 =====
 
