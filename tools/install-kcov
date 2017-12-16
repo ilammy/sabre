@@ -1,0 +1,63 @@
+#!/bin/bash
+#
+# Download, build, and install "kcov" tool for coverage analysis
+#
+# Dependencies (Debian package names):
+#
+#   cmake curl gcc g++ pkg-config binutils-dev libcurl4-openssl-dev zlib1g-dev
+#   libdw-dev libiberty-dev
+#
+# "libiberty-dev" package is not allowed on Travis CI, so we download and
+# build it as well.
+
+set -eu
+
+kcov_install_prefix=~/kcov
+
+libiberty_archive=libiberty_20141014.orig.tar.xz
+libiberty_directory=libiberty-20141014
+
+kcov_archive=v34.tar.gz
+kcov_directory=kcov-34
+
+mkdir /tmp/kcov
+cd /tmp/kcov
+
+echo "[*] Getting the source code of libiberty..."
+curl --location http://http.debian.net/debian/pool/main/libi/libiberty/$libiberty_archive > libiberty.tar.xz
+tar xf libiberty.tar.xz
+
+echo "[*] Getting the source code of kcov..."
+curl --location https://github.com/SimonKagstrom/kcov/archive/$kcov_archive > kcov.tar.gz
+tar xf kcov.tar.gz
+
+echo "[*] Building libiberty..."
+mkdir /tmp/kcov/libiberty-build
+mkdir /tmp/kcov/libiberty-install
+cd /tmp/kcov/libiberty-build
+/tmp/kcov/"$libiberty_directory"/libiberty/configure \
+    --prefix=/tmp/kcov/libiberty-install \
+    --enable-install-libiberty
+make
+make install
+
+echo "[*] Building kcov..."
+mkdir /tmp/kcov/kcov-build
+mkdir "$kcov_install_prefix"
+cd /tmp/kcov/kcov-build
+cmake \
+    -DCMAKE_PREFIX_PATH=/tmp/kcov/libiberty-install \
+    -DCMAKE_INSTALL_PREFIX="$kcov_install_prefix" \
+    /tmp/kcov/"$kcov_directory"
+make
+make install
+
+echo "[*] Configuring PATH..."
+cat >> ~/.profile <<EOF
+# kcov installation
+export PATH=$kcov_install_prefix/bin:\$PATH
+EOF
+
+echo "[*] Cleaning up..."
+cd /
+rm -r /tmp/kcov
