@@ -23,7 +23,7 @@ use std::rc::{Rc};
 use eval::expanders::{Expander, ExpanderStack, BasicExpander, ApplicationExpander,
     QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
 use eval::expression::{Variable};
-use eval::meaning::{Environment};
+use eval::environment::{Environment};
 use locus::diagnostics::{DiagnosticKind, Handler};
 use reader::intern_pool::{InternPool};
 
