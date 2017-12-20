@@ -7,12 +7,14 @@
 
 //! Core Scheme expressions.
 
+use std::fmt;
+
 use locus::diagnostics::{Span};
 use reader::datum::{ScannedDatum};
 use reader::intern_pool::{Atom};
 
 /// Scheme core expression.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub struct Expression {
     /// Kind of an expression.
     pub kind: ExpressionKind,
@@ -22,7 +24,7 @@ pub struct Expression {
 }
 
 /// Kind of an expression.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub enum ExpressionKind {
     /// Variable reference.
     Reference(Atom),
@@ -50,7 +52,7 @@ pub enum ExpressionKind {
 }
 
 /// Literal value.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub enum Literal {
     /// Canonical boolean value.
     Boolean(bool),
@@ -72,7 +74,7 @@ pub enum Literal {
 }
 
 /// Standalone variable reference.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 pub struct Variable {
     /// Name of the variable.
     pub name: Atom,
@@ -82,8 +84,113 @@ pub struct Variable {
 }
 
 /// Procedure argument list.
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Eq, PartialEq)]
 pub enum Arguments {
     /// Fixed number of arguments.
     Fixed(Vec<Variable>),
+}
+
+impl fmt::Debug for Expression {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self.kind {
+            ExpressionKind::Reference(ref variable) =>
+                write!(f, "(Reference {:?})", variable),
+            ExpressionKind::Literal(ref value) =>
+                write!(f, "(Literal {:?})", value),
+            ExpressionKind::Quotation(ref value) =>
+                write!(f, "(Quotation {:?})", value),
+            ExpressionKind::Alternative(ref condition, ref consequent, ref alternate) =>
+                write!(f, "(Alternative {:?} {:?} {:?})", condition, consequent, alternate),
+            ExpressionKind::Assignment(ref variable, ref value) =>
+                write!(f, "(Assignment {:?} {:?})", variable.name, value),
+            ExpressionKind::Sequence(ref body) => {
+                try!(write!(f, "(Sequence"));
+                for expression in body {
+                    try!(write!(f, " {:?}", expression));
+                }
+                try!(write!(f, ")"));
+                Ok(())
+            }
+            ExpressionKind::Abstraction(ref arguments, ref body) => {
+                try!(write!(f, "(Abstraction {:?}", arguments));
+                for expression in body {
+                    try!(write!(f, " {:?}", expression));
+                }
+                try!(write!(f, ")"));
+                Ok(())
+            }
+            ExpressionKind::Application(ref terms) => {
+                try!(write!(f, "(Application"));
+                for expression in terms {
+                    try!(write!(f, " {:?}", expression));
+                }
+                try!(write!(f, ")"));
+                Ok(())
+            }
+        }
+    }
+}
+
+impl fmt::Debug for Literal {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Literal::Boolean(value) =>
+                if value { write!(f, "#t") } else { write!(f, "#f") },
+            Literal::Number(value) =>
+                write!(f, "{:?}", value),
+            Literal::Character(char) =>
+                write!(f, "#\\x{:04X}", char as u32),
+            Literal::String(value) =>
+                write!(f, "\"{:?}\"", value),
+            Literal::Vector(ref values) => {
+                let mut first = true;
+                try!(write!(f, "#("));
+                for value in values {
+                    if first {
+                        first = false;
+                    } else {
+                        try!(write!(f, " "));
+                    }
+                    try!(write!(f, "{:?}", value));
+                }
+                try!(write!(f, ")"));
+                Ok(())
+            }
+            Literal::Bytevector(ref values) => {
+                let mut first = true;
+                try!(write!(f, "#u8("));
+                for value in values {
+                    if first {
+                        first = false;
+                    } else {
+                        try!(write!(f, " "));
+                    }
+                    try!(write!(f, "{:?}", value));
+                }
+                try!(write!(f, ")"));
+                Ok(())
+            }
+        }
+    }
+}
+
+impl fmt::Debug for Arguments {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Arguments::Fixed(ref variables) => {
+                let mut first = true;
+                try!(write!(f, "("));
+                for variable in variables {
+                    if first {
+                        first = false;
+                    } else {
+                        try!(write!(f, " "));
+                    }
+                    try!(write!(f, "{:?}", variable.name));
+                }
+                try!(write!(f, ")"));
+                Ok(())
+            }
+        }
+    }
 }
