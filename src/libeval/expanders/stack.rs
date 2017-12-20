@@ -62,7 +62,7 @@ impl<'a> Expander for ExpanderStack<'a> {
         loop {
             let result = current.expand(datum, environment, expander);
 
-            if result == ExpansionResult::Unknown {
+            if let ExpansionResult::Unknown = result {
                 if let Some(ref next) = self.tail {
                     current = next.as_ref();
                     continue;

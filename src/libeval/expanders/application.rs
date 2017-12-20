@@ -59,6 +59,7 @@ impl<'a> Expander for ApplicationExpander<'a> {
         return ExpansionResult::Some(Expression {
             kind: ExpressionKind::Application(expressions),
             span: Some(datum.span),
+            environment: environment.clone(),
         });
     }
 }

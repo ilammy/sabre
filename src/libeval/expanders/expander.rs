@@ -24,7 +24,6 @@ pub trait Expander {
 }
 
 /// Result of macro expansion.
-#[derive(Debug, Eq, PartialEq)]
 pub enum ExpansionResult {
     /// Successful expansion or error recovery.
     Some(Expression),

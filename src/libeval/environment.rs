@@ -23,7 +23,6 @@ pub struct Environment {
     parent: Option<Rc<Environment>>,
 }
 
-#[derive(Eq, PartialEq)]
 enum EnvironmentKind {
     Local,
     Global,
@@ -76,7 +75,7 @@ impl Environment {
     /// The environment stack should contain exactly one global environment, so the parent must be
     /// an imported environment, or else this function panics.
     pub fn new_global(variables: &[Variable], parent: &Rc<Environment>) -> Rc<Environment> {
-        assert!(parent.kind == EnvironmentKind::Imported);
+        assert!(match parent.kind { EnvironmentKind::Imported => true, _ => false });
         Rc::new(Environment {
             kind: EnvironmentKind::Global,
             variables: variables.to_vec(),

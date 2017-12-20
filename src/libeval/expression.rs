@@ -8,23 +8,27 @@
 //! Core Scheme expressions.
 
 use std::fmt;
+use std::rc::{Rc};
 
 use locus::diagnostics::{Span};
 use reader::datum::{ScannedDatum};
 use reader::intern_pool::{Atom};
 
+use environment::{Environment};
+
 /// Scheme core expression.
-#[derive(Eq, PartialEq)]
 pub struct Expression {
     /// Kind of an expression.
     pub kind: ExpressionKind,
+
+    /// Environment available at this expression.
+    pub environment: Rc<Environment>,
 
     /// Closest known source of the expression.
     pub span: Option<Span>,
 }
 
 /// Kind of an expression.
-#[derive(Eq, PartialEq)]
 pub enum ExpressionKind {
     /// Variable reference.
     Reference(Atom),

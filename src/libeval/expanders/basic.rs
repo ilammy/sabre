@@ -44,24 +44,28 @@ impl<'a> Expander for BasicExpander<'a> {
                 ExpansionResult::Some(Expression {
                     kind: ExpressionKind::Literal(Literal::Boolean(value)),
                     span: Some(datum.span),
+                    environment: environment.clone(),
                 })
             }
             DatumValue::Number(value) => {
                 ExpansionResult::Some(Expression {
                     kind: ExpressionKind::Literal(Literal::Number(value)),
                     span: Some(datum.span),
+                    environment: environment.clone(),
                 })
             }
             DatumValue::Character(value) => {
                 ExpansionResult::Some(Expression {
                     kind: ExpressionKind::Literal(Literal::Character(value)),
                     span: Some(datum.span),
+                    environment: environment.clone(),
                 })
             }
             DatumValue::String(value) => {
                 ExpansionResult::Some(Expression {
                     kind: ExpressionKind::Literal(Literal::String(value)),
                     span: Some(datum.span),
+                    environment: environment.clone(),
                 })
             }
 
@@ -70,6 +74,7 @@ impl<'a> Expander for BasicExpander<'a> {
                 ExpansionResult::Some(Expression {
                     kind: ExpressionKind::Reference(name),
                     span: Some(datum.span),
+                    environment: environment.clone(),
                 })
             }
 
@@ -78,12 +83,14 @@ impl<'a> Expander for BasicExpander<'a> {
                 ExpansionResult::Some(Expression {
                     kind: ExpressionKind::Literal(Literal::Vector(elements.clone())),
                     span: Some(datum.span),
+                    environment: environment.clone(),
                 })
             }
             DatumValue::Bytevector(ref elements) => {
                 ExpansionResult::Some(Expression {
                     kind: ExpressionKind::Literal(Literal::Bytevector(elements.clone())),
                     span: Some(datum.span),
+                    environment: environment.clone(),
                 })
             }
 
@@ -109,6 +116,7 @@ impl<'a> Expander for BasicExpander<'a> {
                 ExpansionResult::Some(Expression {
                     kind: ExpressionKind::Literal(Literal::Boolean(false)),
                     span: Some(datum.span),
+                    environment: environment.clone(),
                 })
             }
         }

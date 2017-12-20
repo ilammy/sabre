@@ -62,6 +62,7 @@ impl<'a> Expander for BeginExpander<'a> {
         return ExpansionResult::Some(Expression {
             kind: ExpressionKind::Sequence(expressions),
             span: Some(datum.span),
+            environment: environment.clone(),
         });
     }
 }

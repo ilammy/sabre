@@ -61,6 +61,7 @@ impl<'a> Expander for IfExpander<'a> {
             return Expression {
                 kind: ExpressionKind::Literal(Literal::Boolean(false)),
                 span: None,
+                environment: environment.clone(),
             };
         };
         let condition   = Box::new(expand_or_recover(values.get(1)));
@@ -70,6 +71,7 @@ impl<'a> Expander for IfExpander<'a> {
         return ExpansionResult::Some(Expression {
             kind: ExpressionKind::Alternative(condition, consequence, alternative),
             span: Some(datum.span),
+            environment: environment.clone(),
         });
     }
 }

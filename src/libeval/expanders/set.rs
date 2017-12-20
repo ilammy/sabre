@@ -60,6 +60,7 @@ impl<'a> Expander for SetExpander<'a> {
                 Expression {
                     kind: ExpressionKind::Assignment(variable, Box::new(value)),
                     span: Some(datum.span),
+                    environment: environment.clone(),
                 }
             } else {
                 value
@@ -99,6 +100,7 @@ impl<'a> SetExpander<'a> {
         return Expression {
             kind: ExpressionKind::Literal(Literal::Boolean(false)),
             span: None,
+            environment: environment.clone(),
         };
     }
 }

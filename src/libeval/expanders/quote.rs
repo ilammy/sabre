@@ -64,6 +64,7 @@ impl<'a> Expander for QuoteExpander<'a> {
         return ExpansionResult::Some(Expression {
             kind: ExpressionKind::Quotation(result),
             span: Some(datum.span),
+            environment: environment.clone(),
         });
     }
 }
