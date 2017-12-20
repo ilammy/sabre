@@ -7,10 +7,13 @@
 
 //! `lambda` expander.
 
+use std::rc::{Rc};
+
 use locus::diagnostics::{Handler, DiagnosticKind, Span};
 use reader::datum::{ScannedDatum, DatumValue};
 use reader::intern_pool::{Atom};
 
+use environment::{Environment};
 use expression::{Expression, ExpressionKind, Variable, Arguments};
 use expanders::{Expander, ExpansionResult};
 
@@ -34,7 +37,7 @@ impl<'a> LambdaExpander<'a> {
 }
 
 impl<'a> Expander for LambdaExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, expander: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
         use expanders::utils::{is_named_form, expect_list_length_at_least};
 
         // Filter out anything that certainly does not look as a lambda form.
@@ -54,7 +57,7 @@ impl<'a> Expander for LambdaExpander<'a> {
         // Expand them sequentially, as in the begin form.
         let expressions = values.iter()
             .skip(2)
-            .filter_map(|datum| match expander.expand(datum, expander) {
+            .filter_map(|datum| match expander.expand(datum, environment, expander) {
                 ExpansionResult::Some(expression) => Some(expression),
                 ExpansionResult::None => None,
                 ExpansionResult::Unknown => None,

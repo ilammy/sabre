@@ -7,9 +7,12 @@
 
 //! Basic expander.
 
+use std::rc::{Rc};
+
 use locus::diagnostics::{Handler, DiagnosticKind, Span};
 use reader::datum::{ScannedDatum, DatumValue};
 
+use environment::{Environment};
 use expression::{Expression, ExpressionKind, Literal};
 use expanders::{Expander, ExpansionResult};
 
@@ -34,7 +37,7 @@ impl<'a> BasicExpander<'a> {
 }
 
 impl<'a> Expander for BasicExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, expander: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
         match datum.value {
             // Simple literal data.
             DatumValue::Boolean(value) => {
@@ -94,7 +97,7 @@ impl<'a> Expander for BasicExpander<'a> {
                 self.diagnostic.report(DiagnosticKind::err_expand_datum_label,
                     Span::new(datum.span.from, labeled_datum.span.from));
 
-                expander.expand(&labeled_datum, expander)
+                expander.expand(&labeled_datum, environment, expander)
             }
 
             // Datum labels cannot be used in programs, only in literal quoted data.

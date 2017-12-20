@@ -455,10 +455,11 @@ fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
     use locus::utils::collect_diagnostics;
 
     let (expansion_result, expansion_diagnostics) = collect_diagnostics(|handler| {
+        let environment = basic_scheme_environment(pool);
         let expander = standard_scheme(pool, handler);
 
         return data.iter()
-            .map(|d| expander.expand(d, expander.as_ref()))
+            .map(|d| expander.expand(d, &environment, expander.as_ref()))
             .map(|e| match e {
                 ExpansionResult::Some(e) => e,
                 _ => panic!("expander did not produce an expression"),

@@ -7,10 +7,13 @@
 
 //! `if` expander.
 
+use std::rc::{Rc};
+
 use locus::diagnostics::{Handler, DiagnosticKind};
 use reader::datum::{ScannedDatum};
 use reader::intern_pool::{Atom};
 
+use environment::{Environment};
 use expression::{Expression, ExpressionKind, Literal};
 use expanders::{Expander, ExpansionResult};
 
@@ -34,7 +37,7 @@ impl<'a> IfExpander<'a> {
 }
 
 impl<'a> Expander for IfExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, expander: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
         use expanders::utils::{is_named_form, expect_list_length_fixed};
 
         // Filter out anything that certainly does not look as a if form.
@@ -50,7 +53,8 @@ impl<'a> Expander for IfExpander<'a> {
         // Recover from errors by using #f as placeholder values.
         let expand_or_recover = |datum| {
             if let Some(datum) = datum {
-                if let ExpansionResult::Some(expression) = expander.expand(datum, expander) {
+                let result = expander.expand(datum, environment, expander);
+                if let ExpansionResult::Some(expression) = result {
                     return expression;
                 }
             }

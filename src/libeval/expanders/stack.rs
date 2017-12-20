@@ -7,8 +7,11 @@
 
 //! Macro expander stack.
 
+use std::rc::{Rc};
+
 use reader::datum::{ScannedDatum};
 
+use environment::{Environment};
 use expanders::{Expander, ExpansionResult};
 
 /// Macro expander stack.
@@ -54,10 +57,10 @@ impl<'a> ExpanderStack<'a> {
 }
 
 impl<'a> Expander for ExpanderStack<'a> {
-    fn expand(&self, datum: &ScannedDatum, expander: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
         let mut current = self.head.as_ref();
         loop {
-            let result = current.expand(datum, expander);
+            let result = current.expand(datum, environment, expander);
 
             if result == ExpansionResult::Unknown {
                 if let Some(ref next) = self.tail {

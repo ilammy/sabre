@@ -7,10 +7,13 @@
 
 //! `set!` expander.
 
+use std::rc::{Rc};
+
 use locus::diagnostics::{Handler, DiagnosticKind};
 use reader::datum::{ScannedDatum, DatumValue};
 use reader::intern_pool::{Atom};
 
+use environment::{Environment};
 use expression::{Expression, ExpressionKind, Literal, Variable};
 use expanders::{Expander, ExpansionResult};
 
@@ -34,7 +37,7 @@ impl<'a> SetExpander<'a> {
 }
 
 impl<'a> Expander for SetExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, expander: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
         use expanders::utils::{is_named_form, expect_list_length_fixed};
 
         // Filter out anything that certainly does not look as a set! form.
@@ -49,7 +52,7 @@ impl<'a> Expander for SetExpander<'a> {
 
         // The first element should be the variable name, followed by the new variable value.
         let variable = self.expand_variable(values.get(1));
-        let value = self.expand_value(values.get(2), expander);
+        let value = self.expand_value(values.get(2), environment, expander);
 
         // If we have a variable to assign then use that variable. Otherwise leave only the value.
         return ExpansionResult::Some(
@@ -87,9 +90,9 @@ impl<'a> SetExpander<'a> {
     /// Expand the subexpression denoting variable value in a set! expression.
     ///
     /// In case of errors return an #f literal as a placeholder.
-    fn expand_value(&self, datum: Option<&ScannedDatum>, expander: &Expander) -> Expression {
+    fn expand_value(&self, datum: Option<&ScannedDatum>, environment: &Rc<Environment>, expander: &Expander) -> Expression {
         if let Some(datum) = datum {
-            if let ExpansionResult::Some(expression) = expander.expand(datum, expander) {
+            if let ExpansionResult::Some(expression) = expander.expand(datum, environment, expander) {
                 return expression;
             }
         }

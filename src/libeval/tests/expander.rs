@@ -13,6 +13,9 @@ extern crate eval;
 extern crate locus;
 extern crate reader;
 
+use std::rc::{Rc};
+
+use eval::environment::{Environment};
 use eval::expanders::{Expander, ExpansionResult, ExpanderStack, BasicExpander,
     ApplicationExpander, QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
 use locus::diagnostics::{Handler, DiagnosticKind};
@@ -51,6 +54,10 @@ impl SchemeBase {
             .push(Box::new(   SetExpander::new(pool.intern(self.set),    handler)))
             .push(Box::new(LambdaExpander::new(pool.intern(self.lambda), handler)))
     }
+}
+
+fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
+    Environment::new_imported(&[])
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -784,9 +791,11 @@ fn check(expander_factory: &SchemeBase, input: &str, expected_result: &str, expe
     assert!(parsing_diagnostics.is_empty(), "parsing produced diagnostics");
 
     let (expand_result, expand_diagnostics) = collect_diagnostics(|handler| {
+        let environment = basic_scheme_environment(&pool);
+
         let expander = expander_factory.make(&pool, handler);
 
-        expander.expand(&datum, &expander)
+        expander.expand(&datum, &environment, &expander)
     });
 
     let expand_result = match expand_result {

@@ -7,9 +7,12 @@
 
 //! Application expander.
 
+use std::rc::{Rc};
+
 use locus::diagnostics::{Handler, DiagnosticKind};
 use reader::datum::{ScannedDatum};
 
+use environment::{Environment};
 use expression::{Expression, ExpressionKind};
 use expanders::{Expander, ExpansionResult};
 
@@ -32,7 +35,7 @@ impl<'a> ApplicationExpander<'a> {
 }
 
 impl<'a> Expander for ApplicationExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, expander: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
         use expanders::utils::{is_form, expect_list_length_at_least};
 
         // Filter out anything that certainly does not look as a form.
@@ -46,7 +49,7 @@ impl<'a> Expander for ApplicationExpander<'a> {
             &self.diagnostic, DiagnosticKind::err_expand_invalid_application);
 
         let expressions = values[..].iter()
-            .filter_map(|datum| match expander.expand(datum, expander) {
+            .filter_map(|datum| match expander.expand(datum, environment, expander) {
                 ExpansionResult::Some(expression) => Some(expression),
                 ExpansionResult::None => None,
                 ExpansionResult::Unknown => None,
