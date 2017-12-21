@@ -25,7 +25,7 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 
-pub use self::atom::Atom;
+pub use self::atom::{Atom, with_formatting_pool};
 pub use self::interned_string::InternedString;
 
 mod atom;
