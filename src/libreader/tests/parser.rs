@@ -1648,3 +1648,89 @@ fn check(pool: &InternPool, test: DataTest) {
     assert_eq!(data, test.data);
     assert_eq!(diagnostics, test.diagnostics);
 }
+
+use locus::diagnostics::{Diagnostic, Span};
+
+#[derive(Default)]
+struct TestCase {
+    input: Option<String>,
+    expected_result: Option<String>,
+    expected_diagnostics: Vec<Diagnostic>,
+}
+
+impl TestCase {
+    fn new() -> TestCase {
+        TestCase::default()
+    }
+
+    fn input<T: Into<String>>(mut self, input: T) -> Self {
+        assert!(self.input.is_none(), "don't set input twice");
+        self.input = Some(input.into());
+        self
+    }
+
+    fn result<T: Into<String>>(mut self, result: T) -> Self {
+        assert!(self.expected_result.is_none(), "don't set result twice");
+        self.expected_result = Some(result.into());
+        self
+    }
+
+    fn diagnostic(mut self, from: usize, to: usize, kind: DiagnosticKind) -> Self {
+        self.expected_diagnostics.push(Diagnostic {
+            kind: kind,
+            loc: Some(Span::new(from, to))
+        });
+        self
+    }
+
+    fn check(self) {
+        let input = self.input.expect("input not set");
+        let expected_result = self.expected_result.expect("result not set");
+
+        check_2(&input, &expected_result, &self.expected_diagnostics);
+    }
+}
+
+/// Check whether the parser produces expected results and reports expected diagnostics
+/// when given a sequence of tokens produced from a given string by `StringScanner`.
+/// Panic if this is not true.
+fn check_2(input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
+    use locus::utils::collect_diagnostics;
+    use reader::intern_pool::with_formatting_pool;
+
+    let pool = InternPool::new();
+
+    let (data, diagnostics) = collect_diagnostics(|handler| {
+        let scanner = Box::new(StringScanner::new(input, handler, &pool));
+        let mut parser = Parser::new(scanner, &pool, handler);
+
+        let all_data = parser.parse_all_data();
+        assert!(parser.parse_all_data().is_empty(), "parser did not consume the whole stream");
+        all_data
+    });
+
+    let result = with_formatting_pool(&pool,
+        || join(data.iter().map(|d| format!("{:?}", d)), " "));
+
+    assert_eq!(result, expected_result);
+    assert_eq!(diagnostics, expected_diagnostics);
+}
+
+fn join<I, T>(items: I, sep: &str) -> String
+    where I: IntoIterator<Item=T>,
+          T: AsRef<str>
+{
+    let mut result = String::new();
+
+    for item in items {
+        result.push_str(item.as_ref());
+        result.push_str(sep);
+    }
+
+    if !result.is_empty() {
+        let new_len = result.len() - sep.len();
+        result.truncate(new_len);
+    }
+
+    return result;
+}
