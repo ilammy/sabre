@@ -1081,25 +1081,6 @@ fn unmatched_paren_after_misplaced_dot() {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-/// Check whether the parser produces expected results and reports expected diagnostics
-/// when given a sequence of tokens produced from a given string by `StringScanner`.
-/// Panic if this is not true.
-fn check(pool: &InternPool, test: DataTest) {
-    use locus::utils::collect_diagnostics;
-
-    let (data, diagnostics) = collect_diagnostics(|handler| {
-        let scanner = Box::new(StringScanner::new(&test.text, handler, pool));
-        let mut parser = Parser::new(scanner, pool, handler);
-
-        let all_data = parser.parse_all_data();
-        assert!(parser.parse_all_data().is_empty(), "parser did not consume the whole stream");
-        all_data
-    });
-
-    assert_eq!(data, test.data);
-    assert_eq!(diagnostics, test.diagnostics);
-}
-
 use locus::diagnostics::{Diagnostic, Span};
 
 #[derive(Default)]
@@ -1138,14 +1119,14 @@ impl TestCase {
         let input = self.input.expect("input not set");
         let expected_result = self.expected_result.expect("result not set");
 
-        check_2(&input, &expected_result, &self.expected_diagnostics);
+        check(&input, &expected_result, &self.expected_diagnostics);
     }
 }
 
 /// Check whether the parser produces expected results and reports expected diagnostics
 /// when given a sequence of tokens produced from a given string by `StringScanner`.
 /// Panic if this is not true.
-fn check_2(input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
+fn check(input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
     use locus::utils::collect_diagnostics;
     use reader::intern_pool::with_formatting_pool;
 
