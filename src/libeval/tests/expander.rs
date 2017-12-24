@@ -2225,3 +2225,89 @@ fn check<F>(pool: &InternPool, expander_factory: F, input: &str,
     assert_eq!(expand_result, expected_result);
     assert_eq!(expand_diagnostics, expected_diagnostics);
 }
+
+#[derive(Default)]
+struct TestCase {
+    input: Option<String>,
+    expected_result: Option<String>,
+    expected_diagnostics: Vec<Diagnostic>,
+    expander_factory: Option<SchemeBase>,
+}
+
+impl TestCase {
+    fn new() -> TestCase {
+        TestCase::default()
+    }
+
+    fn input<T: Into<String>>(mut self, input: T) -> Self {
+        assert!(self.input.is_none(), "don't set input twice");
+        self.input = Some(input.into());
+        self
+    }
+
+    fn result<T: Into<String>>(mut self, result: T) -> Self {
+        assert!(self.expected_result.is_none(), "don't set result twice");
+        self.expected_result = Some(result.into());
+        self
+    }
+
+    fn diagnostic(mut self, from: usize, to: usize, kind: DiagnosticKind) -> Self {
+        self.expected_diagnostics.push(Diagnostic {
+            kind: kind,
+            loc: Some(Span::new(from, to))
+        });
+        self
+    }
+
+    fn expander(mut self, factory: SchemeBase) -> Self {
+        assert!(self.expander_factory.is_none(), "don't set expander twice");
+        self.expander_factory = Some(factory);
+        self
+    }
+
+    fn check(self) {
+        let input = self.input.expect("input not set");
+        let expected_result = self.expected_result.expect("result not set");
+        let expected_diagnostics = self.expected_diagnostics;
+        let expander_factory = self.expander_factory.unwrap_or_default();
+
+        check_2(&expander_factory, &input, &expected_result, &expected_diagnostics);
+    }
+}
+
+/// Check whether the given expander produces expected results and reports expected diagnostics.
+/// Panic if this is not true.
+fn check_2(expander_factory: &SchemeBase, input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
+    use locus::utils::collect_diagnostics;
+    use reader::intern_pool::with_formatting_pool;
+
+    let pool = InternPool::new();
+
+    let (datum, parsing_diagnostics) = collect_diagnostics(|handler| {
+        let scanner = Box::new(StringScanner::new(input, handler, &pool));
+        let mut parser = Parser::new(scanner, &pool, handler);
+
+        let mut all_data = parser.parse_all_data();
+        assert!(parser.parse_all_data().is_empty(), "parser did not consume the whole stream");
+        assert!(all_data.len() == 1, "input must describe exactly one datum");
+        all_data.pop().unwrap()
+    });
+
+    assert!(parsing_diagnostics.is_empty(), "parsing produced diagnostics");
+
+    let (expand_result, expand_diagnostics) = collect_diagnostics(|handler| {
+        let expander = expander_factory.make(&pool, handler);
+
+        expander.expand(&datum, &expander)
+    });
+
+    let expand_result = match expand_result {
+        ExpansionResult::Some(expand_result) =>
+            with_formatting_pool(&pool, || format!("{:?}", expand_result)),
+        ExpansionResult::None => format!("None"),
+        ExpansionResult::Unknown => format!("Unknown"),
+    };
+
+    assert_eq!(expand_result, expected_result);
+    assert_eq!(expand_diagnostics, expected_diagnostics);
+}
