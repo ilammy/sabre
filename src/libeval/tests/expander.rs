@@ -15,8 +15,7 @@ extern crate reader;
 
 use eval::expanders::{Expander, ExpansionResult, ExpanderStack, BasicExpander,
     ApplicationExpander, QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
-use eval::expression::{Expression, ExpressionKind, Literal, Variable, Arguments};
-use locus::diagnostics::{Span, Diagnostic, DiagnosticKind};
+use locus::diagnostics::{Handler, DiagnosticKind};
 use reader::intern_pool::{InternPool};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -42,10 +41,8 @@ impl Default for SchemeBase {
     }
 }
 
-impl<'a> ExpanderFactory<'a> for SchemeBase {
-    type Instance = ExpanderStack<'a>;
-
-    fn make(&self, pool: &InternPool, handler: &'a Handler) -> Self::Instance {
+impl SchemeBase {
+    fn make<'a>(&self, pool: &InternPool, handler: &'a Handler) -> ExpanderStack<'a> {
         ExpanderStack::new(Box::new(BasicExpander::new(handler)))
             .push(Box::new(ApplicationExpander::new(handler)))
             .push(Box::new( QuoteExpander::new(pool.intern(self.quote),  handler)))
@@ -713,46 +710,9 @@ fn altogether() {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use locus::diagnostics::{Handler};
-use reader::datum::{ScannedDatum, DatumValue};
+use locus::diagnostics::{Span, Diagnostic};
 use reader::lexer::{StringScanner};
 use reader::parser::{Parser};
-
-trait ExpanderFactory<'a> {
-    type Instance: Expander;
-    fn make(&self, &InternPool, &'a Handler) -> Self::Instance;
-}
-
-/// Check whether the given expander produces expected results and reports expected diagnostics.
-/// Panic if this is not true.
-fn check<F>(pool: &InternPool, expander_factory: F, input: &str,
-        expected_result: ExpansionResult,
-        expected_diagnostics: &[Diagnostic])
-    where F: for<'a> ExpanderFactory<'a>
-{
-    use locus::utils::collect_diagnostics;
-
-    let (datum, parsing_diagnostics) = collect_diagnostics(|handler| {
-        let scanner = Box::new(StringScanner::new(input, handler, pool));
-        let mut parser = Parser::new(scanner, pool, handler);
-
-        let mut all_data = parser.parse_all_data();
-        assert!(parser.parse_all_data().is_empty(), "parser did not consume the whole stream");
-        assert!(all_data.len() == 1, "input must describe exactly one datum");
-        all_data.pop().unwrap()
-    });
-
-    assert!(parsing_diagnostics.is_empty(), "parsing produced diagnostics");
-
-    let (expand_result, expand_diagnostics) = collect_diagnostics(|handler| {
-        let expander = expander_factory.make(pool, handler);
-
-        expander.expand(&datum, &expander)
-    });
-
-    assert_eq!(expand_result, expected_result);
-    assert_eq!(expand_diagnostics, expected_diagnostics);
-}
 
 #[derive(Default)]
 struct TestCase {
@@ -799,13 +759,13 @@ impl TestCase {
         let expected_diagnostics = self.expected_diagnostics;
         let expander_factory = self.expander_factory.unwrap_or_default();
 
-        check_2(&expander_factory, &input, &expected_result, &expected_diagnostics);
+        check(&expander_factory, &input, &expected_result, &expected_diagnostics);
     }
 }
 
 /// Check whether the given expander produces expected results and reports expected diagnostics.
 /// Panic if this is not true.
-fn check_2(expander_factory: &SchemeBase, input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
+fn check(expander_factory: &SchemeBase, input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
     use locus::utils::collect_diagnostics;
     use reader::intern_pool::with_formatting_pool;
 
