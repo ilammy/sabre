@@ -24,7 +24,7 @@ use eval::expanders::{Expander, ExpanderStack, BasicExpander, ApplicationExpande
     QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
 use eval::expression::{Variable};
 use eval::meaning::{Environment};
-use locus::diagnostics::{Diagnostic, DiagnosticKind, Handler, Span};
+use locus::diagnostics::{DiagnosticKind, Handler};
 use reader::intern_pool::{InternPool};
 
 fn standard_scheme<'a>(pool: &'a InternPool, handler: &'a Handler) -> Box<Expander +'a> {
@@ -125,12 +125,7 @@ fn reference_undefined() {
     TestCase::new()
         .input("@@UNDEFINED_VARIABLE@@")
         .meaning("(Sequence (Undefined))")
-        .diagnostics(&[
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_unresolved_variable,
-                loc: Some(Span::new(0, 22)),
-            },
-        ])
+        .diagnostic(0, 22, DiagnosticKind::err_meaning_unresolved_variable)
         .check();
 }
 
@@ -187,31 +182,15 @@ fn assignment_undefined() {
     TestCase::new()
         .input("(set! undefined 111)")
         .meaning("(Sequence (Constant 0))")
-        .diagnostics(&[
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_unresolved_variable,
-                loc: Some(Span::new(6, 15)),
-            },
-        ])
+        .diagnostic(6, 15, DiagnosticKind::err_meaning_unresolved_variable)
         .check();
 
     TestCase::new()
         .input("(set! undefined (undefined undefined))")
         .meaning("(Sequence (ProcedureCall (Undefined) (Undefined)))")
-        .diagnostics(&[
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_unresolved_variable,
-                loc: Some(Span::new(6, 15)),
-            },
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_unresolved_variable,
-                loc: Some(Span::new(17, 26)),
-            },
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_unresolved_variable,
-                loc: Some(Span::new(27, 36)),
-            },
-        ])
+        .diagnostic( 6, 15, DiagnosticKind::err_meaning_unresolved_variable)
+        .diagnostic(17, 26, DiagnosticKind::err_meaning_unresolved_variable)
+        .diagnostic(27, 36, DiagnosticKind::err_meaning_unresolved_variable)
         .check();
 }
 
@@ -220,12 +199,7 @@ fn assignment_imported() {
     TestCase::new()
         .input("(set! car cdr)")
         .meaning("(Sequence (ImportedReference 1))")
-        .diagnostics(&[
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_assign_to_imported_binding,
-                loc: Some(Span::new(6, 9)),
-            },
-        ])
+        .diagnostic(6, 9, DiagnosticKind::err_meaning_assign_to_imported_binding)
         .check();
 }
 
@@ -335,12 +309,7 @@ fn lambda_undefined_locals() {
     TestCase::new()
         .input("(lambda (x) y)")
         .meaning("(Sequence (ClosureFixed 1 (Sequence (Undefined))))")
-        .diagnostics(&[
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_unresolved_variable,
-                loc: Some(Span::new(12, 13)),
-            },
-        ])
+        .diagnostic(12, 13, DiagnosticKind::err_meaning_unresolved_variable)
         .check();
 }
 
@@ -385,6 +354,7 @@ fn application_closed() {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
+use locus::diagnostics::{Diagnostic, Span};
 use reader::datum::{ScannedDatum};
 use reader::lexer::{StringScanner};
 use reader::parser::{Parser};
@@ -396,7 +366,7 @@ struct TestCase {
     input: Option<String>,
     expected_meaning: Option<String>,
     constant_generator: Option<Box<Fn(&InternPool) -> Vec<Value>>>,
-    expected_diagnostics: Option<Vec<Diagnostic>>,
+    expected_diagnostics: Vec<Diagnostic>,
 }
 
 impl TestCase {
@@ -424,16 +394,18 @@ impl TestCase {
         self
     }
 
-    fn diagnostics(mut self, diagnostics: &[Diagnostic]) -> Self {
-        assert!(self.expected_diagnostics.is_none(), "don't set diagnostics twice");
-        self.expected_diagnostics = Some(diagnostics.to_vec());
+    fn diagnostic(mut self, from: usize, to: usize, kind: DiagnosticKind) -> Self {
+        self.expected_diagnostics.push(Diagnostic {
+            kind: kind,
+            loc: Some(Span::new(from, to))
+        });
         self
     }
 
     fn check(self) {
         let input = self.input.expect("input not set");
         let expected_meaning = self.expected_meaning.expect("meaning not set");
-        let expected_diagnostics = self.expected_diagnostics.unwrap_or_default();
+        let expected_diagnostics = self.expected_diagnostics;
         let constants = self.constant_generator.as_ref().map(|g| g.as_ref());
 
         check(&input, &expected_meaning, &expected_diagnostics, constants);
