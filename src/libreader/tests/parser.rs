@@ -17,8 +17,6 @@ use reader::intern_pool::{InternPool};
 use reader::lexer::{StringScanner};
 use reader::parser::{Parser};
 
-use reader::test_utils::build::datum::{self, DataTest};
-
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Smoke test of test harness
 
