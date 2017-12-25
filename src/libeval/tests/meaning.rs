@@ -392,6 +392,29 @@ fn application_closed() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Shadowing
+
+#[test]
+fn local_variables_shadow_special_forms() {
+    TestCase::new()
+        .input("((lambda (if) (if if if if)) (lambda (a b) (cons a b)))")
+        .meaning("(Sequence \
+                    (ProcedureCall (ClosureFixed 1 \
+                                    (Sequence \
+                                      (ProcedureCall \
+                                        (ShallowArgumentReference 0) \
+                                        (ShallowArgumentReference 0) \
+                                        (ShallowArgumentReference 0) \
+                                        (ShallowArgumentReference 0)))) \
+                      (ClosureFixed 2 \
+                       (Sequence \
+                         (ProcedureCall (ImportedReference 2) \
+                           (ShallowArgumentReference 0) \
+                           (ShallowArgumentReference 1))))))")
+        .check();
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
 use locus::diagnostics::{Diagnostic};
