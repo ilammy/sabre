@@ -420,7 +420,7 @@ fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic],
 
     let data = parse(&pool, input);
     let expressions = expand(&pool, &data);
-    let (meaning, diagnostics) = treat(&pool, &expressions);
+    let (meaning, diagnostics) = treat(&expressions);
 
     let actual = format!("{:?}", meaning.sequence);
 
@@ -472,12 +472,10 @@ fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
     return expansion_result;
 }
 
-fn treat(pool: &InternPool, expressions: &[Expression]) -> (MeaningResult, Vec<Diagnostic>) {
+fn treat(expressions: &[Expression]) -> (MeaningResult, Vec<Diagnostic>) {
     use locus::utils::collect_diagnostics;
 
-    let environment = basic_scheme_environment(pool);
-
     collect_diagnostics(|handler| {
-        return meaning(handler, expressions, &environment);
+        return meaning(handler, expressions);
     })
 }
