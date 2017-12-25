@@ -1,4 +1,4 @@
-// Copyright (c) 2016, Sabre developers
+// Copyright (c) 2017, Sabre developers
 //
 // Licensed under the Apache License, Version 2.0 (see LICENSE.Apache in the
 // root directory) or MIT license (see LICENSE.MIT in the root directory),
@@ -22,70 +22,14 @@
 //! to get the string value associated with the atom. However, this is not a problem in practice
 //! because usually there is only one intern pool in scope.
 
-use std::borrow;
-use std::cmp;
-use std::fmt;
-use std::ops;
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
 
-/// An interned string representation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
-pub struct Atom(u32);
+pub use self::atom::{Atom, with_formatting_pool};
+pub use self::interned_string::InternedString;
 
-/// Value of an interned string.
-#[derive(Clone, PartialEq, Eq, Hash, PartialOrd)]
-pub struct InternedString {
-    /// Ref-counted pointer to the actual immutable data of this string.
-    data: Rc<String>,
-}
-
-impl InternedString {
-    /// Make a fresh unique interned string value.
-    pub fn new(s: &str) -> InternedString {
-        InternedString {
-            data: Rc::new(s.to_string()),
-        }
-    }
-
-    /// Wrap an existing String into InternedString.
-    pub fn from_string(s: String) -> InternedString {
-        InternedString {
-            data: Rc::new(s),
-        }
-    }
-}
-
-impl cmp::Ord for InternedString {
-    fn cmp(&self, other: &InternedString) -> cmp::Ordering {
-        self[..].cmp(&other[..])
-    }
-}
-
-impl fmt::Debug for InternedString {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self[..].fmt(f)
-    }
-}
-
-impl fmt::Display for InternedString {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self[..].fmt(f)
-    }
-}
-
-impl borrow::Borrow<str> for InternedString {
-    fn borrow(&self) -> &str {
-        &self.data[..]
-    }
-}
-
-impl ops::Deref for InternedString {
-    type Target = str;
-
-    fn deref(&self) -> &str { &self.data[..] }
-}
+mod atom;
+mod interned_string;
 
 /// A string intern pool.
 ///

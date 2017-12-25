@@ -9,12 +9,14 @@
 //!
 //! This module contains definitions of data recognized and processed by Scheme reader.
 
+use std::fmt;
+
 use locus::diagnostics::{Span};
 
 use intern_pool::Atom;
 
 /// A scanned datum with extents information. An AST node, if you with.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub struct ScannedDatum {
     /// The datum itself.
     pub value: DatumValue,
@@ -24,7 +26,7 @@ pub struct ScannedDatum {
 }
 
 /// Types of data recognized by the parser.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(PartialEq, Eq, Clone)]
 pub enum DatumValue {
     /// Boolean literal.
     Boolean(bool),
@@ -58,4 +60,41 @@ pub enum DatumValue {
 
     /// Reference to a labeled datum.
     LabelReference(Atom),
+}
+
+impl fmt::Debug for ScannedDatum {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self.value)
+    }
+}
+
+impl fmt::Debug for DatumValue {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use format::{write_list, write_dotted_list};
+
+        match *self {
+            DatumValue::Boolean(value) =>
+                write!(f, "{}", if value { "#t" } else { "#f" }),
+            DatumValue::Character(value) =>
+                write!(f, "#\\x{:04X}", value as u32),
+            DatumValue::Number(value) =>
+                write!(f, "{:?}", value),
+            DatumValue::String(value) =>
+                write!(f, "\"{:?}\"", value),
+            DatumValue::Symbol(value) =>
+                write!(f, "{:?}", value),
+            DatumValue::Bytevector(ref values) =>
+                write_list(f, "#u8(", values, " ", ")"),
+            DatumValue::Vector(ref values) =>
+                write_list(f, "#(", values, " ", ")"),
+            DatumValue::ProperList(ref values) =>
+                write_list(f, "(", values, " ", ")"),
+            DatumValue::DottedList(ref values) =>
+                write_dotted_list(f, "(", values, " ", ")"),
+            DatumValue::LabeledDatum(label, ref value) =>
+                write!(f, "#{:?}={:?}", label, value),
+            DatumValue::LabelReference(label) =>
+                write!(f, "#{:?}#", label),
+        }
+    }
 }

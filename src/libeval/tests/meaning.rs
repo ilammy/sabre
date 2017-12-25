@@ -24,7 +24,7 @@ use eval::expanders::{Expander, ExpanderStack, BasicExpander, ApplicationExpande
     QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
 use eval::expression::{Variable};
 use eval::meaning::{Environment};
-use locus::diagnostics::{Diagnostic, DiagnosticKind, Handler, Span};
+use locus::diagnostics::{DiagnosticKind, Handler};
 use reader::intern_pool::{InternPool};
 
 fn standard_scheme<'a>(pool: &'a InternPool, handler: &'a Handler) -> Box<Expander +'a> {
@@ -90,8 +90,9 @@ fn quote_literals() {
 fn constants_are_duplicated() {
     TestCase::new()
         .input("(begin 1 2 3 1 2 3 1)")
-        .meaning("(Sequence (Constant 0) (Constant 1) (Constant 2) (Constant 3)
-            (Constant 4) (Constant 5) (Constant 6))")
+        .meaning("(Sequence \
+                    (Constant 0) (Constant 1) (Constant 2) (Constant 3) \
+                    (Constant 4) (Constant 5) (Constant 6))")
         .constants(|pool| vec![
             Value::Number(pool.intern("1")),
             Value::Number(pool.intern("2")),
@@ -124,12 +125,7 @@ fn reference_undefined() {
     TestCase::new()
         .input("@@UNDEFINED_VARIABLE@@")
         .meaning("(Sequence (Undefined))")
-        .diagnostics(&[
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_unresolved_variable,
-                loc: Some(Span::new(0, 22)),
-            },
-        ])
+        .diagnostic(0, 22, DiagnosticKind::err_meaning_unresolved_variable)
         .check();
 }
 
@@ -145,11 +141,10 @@ fn alternative() {
 
     TestCase::new()
         .input("(if *global* car cdr)")
-        .meaning("\
-        (Sequence
-            (Alternative (GlobalReference 0)
-                (ImportedReference 0)
-                (ImportedReference 1)))")
+        .meaning("(Sequence \
+                    (Alternative (GlobalReference 0) \
+                      (ImportedReference 0) \
+                      (ImportedReference 1)))")
         .check();
 }
 
@@ -157,13 +152,12 @@ fn alternative() {
 fn alternative_nested() {
     TestCase::new()
         .input("(if (if #f 111 #t) 222 333)")
-        .meaning("\
-        (Sequence
-            (Alternative (Alternative (Constant 0)
-                            (Constant 1)
-                            (Constant 2))
-                (Constant 3)
-                (Constant 4)))")
+        .meaning("(Sequence \
+                    (Alternative (Alternative (Constant 0) \
+                                   (Constant 1) \
+                                   (Constant 2)) \
+                      (Constant 3) \
+                      (Constant 4)))")
         .check();
 }
 
@@ -188,31 +182,15 @@ fn assignment_undefined() {
     TestCase::new()
         .input("(set! undefined 111)")
         .meaning("(Sequence (Constant 0))")
-        .diagnostics(&[
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_unresolved_variable,
-                loc: Some(Span::new(6, 15)),
-            },
-        ])
+        .diagnostic(6, 15, DiagnosticKind::err_meaning_unresolved_variable)
         .check();
 
     TestCase::new()
         .input("(set! undefined (undefined undefined))")
         .meaning("(Sequence (ProcedureCall (Undefined) (Undefined)))")
-        .diagnostics(&[
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_unresolved_variable,
-                loc: Some(Span::new(6, 15)),
-            },
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_unresolved_variable,
-                loc: Some(Span::new(17, 26)),
-            },
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_unresolved_variable,
-                loc: Some(Span::new(27, 36)),
-            },
-        ])
+        .diagnostic( 6, 15, DiagnosticKind::err_meaning_unresolved_variable)
+        .diagnostic(17, 26, DiagnosticKind::err_meaning_unresolved_variable)
+        .diagnostic(27, 36, DiagnosticKind::err_meaning_unresolved_variable)
         .check();
 }
 
@@ -221,12 +199,7 @@ fn assignment_imported() {
     TestCase::new()
         .input("(set! car cdr)")
         .meaning("(Sequence (ImportedReference 1))")
-        .diagnostics(&[
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_assign_to_imported_binding,
-                loc: Some(Span::new(6, 9)),
-            },
-        ])
+        .diagnostic(6, 9, DiagnosticKind::err_meaning_assign_to_imported_binding)
         .check();
 }
 
@@ -245,15 +218,14 @@ fn sequence_simple() {
 fn sequence_splicing_toplevel() {
     TestCase::new()
         .input("(begin (begin #f #f #t) (if #f 1 2) (begin 9))")
-        .meaning("\
-        (Sequence
-            (Constant 0)
-            (Constant 1)
-            (Constant 2)
-            (Alternative (Constant 3)
-                (Constant 4)
-                (Constant 5))
-            (Constant 6))")
+        .meaning("(Sequence \
+                    (Constant 0) \
+                    (Constant 1) \
+                    (Constant 2) \
+                    (Alternative (Constant 3) \
+                      (Constant 4) \
+                      (Constant 5)) \
+                    (Constant 6))")
         .check();
 }
 
@@ -261,14 +233,13 @@ fn sequence_splicing_toplevel() {
 fn sequence_splicing_inner() {
     TestCase::new()
         .input("(lambda () (begin #f #f #t) (begin (begin 1)))")
-        .meaning("\
-        (Sequence
-            (ClosureFixed 0
-                (Sequence
-                    (Constant 0)
-                    (Constant 1)
-                    (Constant 2)
-                    (Constant 3))))")
+        .meaning("(Sequence \
+                    (ClosureFixed 0 \
+                     (Sequence \
+                       (Constant 0) \
+                       (Constant 1) \
+                       (Constant 2) \
+                       (Constant 3))))")
         .check();
 }
 
@@ -276,11 +247,10 @@ fn sequence_splicing_inner() {
 fn sequence_nonsplicing() {
     TestCase::new()
         .input("(if *global* (begin 1 2) (begin 3))")
-        .meaning("\
-        (Sequence
-            (Alternative (GlobalReference 0)
-                (Sequence (Constant 0) (Constant 1))
-                (Sequence (Constant 2))))")
+        .meaning("(Sequence \
+                    (Alternative (GlobalReference 0) \
+                      (Sequence (Constant 0) (Constant 1)) \
+                      (Sequence (Constant 2))))")
         .check();
 }
 
@@ -303,35 +273,34 @@ fn lambda_no_arguments() {
 fn lambda_fixed_arguments() {
     TestCase::new()
         .input("(lambda (n) (if n (begin 2 3) #f))")
-        .meaning("\
-        (Sequence
-            (ClosureFixed 1
-                (Sequence
-                    (Alternative (ShallowArgumentReference 0)
-                        (Sequence (Constant 0) (Constant 1))
-                        (Constant 2)))))")
+        .meaning("(Sequence \
+                    (ClosureFixed 1 \
+                     (Sequence \
+                       (Alternative (ShallowArgumentReference 0) \
+                         (Sequence (Constant 0) (Constant 1)) \
+                         (Constant 2)))))")
         .check();
 }
 
 #[test]
 fn lambda_fixed_arguments_nested() {
     TestCase::new()
-        .input("\
-        (lambda (a b n)
-          (if n
-            (lambda (x) x a)
-            (lambda (x) x b)))")
-        .meaning("\
-        (Sequence
-            (ClosureFixed 3
-                (Sequence
-                    (Alternative (ShallowArgumentReference 2)
-                        (ClosureFixed 1
-                            (Sequence (ShallowArgumentReference 0)
-                                      (DeepArgumentReference 1 0)))
-                        (ClosureFixed 1
-                            (Sequence (ShallowArgumentReference 0)
-                                      (DeepArgumentReference 1 1)))))))")
+        .input("(lambda (a b n)
+                  (if n
+                    (lambda (x) x a)
+                    (lambda (x) x b) ) )")
+        .meaning("(Sequence \
+                    (ClosureFixed 3 \
+                     (Sequence \
+                       (Alternative (ShallowArgumentReference 2) \
+                         (ClosureFixed 1 \
+                          (Sequence \
+                            (ShallowArgumentReference 0) \
+                            (DeepArgumentReference 1 0))) \
+                         (ClosureFixed 1 \
+                          (Sequence \
+                            (ShallowArgumentReference 0) \
+                            (DeepArgumentReference 1 1)))))))")
         .check();
 }
 
@@ -339,17 +308,8 @@ fn lambda_fixed_arguments_nested() {
 fn lambda_undefined_locals() {
     TestCase::new()
         .input("(lambda (x) y)")
-        .meaning("\
-        (Sequence
-            (ClosureFixed 1
-                (Sequence
-                    (Undefined))))")
-        .diagnostics(&[
-            Diagnostic {
-                kind: DiagnosticKind::err_meaning_unresolved_variable,
-                loc: Some(Span::new(12, 13)),
-            },
-        ])
+        .meaning("(Sequence (ClosureFixed 1 (Sequence (Undefined))))")
+        .diagnostic(12, 13, DiagnosticKind::err_meaning_unresolved_variable)
         .check();
 }
 
@@ -360,9 +320,7 @@ fn lambda_undefined_locals() {
 fn application_simple() {
     TestCase::new()
         .input("(cons 111 222)")
-        .meaning("\
-        (Sequence
-            (ProcedureCall (ImportedReference 2) (Constant 0) (Constant 1)))")
+        .meaning("(Sequence (ProcedureCall (ImportedReference 2) (Constant 0) (Constant 1)))")
         .check();
 }
 
@@ -370,10 +328,11 @@ fn application_simple() {
 fn application_nested() {
     TestCase::new()
         .input("(car (cons 111 222))")
-        .meaning("\
-        (Sequence
-            (ProcedureCall (ImportedReference 0)
-                (ProcedureCall (ImportedReference 2) (Constant 0) (Constant 1))))")
+        .meaning("(Sequence \
+                    (ProcedureCall (ImportedReference 0) \
+                      (ProcedureCall (ImportedReference 2) \
+                        (Constant 0) \
+                        (Constant 1))))")
         .check();
 }
 
@@ -381,22 +340,21 @@ fn application_nested() {
 fn application_closed() {
     TestCase::new()
         .input("((lambda (a b) (cons a b)) 111 222)")
-        .meaning("\
-        (Sequence
-            (ProcedureCall
-                (ClosureFixed 2
-                    (Sequence
-                        (ProcedureCall (ImportedReference 2)
-                            (ShallowArgumentReference 0)
-                            (ShallowArgumentReference 1))))
-                (Constant 0)
-                (Constant 1)))")
+        .meaning("(Sequence \
+                    (ProcedureCall (ClosureFixed 2 \
+                                    (Sequence \
+                                      (ProcedureCall (ImportedReference 2) \
+                                        (ShallowArgumentReference 0) \
+                                        (ShallowArgumentReference 1)))) \
+                      (Constant 0) \
+                      (Constant 1)))")
         .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
+use locus::diagnostics::{Diagnostic, Span};
 use reader::datum::{ScannedDatum};
 use reader::lexer::{StringScanner};
 use reader::parser::{Parser};
@@ -408,7 +366,7 @@ struct TestCase {
     input: Option<String>,
     expected_meaning: Option<String>,
     constant_generator: Option<Box<Fn(&InternPool) -> Vec<Value>>>,
-    expected_diagnostics: Option<Vec<Diagnostic>>,
+    expected_diagnostics: Vec<Diagnostic>,
 }
 
 impl TestCase {
@@ -436,16 +394,18 @@ impl TestCase {
         self
     }
 
-    fn diagnostics(mut self, diagnostics: &[Diagnostic]) -> Self {
-        assert!(self.expected_diagnostics.is_none(), "don't set diagnostics twice");
-        self.expected_diagnostics = Some(diagnostics.to_vec());
+    fn diagnostic(mut self, from: usize, to: usize, kind: DiagnosticKind) -> Self {
+        self.expected_diagnostics.push(Diagnostic {
+            kind: kind,
+            loc: Some(Span::new(from, to))
+        });
         self
     }
 
     fn check(self) {
         let input = self.input.expect("input not set");
         let expected_meaning = self.expected_meaning.expect("meaning not set");
-        let expected_diagnostics = self.expected_diagnostics.unwrap_or_default();
+        let expected_diagnostics = self.expected_diagnostics;
         let constants = self.constant_generator.as_ref().map(|g| g.as_ref());
 
         check(&input, &expected_meaning, &expected_diagnostics, constants);
@@ -464,7 +424,7 @@ fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic],
 
     let actual = format!("{:?}", meaning.sequence);
 
-    assert_eq!(trim_space(&actual), trim_space(output));
+    assert_eq!(actual, output);
     if let Some(generate_constants) = constant_generator {
         let expected_constants = generate_constants(&pool);
         assert_eq!(meaning.constants, expected_constants);
@@ -519,40 +479,4 @@ fn treat(pool: &InternPool, expressions: &[Expression]) -> (MeaningResult, Vec<D
     collect_diagnostics(|handler| {
         return meaning(handler, expressions, &environment);
     })
-}
-
-// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-// Pretty-printing meanings
-
-fn trim_space(sexpr: &str) -> String {
-    enum State {
-        InString,
-        Other,
-    }
-    let mut state = State::Other;
-    let mut previous_whitespace = false;
-
-    let mut result = String::with_capacity(sexpr.len());
-
-    for c in sexpr.chars() {
-        match state {
-            State::InString => {
-                if c == '"' {
-                    state = State::Other;
-                }
-            }
-            State::Other => {
-                if c == '"' {
-                    state = State::InString;
-                }
-                if previous_whitespace && c.is_whitespace() {
-                    continue;
-                }
-            }
-        }
-        previous_whitespace = c.is_whitespace();
-        result.push(if previous_whitespace { ' ' } else { c });
-    }
-
-    return result;
 }

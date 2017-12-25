@@ -17,48 +17,36 @@ use reader::intern_pool::{InternPool};
 use reader::lexer::{StringScanner};
 use reader::parser::{Parser};
 
-use reader::test_utils::build::datum::{self, DataTest};
-
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Smoke test of test harness
 
 #[test]
 fn smoke_test_empty_string() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![]));
+    TestCase::new().input("").result("").check();
 }
 
 #[test]
 fn smoke_test_directives() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#!fold-case"),
-        datum::ignored("#!no-fold-case"),
-        datum::ignored("#!make-me-a-sandwitch")
-            .diagnostic(0, 21, DiagnosticKind::err_lexer_unknown_directive),
-    ]));
+    TestCase::new().input("#!fold-case").result("").check();
+    TestCase::new().input("#!no-fold-case").result("").check();
+    TestCase::new().input("#!make-me-a-sandwitch").result("")
+        .diagnostic(0, 21, DiagnosticKind::err_lexer_unknown_directive)
+        .check();
 }
 
 #[test]
 fn smoke_test_comments() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("; test comment"),
-        datum::ignored("#| nested #|comments|#|#"),
-    ]));
+    TestCase::new().input("; test comment").result("").check();
+    TestCase::new().input("#| nested #|comments|#|#").result("").check();
 }
 
 #[test]
 fn smoke_test_comments_unterminated() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#| I'm too lazy")
-            .diagnostic(0, 16, DiagnosticKind::fatal_lexer_unterminated_comment),
-    ]));
+    TestCase::new()
+        .input("#| I'm too lazy")
+        .result("")
+        .diagnostic(0, 15, DiagnosticKind::fatal_lexer_unterminated_comment)
+        .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -66,88 +54,69 @@ fn smoke_test_comments_unterminated() {
 
 #[test]
 fn simple_boolean() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::boolean("#false", false),
-        datum::boolean("#T",     true),
-    ]));
+    TestCase::new().input("#false").result("#f").check();
 }
 
 #[test]
 fn simple_character() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::character("#\\newline",      '\n'),
-        datum::character("#\\X371A",        '\u{371A}'),
-        datum::character("#\\?",            '?'),
-        datum::character("#\\seventeen",    '\u{FFFD}')
-            .diagnostic(0, 11, DiagnosticKind::err_lexer_unknown_character_name),
-    ]));
+    TestCase::new().input("#\\newline")         .result("#\\x000A")         .check();
+    TestCase::new().input("#\\X371A")           .result("#\\x371A")         .check();
+    TestCase::new().input("#\\?")               .result("#\\x003F")         .check();
+    TestCase::new().input("#\\seventeen")       .result("#\\xFFFD")
+        .diagnostic(0, 11, DiagnosticKind::err_lexer_unknown_character_name)
+        .check();
 }
 
 #[test]
 fn simple_number() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::number("1",                  pool.intern("1")),
-        datum::number("23e+45",             pool.intern("23e+45")),
-        datum::number("#E67-89I",           pool.intern("#E67-89I")),
-        datum::number("-NaN.0",             pool.intern("-NaN.0")),
-        datum::number("#m#x+butterfly",     pool.intern("#m#x+butterfly"))
-            .diagnostic( 0,  2, DiagnosticKind::err_lexer_invalid_number_prefix)
-            .diagnostic( 6,  7, DiagnosticKind::err_lexer_invalid_number_character)
-            .diagnostic( 7,  8, DiagnosticKind::err_lexer_invalid_number_character)
-            .diagnostic( 8,  9, DiagnosticKind::err_lexer_invalid_number_character)
-            .diagnostic(10, 11, DiagnosticKind::err_lexer_invalid_number_character)
-            .diagnostic(12, 13, DiagnosticKind::err_lexer_invalid_number_character)
-            .diagnostic(13, 14, DiagnosticKind::err_lexer_invalid_number_character),
-    ]));
+    TestCase::new().input("1")                  .result("1")                .check();
+    TestCase::new().input("23e+45")             .result("23e+45")           .check();
+    TestCase::new().input("#E67-89I")           .result("#E67-89I")         .check();
+    TestCase::new().input("-NaN.0")             .result("-NaN.0")           .check();
+    TestCase::new().input("#m#x+butterfly")     .result("#m#x+butterfly")
+        .diagnostic( 0,  2, DiagnosticKind::err_lexer_invalid_number_prefix)
+        .diagnostic( 6,  7, DiagnosticKind::err_lexer_invalid_number_character)
+        .diagnostic( 7,  8, DiagnosticKind::err_lexer_invalid_number_character)
+        .diagnostic( 8,  9, DiagnosticKind::err_lexer_invalid_number_character)
+        .diagnostic(10, 11, DiagnosticKind::err_lexer_invalid_number_character)
+        .diagnostic(12, 13, DiagnosticKind::err_lexer_invalid_number_character)
+        .diagnostic(13, 14, DiagnosticKind::err_lexer_invalid_number_character)
+        .check();
 }
 
 #[test]
 fn simple_string() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::string("\"\"",           pool.intern("")),
-        datum::string("\"test\"",       pool.intern("test")),
-        datum::string("\"\\x1234;\"",   pool.intern("\u{1234}")),
-    ]));
+    // TODO: add escaping to debug output
+    TestCase::new().input("\"\"")           .result("\"\"")         .check();
+    TestCase::new().input("\"test\"")       .result("\"test\"")     .check();
+    TestCase::new().input("\"\\x1234;\"")   .result("\"\u{1234}\"") .check();
 }
 
 #[test]
 fn simple_string_unterminated() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("\"CANDLEJA-")
-            .diagnostic(0, 11, DiagnosticKind::fatal_lexer_unterminated_string),
-    ]));
+    TestCase::new()
+        .input("\"CANDLEJA-")
+        .result("")
+        .diagnostic(0, 10, DiagnosticKind::fatal_lexer_unterminated_string)
+        .check();
 }
 
 #[test]
 fn simple_symbol() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::symbol("hello",          pool.intern("hello")),
-        datum::symbol("|^_^|",          pool.intern("^_^")),
-        datum::symbol("||",             pool.intern("")),
-        datum::symbol("|\\x1111;|",     pool.intern("\u{1111}")),
-    ]));
+    // TODO: add escaping to debug output
+    TestCase::new().input("hello")      .result("hello")    .check();
+    TestCase::new().input("|^_^|")      .result("^_^")      .check();
+    TestCase::new().input("||")         .result("")         .check();
+    TestCase::new().input("|\\x1111;|") .result("\u{1111}") .check();
 }
 
 #[test]
 fn simple_symbol_unterminated() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("|Il1")
-            .diagnostic(0, 5, DiagnosticKind::fatal_lexer_unterminated_identifier),
-    ]));
+    TestCase::new()
+        .input("|Il1")
+        .result("")
+        .diagnostic(0, 4, DiagnosticKind::fatal_lexer_unterminated_identifier)
+        .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -155,177 +124,183 @@ fn simple_symbol_unterminated() {
 
 #[test]
 fn bytevector_empty() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::bytevector("#U8()", vec![]),
-        datum::bytevector("#u8[]", vec![]),
-        datum::bytevector("#u8{}", vec![]),
-    ]));
+    TestCase::new().input("#U8()").result("#u8()").check();
+    TestCase::new().input("#u8[]").result("#u8()").check();
+    TestCase::new().input("#u8{}").result("#u8()").check();
 }
 
 #[test]
 fn bytevector_numbers() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::bytevector("#u8(1 2 3 #e#x3A)", vec![
-            pool.intern("1"),
-            pool.intern("2"),
-            pool.intern("3"),
-            pool.intern("#e#x3A"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("#u8(1 2 3 #e#x3A)")
+        .result("#u8(1 2 3 #e#x3A)")
+        .check();
 }
 
 #[test]
 fn bytevector_padded() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::bytevector("#U8( 1 2 )", vec![pool.intern("1"), pool.intern("2")]),
-    ]));
+    TestCase::new()
+        .input("#U8( 1 2 )")
+        .result("#u8(1 2)")
+        .check();
 }
 
 #[test]
 fn bytevector_out_of_range_numbers() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::bytevector("#u8(100500 1e+400 3.1415 -74+i +inf.0)", vec![
-            pool.intern("100500"),
-            pool.intern("1e+400"),
-            pool.intern("3.1415"),
-            pool.intern("-74+i"),
-            pool.intern("+inf.0"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("#u8(100500 1e+400 3.1415 -74+i +inf.0)")
+        .result("#u8(100500 1e+400 3.1415 -74+i +inf.0)")
+        .check();
 }
 
 #[test]
 fn bytevector_incorrect_numbers() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::bytevector("#u8(#k9 1+1 #o9 1/.)", vec![
-            pool.intern("#k9"),
-            pool.intern("1+1"),
-            pool.intern("#o9"),
-            pool.intern("1/."),
-        ])
-            .diagnostic( 4,  6, DiagnosticKind::err_lexer_invalid_number_prefix)
-            .diagnostic(11, 11, DiagnosticKind::err_lexer_missing_i)
-            .diagnostic(14, 15, DiagnosticKind::err_lexer_invalid_number_digit)
-            .diagnostic(18, 19, DiagnosticKind::err_lexer_digits_missing)
-            .diagnostic(18, 19, DiagnosticKind::err_lexer_noninteger_rational),
-    ]));
+    TestCase::new()
+        .input("#u8(#k9 1+1 #o9 1/.)")
+        .result("#u8(#k9 1+1 #o9 1/.)")
+        .diagnostic( 4,  6, DiagnosticKind::err_lexer_invalid_number_prefix)
+        .diagnostic(11, 11, DiagnosticKind::err_lexer_missing_i)
+        .diagnostic(14, 15, DiagnosticKind::err_lexer_invalid_number_digit)
+        .diagnostic(18, 19, DiagnosticKind::err_lexer_digits_missing)
+        .diagnostic(18, 19, DiagnosticKind::err_lexer_noninteger_rational)
+        .check();
 }
 
 #[test]
 fn bytevector_invalid_elements() {
-    let pool = InternPool::new();
+    // Only number literals are allowed.
+    TestCase::new()
+        .input("#u8(#false \"string\" value #\\x42)")
+        .result("#u8()")
+        .diagnostic( 4, 10, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .diagnostic(11, 19, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .diagnostic(20, 25, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .diagnostic(26, 31, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        // Only number literals are allowed.
-        datum::bytevector("#u8(#false \"string\" value #\\x42)", vec![])
-            .diagnostic( 4, 10, DiagnosticKind::err_parser_invalid_bytevector_element)
-            .diagnostic(11, 19, DiagnosticKind::err_parser_invalid_bytevector_element)
-            .diagnostic(20, 25, DiagnosticKind::err_parser_invalid_bytevector_element)
-            .diagnostic(26, 31, DiagnosticKind::err_parser_invalid_bytevector_element),
+    // No way bytevectors can be nested.
+    TestCase::new()
+        .input("#u8(#U8[#u8{0}])")
+        .result("#u8()")
+        .diagnostic(8, 14, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .diagnostic(4, 15, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .check();
 
-        // No way bytevectors can be nested.
-        datum::bytevector("#u8(#U8[#u8{0}])", vec![])
-            .diagnostic(8, 14, DiagnosticKind::err_parser_invalid_bytevector_element)
-            .diagnostic(4, 15, DiagnosticKind::err_parser_invalid_bytevector_element),
+    // Vectors cannot be nested into bytevectors.
+    TestCase::new()
+        .input("#u8(#(1 2 3))")
+        .result("#u8()")
+        .diagnostic(4, 12, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .check();
 
-        // Vectors cannot be nested into bytevectors.
-        datum::bytevector("#u8(#(1 2 3))", vec![])
-            .diagnostic(4, 12, DiagnosticKind::err_parser_invalid_bytevector_element),
+    // Lists cannot be nested into bytevectors.
+    TestCase::new()
+        .input("#u8(4 {5 6})")
+        .result("#u8(4)")
+        .diagnostic(6, 11, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .check();
 
-        // Lists cannot be nested into bytevectors.
-        datum::bytevector("#u8(4 {5 6})", vec![pool.intern("4")])
-            .diagnostic(6, 11, DiagnosticKind::err_parser_invalid_bytevector_element),
+    TestCase::new()
+        .input("#u8({6 7 . 8})")
+        .result("#u8()")
+        .diagnostic(4, 13, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .check();
 
-        datum::bytevector("#u8({6 7 . 8})", vec![])
-            .diagnostic(4, 13, DiagnosticKind::err_parser_invalid_bytevector_element),
+    // Abbreviations cannot be nested into bytevectors.
+    TestCase::new()
+        .input("#U8(1 '2 3)")
+        .result("#u8(1 3)")
+        .diagnostic(6, 8, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .check();
 
-        // Abbreviations cannot be nested into bytevectors.
-        datum::bytevector("#U8(1 '2 3)", vec![pool.intern("1"), pool.intern("3")])
-            .diagnostic(6, 8, DiagnosticKind::err_parser_invalid_bytevector_element),
+    // Labels cannot be used inside bytevector.
+    TestCase::new()
+        .input("#u8(#1=2 4 #8# 16)")
+        .result("#u8(4 16)")
+        .diagnostic( 4,  8, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .diagnostic(11, 14, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .check();
 
-        // Labels cannot be used inside bytevector.
-        datum::bytevector("#u8(#1=2 4 #8# 16)", vec![pool.intern("4"), pool.intern("16")])
-            .diagnostic( 4,  8, DiagnosticKind::err_parser_invalid_bytevector_element)
-            .diagnostic(11, 14, DiagnosticKind::err_parser_invalid_bytevector_element),
-
-        // S-expr comments *can* be used inside bytevector.
-        datum::bytevector("#U8(#; 1 2 #;[3 4] 5)", vec![pool.intern("2"), pool.intern("5")]),
-    ]));
+    // S-expr comments *can* be used inside bytevector.
+    TestCase::new()
+        .input("#U8(#; 1 2 #;[3 4] 5)")
+        .result("#u8(2 5)")
+        .check();
 }
 
 #[test]
 fn bytevector_invalid_dots() {
-    let pool = InternPool::new();
+    // Dot notation cannot be used in bytevectors.
+    TestCase::new()
+        .input("#u8(1 2 . 3)")
+        .result("#u8(1 2 3)")
+        .diagnostic(8, 9, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        // Dot notation cannot be used in bytevectors.
-        datum::bytevector("#u8(1 2 . 3)", vec![pool.intern("1"), pool.intern("2"), pool.intern("3")])
-            .diagnostic(8, 9, DiagnosticKind::err_parser_misplaced_dot),
-
-        datum::bytevector("#u8(. . .)", vec![])
-            .diagnostic(4, 5, DiagnosticKind::err_parser_misplaced_dot)
-            .diagnostic(6, 7, DiagnosticKind::err_parser_misplaced_dot)
-            .diagnostic(8, 9, DiagnosticKind::err_parser_misplaced_dot),
-    ]));
+    TestCase::new()
+        .input("#u8(. . .)")
+        .result("#u8()")
+        .diagnostic(4, 5, DiagnosticKind::err_parser_misplaced_dot)
+        .diagnostic(6, 7, DiagnosticKind::err_parser_misplaced_dot)
+        .diagnostic(8, 9, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 }
 
 #[test]
 fn bytevector_mismatched_delimiters() {
-    let pool = InternPool::new();
+    TestCase::new()
+        .input("#u8(1 2 3]")
+        .result("#u8(1 2 3)")
+        .diagnostic(9, 10, DiagnosticKind::err_parser_mismatched_delimiter)
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        datum::bytevector("#u8(1 2 3]", vec![pool.intern("1"), pool.intern("2"), pool.intern("3")])
-            .diagnostic(9, 10, DiagnosticKind::err_parser_mismatched_delimiter),
+    TestCase::new()
+        .input("#u8(4 #u8(5 6])")
+        .result("#u8(4)")
+        .diagnostic(13, 14, DiagnosticKind::err_parser_mismatched_delimiter)
+        .diagnostic( 6, 14, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .check();
 
-        // Check the (invalid) nested data as well:
-        datum::bytevector("#u8(4 #u8(5 6])", vec![pool.intern("4")])
-            .diagnostic(13, 14, DiagnosticKind::err_parser_mismatched_delimiter)
-            .diagnostic( 6, 14, DiagnosticKind::err_parser_invalid_bytevector_element),
+    TestCase::new()
+        .input("#u8(#{9))")
+        .result("#u8()")
+        .diagnostic(7, 8, DiagnosticKind::err_parser_mismatched_delimiter)
+        .diagnostic(4, 8, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .check();
 
-        datum::bytevector("#u8(#{9))", vec![])
-            .diagnostic(7, 8, DiagnosticKind::err_parser_mismatched_delimiter)
-            .diagnostic(4, 8, DiagnosticKind::err_parser_invalid_bytevector_element),
+    TestCase::new()
+        .input("#u8(1 [2} 3)")
+        .result("#u8(1 3)")
+        .diagnostic(8, 9, DiagnosticKind::err_parser_mismatched_delimiter)
+        .diagnostic(6, 9, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .check();
 
-        datum::bytevector("#u8(1 [2} 3)", vec![pool.intern("1"), pool.intern("3")])
-            .diagnostic(8, 9, DiagnosticKind::err_parser_mismatched_delimiter)
-            .diagnostic(6, 9, DiagnosticKind::err_parser_invalid_bytevector_element),
-
-        datum::bytevector("#u8[4 (car . cdr] 5]", vec![pool.intern("4"), pool.intern("5")])
-            .diagnostic(16, 17, DiagnosticKind::err_parser_mismatched_delimiter)
-            .diagnostic( 6, 17, DiagnosticKind::err_parser_invalid_bytevector_element),
-    ]));
+    TestCase::new()
+        .input("#u8[4 (car . cdr] 5]")
+        .result("#u8(4 5)")
+        .diagnostic(16, 17, DiagnosticKind::err_parser_mismatched_delimiter)
+        .diagnostic( 6, 17, DiagnosticKind::err_parser_invalid_bytevector_element)
+        .check();
 
     // TODO: tell the user where the opening parenthesis is (and maybe its kind)
 }
 
 #[test]
 fn bytevector_missing_delimiters() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#u8(1 2")
-            .diagnostic(0, 4, DiagnosticKind::fatal_parser_unterminated_delimiter),
-    ]));
+    TestCase::new()
+        .input("#u8(1 2")
+        .result("")
+        .diagnostic(0, 4, DiagnosticKind::fatal_parser_unterminated_delimiter)
+        .check();
 }
 
 #[test]
 fn bytevector_missing_delimiters_nested() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#u8(1 #u8[2 #u8{3")
-            .diagnostic(12, 16, DiagnosticKind::fatal_parser_unterminated_delimiter),
-    ]));
+    TestCase::new()
+        .input("#u8(1 #u8[2 #u8{3")
+        .result("")
+        .diagnostic(12, 16, DiagnosticKind::fatal_parser_unterminated_delimiter)
+        .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -333,142 +308,88 @@ fn bytevector_missing_delimiters_nested() {
 
 #[test]
 fn vector_empty() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::vector(vec![datum::ignored("#()")]),
-        datum::vector(vec![datum::ignored("#[]")]),
-        datum::vector(vec![datum::ignored("#{}")]),
-    ]));
+    TestCase::new().input("#()").result("#()").check();
+    TestCase::new().input("#[]").result("#()").check();
+    TestCase::new().input("#{}").result("#()").check();
 }
 
 #[test]
 fn vector_elements() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::vector(vec![
-            datum::ignored("#("),
-            datum::number("123", pool.intern("123")),
-            datum::ignored("\t"),
-            datum::string("\"test\"", pool.intern("test")),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("#(123\t\"test\")")
+        .result("#(123 \"test\")")
+        .check();
 }
 
 #[test]
 fn vector_nested() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::vector(vec![
-            datum::ignored("#("),
-            datum::boolean("#true", true),
-            datum::ignored(" "),
-            datum::vector(vec![
-                datum::ignored("#["),
-                datum::boolean("#f", false),
-                datum::ignored(" "),
-                datum::boolean("#f", false),
-                datum::ignored(" "),
-                datum::character("#\\u", 'u'),
-                datum::ignored("]"),
-            ]),
-            datum::ignored(" "),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("#(#true #[#f #f #\\u])")
+        .result("#(#t #(#f #f #\\x0075))")
+        .check();
 }
 
 #[test]
 fn vector_invalid_dots() {
-    let pool = InternPool::new();
+    TestCase::new()
+        .input("#(. . .)")
+        .result("#()")
+        .diagnostic(2, 3, DiagnosticKind::err_parser_misplaced_dot)
+        .diagnostic(4, 5, DiagnosticKind::err_parser_misplaced_dot)
+        .diagnostic(6, 7, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        datum::vector(vec![
-            datum::ignored("#("),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("#(vector . 9)")
+        .result("#(vector 9)")
+        .diagnostic(9, 10, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 
-        datum::vector(vec![
-            datum::ignored("#("),
-            datum::symbol("vector", pool.intern("vector")),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::number("9", pool.intern("9")),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("#[. 9]")
+        .result("#(9)")
+        .diagnostic(2, 3, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 
-        datum::vector(vec![
-            datum::ignored("#["),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::number("9", pool.intern("9")),
-            datum::ignored("]"),
-        ]),
-
-        datum::vector(vec![
-            datum::ignored("#{"),
-            datum::number("9", pool.intern("9")),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored("}"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("#{9 .}")
+        .result("#(9)")
+        .diagnostic(4, 5, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 }
 
 #[test]
 fn vector_mismatched_delimiters() {
-    let pool = InternPool::new();
+    TestCase::new()
+        .input("#{2 + 2)")
+        .result("#(2 + 2)")
+        .diagnostic(7, 8, DiagnosticKind::err_parser_mismatched_delimiter)
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        datum::vector(vec![
-            datum::ignored("#{"),
-            datum::number("2", pool.intern("2")),
-            datum::ignored(" "),
-            datum::symbol("+", pool.intern("+")),
-            datum::ignored(" "),
-            datum::number("2", pool.intern("2")),
-            datum::ignored(")").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
-        ]),
-
-        // Nested data:
-        datum::vector(vec![
-            datum::ignored("#{"),
-            datum::vector(vec![
-                datum::ignored("#["),
-                datum::ignored("}").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
-            ]),
-            datum::ignored(")").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
-        ]),
-    ]));
+    TestCase::new()
+        .input("#{#[})")
+        .result("#(#())")
+        .diagnostic(4, 5, DiagnosticKind::err_parser_mismatched_delimiter)
+        .diagnostic(5, 6, DiagnosticKind::err_parser_mismatched_delimiter)
+        .check();
 }
 
 #[test]
 fn vector_missing_delimiters() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#(1 2")
-            .diagnostic(0, 2, DiagnosticKind::fatal_parser_unterminated_delimiter),
-    ]));
+    TestCase::new()
+        .input("#(1 2")
+        .result("")
+        .diagnostic(0, 2, DiagnosticKind::fatal_parser_unterminated_delimiter)
+        .check();
 }
 
 #[test]
 fn vector_missing_delimiters_nested() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#(#[#u8{")
-            .diagnostic(4, 8, DiagnosticKind::fatal_parser_unterminated_delimiter),
-    ]));
+    TestCase::new()
+        .input("#(#[#u8{")
+        .result("")
+        .diagnostic(4, 8, DiagnosticKind::fatal_parser_unterminated_delimiter)
+        .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -476,101 +397,59 @@ fn vector_missing_delimiters_nested() {
 
 #[test]
 fn proper_list_empty() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![datum::ignored("()")]),
-        datum::proper_list(vec![datum::ignored("[]")]),
-        datum::proper_list(vec![datum::ignored("{}")]),
-    ]));
+    TestCase::new().input("()").result("()").check();
+    TestCase::new().input("[]").result("()").check();
+    TestCase::new().input("{}").result("()").check();
 }
 
 #[test]
 fn proper_list_elements() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::number("123", pool.intern("123")),
-            datum::ignored("\t"),
-            datum::string("\"test\"", pool.intern("test")),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(123\t\"test\")")
+        .result("(123 \"test\")")
+        .check();
 }
 
 #[test]
 fn proper_list_nested() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("["),
-            datum::boolean("#true", true),
-            datum::ignored(" "),
-            datum::proper_list(vec![
-                datum::ignored("{"),
-                datum::boolean("#f", false),
-                datum::ignored(" "),
-                datum::boolean("#f", false),
-                datum::ignored(" "),
-                datum::character("#\\u", 'u'),
-                datum::ignored("}"),
-            ]),
-            datum::ignored("]"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("[#true {#f #f #\\u}]")
+        .result("(#t (#f #f #\\x0075))")
+        .check();
 }
 
 #[test]
 fn proper_list_mismatched_delimiters() {
-    let pool = InternPool::new();
+    TestCase::new()
+        .input("[2 + 2}")
+        .result("(2 + 2)")
+        .diagnostic(6, 7, DiagnosticKind::err_parser_mismatched_delimiter)
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("["),
-            datum::number("2", pool.intern("2")),
-            datum::ignored(" "),
-            datum::symbol("+", pool.intern("+")),
-            datum::ignored(" "),
-            datum::number("2", pool.intern("2")),
-            datum::ignored("}")
-                .diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
-        ]),
-
-        // Nested data:
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::vector(vec![
-                datum::ignored("#["),
-                datum::ignored(")")
-                    .diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
-            ]),
-            datum::ignored("]")
-                .diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(#[)]")
+        .result("(#())")
+        .diagnostic(3, 4, DiagnosticKind::err_parser_mismatched_delimiter)
+        .diagnostic(4, 5, DiagnosticKind::err_parser_mismatched_delimiter)
+        .check();
 }
 
 #[test]
 fn proper_list_missing_delimiters() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("(1 2")
-            .diagnostic(0, 1, DiagnosticKind::fatal_parser_unterminated_delimiter),
-    ]));
+    TestCase::new()
+        .input("(1 2")
+        .result("")
+        .diagnostic(0, 1, DiagnosticKind::fatal_parser_unterminated_delimiter)
+        .check();
 }
 
 #[test]
 fn proper_list_missing_delimiters_nested() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("(#u8{#[")
-            .diagnostic(5, 7, DiagnosticKind::fatal_parser_unterminated_delimiter),
-    ]));
+    TestCase::new()
+        .input("(#u8{#[")
+        .result("")
+        .diagnostic(5, 7, DiagnosticKind::fatal_parser_unterminated_delimiter)
+        .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -578,287 +457,173 @@ fn proper_list_missing_delimiters_nested() {
 
 #[test]
 fn dotted_list_empty() {
-    let pool = InternPool::new();
+    TestCase::new()
+        .input("(.)")
+        .result("()")
+        .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![datum::ignored("(.)")])
-            .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot),
+    TestCase::new()
+        .input("[.]")
+        .result("()")
+        .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 
-        datum::proper_list(vec![datum::ignored("[.]")])
-            .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot),
-
-        datum::proper_list(vec![datum::ignored("{.}")])
-            .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot),
-    ]));
+    TestCase::new()
+        .input("{.}")
+        .result("()")
+        .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 }
 
 #[test]
 fn dotted_list_elements() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::dotted_list(vec![
-            datum::ignored("["),
-            datum::symbol("car", pool.intern("car")),
-            datum::ignored(" . "),
-            datum::symbol("cdr", pool.intern("cdr")),
-            datum::ignored("]"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("[car . cdr]")
+        .result("(car . cdr)")
+        .check();
 }
 
 #[test]
 fn dotted_list_nested() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::dotted_list(vec![
-            datum::ignored("["),
-            datum::number("1", pool.intern("1")),
-            datum::ignored(" . "),
-            datum::dotted_list(vec![
-                datum::ignored("{"),
-                datum::number("2", pool.intern("2")),
-                datum::ignored(" . "),
-                datum::dotted_list(vec![
-                    datum::ignored("("),
-                    datum::number("3", pool.intern("3")),
-                    datum::ignored(" . "),
-                    datum::proper_list(vec![datum::ignored("[#||||#]")]),
-                    datum::ignored(")"),
-                ]),
-                datum::ignored("}"),
-            ]),
-            datum::ignored("]"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("[1 . {2 . (3 . [#||||#])}]")
+        .result("(1 . (2 . (3 . ())))")
+        .check();
 }
 
 #[test]
 fn dotted_list_no_atmosphere() {
-    let pool = InternPool::new();
+    TestCase::new()
+        .input("(\"car\".\"cdr\")")
+        .result("(\"car\" . \"cdr\")")
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        datum::dotted_list(vec![
-            datum::ignored("("),
-            datum::string("\"car\"", pool.intern("car")),
-            datum::ignored("."),
-            datum::string("\"cdr\"", pool.intern("cdr")),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("(\"car\". \"cdr\")")
+        .result("(\"car\" . \"cdr\")")
+        .check();
 
-        datum::dotted_list(vec![
-            datum::ignored("("),
-            datum::string("\"car\"", pool.intern("car")),
-            datum::ignored(". "),
-            datum::string("\"cdr\"", pool.intern("cdr")),
-            datum::ignored(")"),
-        ]),
-
-        datum::dotted_list(vec![
-            datum::ignored("("),
-            datum::string("\"car\"", pool.intern("car")),
-            datum::ignored(" ."),
-            datum::string("\"cdr\"", pool.intern("cdr")),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(\"car\" .\"cdr\")")
+        .result("(\"car\" . \"cdr\")")
+        .check();
 }
 
 #[test]
 fn dotted_list_misplaced_dots_leading() {
-    let pool = InternPool::new();
+    TestCase::new()
+        .input("(. 1 2)")
+        .result("(1 2)")
+        .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::number("1", pool.intern("1")),
-            datum::ignored(" "),
-            datum::number("2", pool.intern("2")),
-            datum::ignored(")"),
-        ]),
-
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::symbol("x", pool.intern("x")),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(. . x)")
+        .result("(x)")
+        .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot)
+        .diagnostic(3, 4, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 }
 
 #[test]
 fn dotted_list_misplaced_dots_trailing() {
-    let pool = InternPool::new();
+    TestCase::new()
+        .input("(1 2 .)")
+        .result("(1 2)")
+        .diagnostic(5, 6, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::number("1", pool.intern("1")),
-            datum::ignored(" "),
-            datum::number("2", pool.intern("2")),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(")"),
-        ]),
-
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::symbol("x", pool.intern("x")),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(x . .)")
+        .result("(x)")
+        .diagnostic(3, 4, DiagnosticKind::err_parser_misplaced_dot)
+        .diagnostic(5, 6, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 }
 
 #[test]
 fn dotted_list_misplaced_dots_repeated() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(. . .)")
+        .result("()")
+        .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot)
+        .diagnostic(3, 4, DiagnosticKind::err_parser_misplaced_dot)
+        .diagnostic(5, 6, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 }
 
 #[test]
 fn dotted_list_misplaced_dots_repeated_with_proper_cdr() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::number("1", pool.intern("1")),
-            datum::ignored(" "),
-            datum::number("2", pool.intern("2")),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::number("3", pool.intern("3")),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(1 2 . . 3)")
+        .result("(1 2 3)")
+        .diagnostic(5, 6, DiagnosticKind::err_parser_misplaced_dot)
+        .diagnostic(7, 8, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 }
 
 #[test]
 fn dotted_list_misplaced_dots_interleaved() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::number("1", pool.intern("1")),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::number("2", pool.intern("2")),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::number("3", pool.intern("3")),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(1 . 2 . 3)")
+        .result("(1 2 3)")
+        .diagnostic(3, 4, DiagnosticKind::err_parser_misplaced_dot)
+        .diagnostic(7, 8, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 }
 
 #[test]
 fn dotted_list_misplaced_dots_more_than_one_cdr() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::number("1", pool.intern("1")),
-            datum::ignored(" "),
-            datum::number("2", pool.intern("2")),
-            datum::ignored(" "),
-            datum::ignored(".").diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::number("3", pool.intern("3")),
-            datum::ignored(" "),
-            datum::number("4", pool.intern("4")),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(1 2 . 3 4)")
+        .result("(1 2 3 4)")
+        .diagnostic(5, 6, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 }
 
 #[test]
 fn dotted_list_mismatched_delimiters() {
-    let pool = InternPool::new();
+    TestCase::new()
+        .input("(#t . #false}")
+        .result("(#t . #f)")
+        .diagnostic(12, 13, DiagnosticKind::err_parser_mismatched_delimiter)
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        datum::dotted_list(vec![
-            datum::ignored("("),
-            datum::boolean("#t", true),
-            datum::ignored(" . "),
-            datum::boolean("#false", false),
-            datum::ignored("}").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
-        ]),
-
-        datum::dotted_list(vec![
-            datum::ignored("("),
-            datum::boolean("#f", false),
-            datum::ignored(" . "),
-            datum::dotted_list(vec![
-                datum::ignored("["),
-                datum::boolean("#true", true),
-                datum::ignored(" . "),
-                datum::proper_list(vec![
-                    datum::ignored("{"),
-                    datum::ignored("]").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
-                ]),
-                datum::ignored(")").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
-            ]),
-            datum::ignored("}").diagnostic(0, 1, DiagnosticKind::err_parser_mismatched_delimiter),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(#f . [#true . {])}")
+        .result("(#f . (#t . ()))")
+        .diagnostic(16, 17, DiagnosticKind::err_parser_mismatched_delimiter)
+        .diagnostic(17, 18, DiagnosticKind::err_parser_mismatched_delimiter)
+        .diagnostic(18, 19, DiagnosticKind::err_parser_mismatched_delimiter)
+        .check();
 }
 
 #[test]
 fn dotted_list_missing_delimiters() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("(1 2 . 3")
-            .diagnostic( 0,  1, DiagnosticKind::fatal_parser_unterminated_delimiter),
-    ]));
+    TestCase::new()
+        .input("(1 2 . 3")
+        .result("")
+        .diagnostic(0, 1, DiagnosticKind::fatal_parser_unterminated_delimiter)
+        .check();
 }
 
 #[test]
 fn dotted_list_missing_delimiters_no_cdr() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("(1 2 .")
-            .diagnostic( 0,  1, DiagnosticKind::fatal_parser_unterminated_delimiter),
-    ]));
+    TestCase::new()
+        .input("(1 2 .")
+        .result("")
+        .diagnostic(0, 1, DiagnosticKind::fatal_parser_unterminated_delimiter)
+        .check();
 }
 
 #[test]
 fn dotted_list_missing_delimiters_nested() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("(1 2 . (3 . #(")
-            .diagnostic(12, 14, DiagnosticKind::fatal_parser_unterminated_delimiter),
-    ]));
+    TestCase::new()
+        .input("(1 2 . (3 . #(")
+        .result("")
+        .diagnostic(12, 14, DiagnosticKind::fatal_parser_unterminated_delimiter)
+        .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -866,220 +631,113 @@ fn dotted_list_missing_delimiters_nested() {
 
 #[test]
 fn abbreviation_simple() {
-    let pool = InternPool::new();
+    TestCase::new()
+        .input("'\"a string\"")
+        .result("(quote \"a string\")")
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        datum::quote(&pool, vec![
-            datum::ignored("'"),
-            datum::string("\"a string\"", pool.intern("a string")),
-        ]),
-        datum::quasiquote(&pool, vec![
-            datum::ignored("`"),
-            datum::bytevector("#u8(0 0 7)", vec![pool.intern("0"), pool.intern("0"), pool.intern("7")]),
-        ]),
-        datum::unquote(&pool, vec![
-            datum::ignored(","),
-            datum::symbol("var", pool.intern("var")),
-        ]),
-        datum::unquote_splicing(&pool, vec![
-            datum::ignored(",@"),
-            datum::symbol("another", pool.intern("another")),
-        ]),
-    ]));
+    TestCase::new()
+        .input("`#u8(0 0 7)")
+        .result("(quasiquote #u8(0 0 7))")
+        .check();
+
+    TestCase::new()
+        .input(",var")
+        .result("(unquote var)")
+        .check();
+
+    TestCase::new()
+        .input(",@another")
+        .result("(unquote-splicing another)")
+        .check();
 }
 
 #[test]
 fn abbreviation_complex() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::quasiquote(&pool, vec![
-            datum::ignored("`"),
-            datum::dotted_list(vec![
-                datum::ignored("("),
-                datum::unquote(&pool, vec![
-                    datum::ignored(","),
-                    datum::proper_list(vec![
-                        datum::ignored("("),
-                        datum::symbol("+", pool.intern("+")),
-                        datum::ignored(" "),
-                        datum::number("2", pool.intern("2")),
-                        datum::ignored(" "),
-                        datum::number("2", pool.intern("2")),
-                        datum::ignored(")"),
-                    ]),
-                ]),
-                datum::ignored(" "),
-                datum::quote(&pool, vec![
-                    datum::ignored("'"),
-                    datum::vector(vec![
-                        datum::ignored("#["),
-                        datum::symbol("x", pool.intern("x")),
-                        datum::ignored(" "),
-                        datum::symbol("y", pool.intern("y")),
-                        datum::ignored("]"),
-                    ]),
-                ]),
-                datum::ignored(" . "),
-                datum::unquote_splicing(&pool, vec![
-                    datum::ignored(",@"),
-                    datum::symbol("dumb-list", pool.intern("dumb-list")),
-                ]),
-                datum::ignored(")"),
-            ]),
-        ]),
-    ]));
+    TestCase::new()
+        .input("`(,(+ 2 2) '#[x y] . ,@dumb-list)")
+        .result("(quasiquote ((unquote (+ 2 2)) (quote #(x y)) . (unquote-splicing dumb-list)))")
+        .check();
 }
 
 #[test]
 fn abbreviation_nested() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::quote(&pool, vec![
-            datum::ignored("'"),
-            datum::quote(&pool, vec![
-                datum::ignored("'"),
-                datum::quasiquote(&pool, vec![
-                    datum::ignored("`"),
-                    datum::quasiquote(&pool, vec![
-                        datum::ignored("`"),
-                        datum::unquote(&pool, vec![
-                            datum::ignored(","),
-                            datum::unquote_splicing(&pool, vec![
-                                datum::ignored(",@"),
-                                datum::unquote(&pool, vec![
-                                    datum::ignored(","),
-    /********************/          datum::unquote_splicing(&pool, vec![
-    /*                  */              datum::ignored(",@"),
-    /*   YOUR AD HERE   */              datum::quote(&pool, vec![
-    /*                  */                  datum::ignored("'"),
-    /********************/                  datum::proper_list(vec![
-             /**/                               datum::ignored("("),
-             /**/                               datum::number("9", pool.intern("9")),
-             /**/                               datum::ignored(")"),
-             /**/                           ]),
-             /**/                       ]),
-            /****/                  ]),
-                                ]),
-                            ]),
-                        ]),
-                    ]),
-                ]),
-            ]),
-        ]),
-    ]));
+    TestCase::new()
+        .input("''``,,@,,@'(9)")
+        .result("(quote (quote (quasiquote \
+                    (quasiquote (unquote (unquote-splicing \
+                        (unquote (unquote-splicing (quote (9))))))))))")
+        .check();
 }
 
 #[test]
 fn abbreviation_interspersed_sexpr_comments() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::quasiquote(&pool, vec![
-            datum::ignored("`"),
-            datum::ignored("#;%^&*"),
-            datum::proper_list(vec![datum::ignored("()")]),
-        ]),
-    ]));
+    TestCase::new()
+        .input("`#;%^&*()")
+        .result("(quasiquote ())")
+        .check();
 }
 
 #[test]
 fn abbreviation_missing_data_eof() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("(1 '")
-            .diagnostic(4, 4, DiagnosticKind::err_parser_missing_datum)
-            .diagnostic(0, 1, DiagnosticKind::fatal_parser_unterminated_delimiter),
-    ]));
+    TestCase::new()
+        .input("(1 '")
+        .result("")
+        .diagnostic(4, 4, DiagnosticKind::err_parser_missing_datum)
+        .diagnostic(0, 1, DiagnosticKind::fatal_parser_unterminated_delimiter)
+        .check();
 }
 
 #[test]
 fn abbreviation_missing_data_complex() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::number("2", pool.intern("2")),
-            datum::ignored(" .',`")
-                .diagnostic(5, 5, DiagnosticKind::err_parser_missing_datum)
-                .diagnostic(4, 4, DiagnosticKind::err_parser_missing_datum)
-                .diagnostic(3, 3, DiagnosticKind::err_parser_missing_datum)
-                .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(2 .',`)")
+        .result("(2)")
+        .diagnostic(7, 7, DiagnosticKind::err_parser_missing_datum)
+        .diagnostic(6, 6, DiagnosticKind::err_parser_missing_datum)
+        .diagnostic(5, 5, DiagnosticKind::err_parser_missing_datum)
+        .diagnostic(3, 4, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 }
 
 #[test]
 fn abbreviation_missing_data_after_sexpr_comments() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::number("8", pool.intern("8")),
-            datum::ignored(" "),
-            datum::ignored("',`#;")
-                .diagnostic(5, 5, DiagnosticKind::err_parser_missing_datum)
-                .diagnostic(3, 3, DiagnosticKind::err_parser_missing_datum)
-                .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum)
-                .diagnostic(1, 1, DiagnosticKind::err_parser_missing_datum),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(8 ',`#;)")
+        .result("(8)")
+        .diagnostic(8, 8, DiagnosticKind::err_parser_missing_datum)
+        .diagnostic(6, 6, DiagnosticKind::err_parser_missing_datum)
+        .diagnostic(5, 5, DiagnosticKind::err_parser_missing_datum)
+        .diagnostic(4, 4, DiagnosticKind::err_parser_missing_datum)
+        .check();
 }
 
 #[test]
 fn abbreviation_invalid_dot() {
-    let pool = InternPool::new();
+    TestCase::new()
+        .input("(1 '. 2)")
+        .result("(1 . 2)")
+        .diagnostic(4, 4, DiagnosticKind::err_parser_missing_datum)
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        datum::dotted_list(vec![
-            datum::ignored("("),
-            datum::number("1", pool.intern("1")),
-            datum::ignored(" "),
-            datum::ignored("'")
-                .diagnostic(1, 1, DiagnosticKind::err_parser_missing_datum),
-            datum::ignored("."),
-            datum::ignored(" "),
-            datum::number("2", pool.intern("2")),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("#(1 '. 2)")
+        .result("#(1 2)")
+        .diagnostic(5, 5, DiagnosticKind::err_parser_missing_datum)
+        .diagnostic(5, 6, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 
-        datum::vector(vec![
-            datum::ignored("#("),
-            datum::number("1", pool.intern("1")),
-            datum::ignored(" "),
-            datum::ignored("'")
-                .diagnostic(1, 1, DiagnosticKind::err_parser_missing_datum),
-            datum::ignored(".")
-                .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::number("2", pool.intern("2")),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("(1 . ' 2)")
+        .result("(1 . (quote 2))")
+        .check();
 
-        datum::dotted_list(vec![
-            datum::ignored("("),
-            datum::number("1", pool.intern("1")),
-            datum::ignored(" "),
-            datum::ignored("."),
-            datum::quote(&pool, vec![
-                datum::ignored("'"),
-                datum::ignored(" "),
-                datum::number("2", pool.intern("2")),
-            ]),
-            datum::ignored(")"),
-        ]),
-
-        datum::ignored("'.")
-            .diagnostic(1, 1, DiagnosticKind::err_parser_missing_datum)
-            .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot),
-        datum::proper_list(vec![datum::ignored("()")]),
-    ]));
+    TestCase::new()
+        .input("'.()")
+        .result("()")
+        .diagnostic(1, 1, DiagnosticKind::err_parser_missing_datum)
+        .diagnostic(1, 2, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1087,139 +745,91 @@ fn abbreviation_invalid_dot() {
 
 #[test]
 fn labels_simple() {
-    let pool = InternPool::new();
+    TestCase::new()
+        .input("#0=test")
+        .result("#0=test")
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        datum::labeled(pool.intern("0"), vec![
-            datum::ignored("#0="),
-            datum::symbol("test", pool.intern("test")),
-        ]),
+    TestCase::new()
+        .input("#1=9")
+        .result("#1=9")
+        .check();
 
-        datum::labeled(pool.intern("1"), vec![
-            datum::ignored("#1= "),
-            datum::number("9", pool.intern("9")),
-        ]),
+    TestCase::new()
+        .input("#2= #U8(3 4 5)")
+        .result("#2=#u8(3 4 5)")
+        .check();
 
-        datum::labeled(pool.intern("2"), vec![
-            datum::ignored("#2= "),
-            datum::bytevector("#U8(3 4 5)", vec![
-                pool.intern("3"), pool.intern("4"), pool.intern("5"),
-            ]),
-        ]),
+    TestCase::new()
+        .input("#59595#")
+        .result("#59595#")
+        .check();
 
-        datum::label_ref("#59595#", pool.intern("59595")),
-
-        datum::labeled(pool.intern("9"), vec![
-            datum::ignored("#9="),
-            datum::label_ref("#9#", pool.intern("9")),
-        ]),
-    ]));
+    TestCase::new()
+        .input("#9=#9#")
+        .result("#9=#9#")
+        .check();
 }
 
 #[test]
 fn labels_complex() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::labeled(pool.intern("0"), vec![
-            datum::ignored("#0= "),
-            datum::labeled(pool.intern("1"), vec![
-                datum::ignored("#1="),
-                datum::dotted_list(vec![
-                    datum::ignored("("),
-                    datum::number("1", pool.intern("1")),
-                    datum::ignored(" . "),
-                    datum::label_ref("#1#", pool.intern("1")),
-                    datum::ignored(")"),
-                ]),
-            ]),
-        ]),
-    ]));
+    TestCase::new()
+        .input("#0= #1=(1 . #1#)")
+        .result("#0=#1=(1 . #1#)")
+        .check();
 }
 
 #[test]
 fn labels_interspersed_sexpr_comments() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::labeled(pool.intern("0"), vec![
-            datum::ignored("#0= "),
-            datum::ignored("#;1 "),
-            datum::ignored("#;2 "),
-            datum::number("3", pool.intern("3")),
-        ]),
-    ]));
+    TestCase::new()
+        .input("#0= #;1 #;2 3")
+        .result("#0=3")
+        .check();
 }
 
 #[test]
 fn labels_data_eof() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#1=(2 ")
-            .diagnostic(3, 4, DiagnosticKind::fatal_parser_unterminated_delimiter),
-    ]));
+    TestCase::new()
+        .input("#1=(2")
+        .result("")
+        .diagnostic(3, 4, DiagnosticKind::fatal_parser_unterminated_delimiter)
+        .check();
 }
 
 #[test]
 fn labels_missing_data_eof() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#1=")
-            .diagnostic(3, 3, DiagnosticKind::err_parser_missing_datum),
-    ]));
+    TestCase::new()
+        .input("#1=")
+        .result("")
+        .diagnostic(3, 3, DiagnosticKind::err_parser_missing_datum)
+        .check();
 }
 
 #[test]
 fn labels_missing_data_complex() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::number("2", pool.intern("2")),
-            datum::ignored(" "),
-            datum::ignored("#0= ")
-                .diagnostic(3, 3, DiagnosticKind::err_parser_missing_datum),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(2 #0=)")
+        .result("(2)")
+        .diagnostic(6, 6, DiagnosticKind::err_parser_missing_datum)
+        .check();
 }
 
 #[test]
 fn labels_missing_data_after_sexpr_comments() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::number("9", pool.intern("9")),
-            datum::ignored(" "),
-            datum::ignored("#0= #;1 #;2")
-                .diagnostic(3, 3, DiagnosticKind::err_parser_missing_datum),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(9 #0= #;1 #;2)")
+        .result("(9)")
+        .diagnostic(6, 6, DiagnosticKind::err_parser_missing_datum)
+        .check();
 }
 
 #[test]
 fn labels_invalid_dot() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::dotted_list(vec![
-            datum::ignored("("),
-            datum::number("3", pool.intern("3")),
-            datum::ignored(" "),
-            datum::ignored("#666=")
-                .diagnostic(5, 5, DiagnosticKind::err_parser_missing_datum),
-            datum::ignored("."),
-            datum::ignored(" "),
-            datum::proper_list(vec![datum::ignored("()")]),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(3 #666=. ())")
+        .result("(3 . ())")
+        .diagnostic(8, 8, DiagnosticKind::err_parser_missing_datum)
+        .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1227,347 +837,193 @@ fn labels_invalid_dot() {
 
 #[test]
 fn sexpr_comment_simple() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#; 1"),
-        datum::number("2", pool.intern("2")),
-    ]));
+    TestCase::new()
+        .input("#; 1 2")
+        .result("2")
+        .check();
 }
 
 #[test]
 fn sexpr_comment_complex() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#;(1 #(2) 3 . 4)"),
-        datum::number("5", pool.intern("5")),
-    ]));
+    TestCase::new()
+        .input("#;(1 #(2) 3 . 4) 5")
+        .result("5")
+        .check();
 }
 
 #[test]
 fn sexpr_comment_nested_data() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#;[1 #; #(2 #;3) 4]"),
-        datum::vector(vec![
-            datum::ignored("#("),
-            datum::ignored("#; (5 6)"),
-            datum::ignored(" "),
-            datum::symbol("var", pool.intern("var")),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("#;[1 #; #(2 #;3) 4] #(#; (5 6) var)")
+        .result("#(var)")
+        .check();
 }
 
 #[test]
 fn sexpr_comment_nested_comments() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#; #; 1 2 "),
-        datum::number("3", pool.intern("3")),
-        datum::ignored("#; #;4 #;5 6"),
-        datum::number("7", pool.intern("7")),
-    ]));
+    TestCase::new()
+        .input("#; #; 1 2 3 #; #;4 #;5 6 7")
+        .result("3 7")
+        .check();
 }
 
 #[test]
 fn sexpr_comment_masked_line_comments() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored(";#; ( in . valid ."),
-        datum::character("#\\x1234", '\u{1234}'),
-    ]));
+    TestCase::new()
+        .input(";#; ( in . valid .\n#\\x1234")
+        .result("#\\x1234")
+        .check();
 }
 
 #[test]
 fn sexpr_comment_masked_block_comments() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#|#;(in . valid .|#"),
-        datum::character("#\\x1234", '\u{1234}'),
-    ]));
+    TestCase::new()
+        .input("#|#;(in . valid .|# #\\x1234")
+        .result("#\\x1234")
+        .check();
 }
 
 #[test]
 fn sexpr_comment_interspersed_line_comments() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#;"),
-        datum::ignored("; test"),
-        datum::ignored("1"),
-        datum::number("2", pool.intern("2")),
-    ]));
+    TestCase::new()
+        .input("#;\n; test\n1\n2")
+        .result("2")
+        .check();
 }
 
 #[test]
 fn sexpr_comment_interspersed_block_comments() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#;#||#5"),
-        datum::number("10", pool.intern("10")),
-    ]));
+    TestCase::new()
+        .input("#;#||#5 10")
+        .result("10")
+        .check();
 }
 
 #[test]
 fn sexpr_comment_data_eof() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#; (1 2 3")
-            .diagnostic(3, 4, DiagnosticKind::fatal_parser_unterminated_delimiter),
-    ]));
+    TestCase::new()
+        .input("#; (1 2 3")
+        .result("")
+        .diagnostic(3, 4, DiagnosticKind::fatal_parser_unterminated_delimiter)
+        .check();
 }
 
 #[test]
 fn sexpr_comment_missing_data_eof() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#;")
-            .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum),
-    ]));
+    TestCase::new()
+        .input("#;")
+        .result("")
+        .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum)
+        .check();
 }
 
 #[test]
 fn sexpr_comment_missing_data_complex() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::number("1", pool.intern("1")),
-            datum::ignored(" "),
-            datum::ignored("#;")
-                .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(1 #;)")
+        .result("(1)")
+        .diagnostic(5, 5, DiagnosticKind::err_parser_missing_datum)
+        .check();
 }
 
 #[test]
 fn sexpr_comment_invalid_dots() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::dotted_list(vec![
-            datum::ignored("("),
-            datum::number("3", pool.intern("3")),
-            datum::ignored(" "),
-            datum::ignored("#;")
-                .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum),
-            datum::ignored(" . "),
-            datum::number("4", pool.intern("4")),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(3 #; . 4)")
+        .result("(3 . 4)")
+        .diagnostic(5, 5, DiagnosticKind::err_parser_missing_datum)
+        .check();
 }
 
 #[test]
 fn sexpr_comment_errors_in_datum() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#; (\"\\xDEAD;\"]")
-            .diagnostic( 5, 12, DiagnosticKind::err_lexer_invalid_unicode_range)
-            .diagnostic(13, 14, DiagnosticKind::err_parser_mismatched_delimiter),
-    ]));
+    TestCase::new()
+        .input("#; (\"\\xDEAD;\"]")
+        .result("")
+        .diagnostic( 5, 12, DiagnosticKind::err_lexer_invalid_unicode_range)
+        .diagnostic(13, 14, DiagnosticKind::err_parser_mismatched_delimiter)
+        .check();
 }
 
 #[test]
 fn sexpr_comment_srfi_62_examples() {
-    let pool = InternPool::new();
+    TestCase::new()
+        .input("(+ 1 #;(* 2 3) 4)")
+        .result("(+ 1 4)")
+        .check();
 
-    check(&pool, datum::line_sequence(vec![
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::symbol("+", pool.intern("+")),
-            datum::ignored(" "),
-            datum::number("1", pool.intern("1")),
-            datum::ignored(" "),
-            datum::ignored("#;(* 2 3)"),
-            datum::ignored(" "),
-            datum::number("4", pool.intern("4")),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("(list 'x #;'y 'z)")
+        .result("(list (quote x) (quote z))")
+        .check();
 
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::symbol("list", pool.intern("list")),
-            datum::ignored(" "),
-            datum::quote(&pool, vec![
-                datum::ignored("'"),
-                datum::symbol("x", pool.intern("x")),
-            ]),
-            datum::ignored(" "),
-            datum::ignored("#;'y"),
-            datum::ignored(" "),
-            datum::quote(&pool, vec![
-                datum::ignored("'"),
-                datum::symbol("z", pool.intern("z")),
-            ]),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("(* 3 #;(+ 1 2))")
+        .result("(* 3)")
+        .check();
 
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::symbol("*", pool.intern("*")),
-            datum::ignored(" "),
-            datum::number("3", pool.intern("3")),
-            datum::ignored(" "),
-            datum::ignored("#;(+ 1 2)"),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("(#;sqrt abs -16)")
+        .result("(abs -16)")
+        .check();
 
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::ignored("#;sqrt"),
-            datum::ignored(" "),
-            datum::symbol("abs", pool.intern("abs")),
-            datum::ignored(" "),
-            datum::number("-16", pool.intern("-16")),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("(list 'a #; #;'b 'c 'd)")
+        .result("(list (quote a) (quote d))")
+        .check();
 
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::symbol("list", pool.intern("list")),
-            datum::ignored(" "),
-            datum::quote(&pool, vec![
-                datum::ignored("'"),
-                datum::symbol("a", pool.intern("a")),
-            ]),
-            datum::ignored(" "),
-            datum::ignored("#; #;'b 'c"),
-            datum::ignored(" "),
-            datum::quote(&pool, vec![
-                datum::ignored("'"),
-                datum::symbol("d", pool.intern("d")),
-            ]),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("(list 'a #;(list 'b #;c 'd) 'e)")
+        .result("(list (quote a) (quote e))")
+        .check();
 
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::symbol("list", pool.intern("list")),
-            datum::ignored(" "),
-            datum::quote(&pool, vec![
-                datum::ignored("'"),
-                datum::symbol("a", pool.intern("a")),
-            ]),
-            datum::ignored(" "),
-            datum::ignored("#;(list 'b #;c 'd)"),
-            datum::ignored(" "),
-            datum::quote(&pool, vec![
-                datum::ignored("'"),
-                datum::symbol("e", pool.intern("e")),
-            ]),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("'(a . #;b c)")
+        .result("(quote (a . c))")
+        .check();
 
-        datum::quote(&pool, vec![
-            datum::ignored("'"),
-            datum::dotted_list(vec![
-                datum::ignored("("),
-                datum::symbol("a", pool.intern("a")),
-                datum::ignored(" . "),
-                datum::ignored("#;b"),
-                datum::ignored(" "),
-                datum::symbol("c", pool.intern("c")),
-                datum::ignored(")"),
-            ]),
-        ]),
+    TestCase::new()
+        .input("'(a . b #;c)")
+        .result("(quote (a . b))")
+        .check();
 
-        datum::quote(&pool, vec![
-            datum::ignored("'"),
-            datum::dotted_list(vec![
-                datum::ignored("("),
-                datum::symbol("a", pool.intern("a")),
-                datum::ignored(" . "),
-                datum::symbol("b", pool.intern("b")),
-                datum::ignored(" "),
-                datum::ignored("#;c"),
-                datum::ignored(")"),
-            ]),
-        ]),
+    TestCase::new()
+        .input("(#;a . b)")
+        .result("(b)")
+        .diagnostic(5, 6, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::ignored("#;a"),
-            datum::ignored(" "),
-            datum::ignored(".")
-                .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::symbol("b", pool.intern("b")),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("(a . #;b)")
+        .result("(a)")
+        .diagnostic(3, 4, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::symbol("a", pool.intern("a")),
-            datum::ignored(" "),
-            datum::ignored(".")
-                .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::ignored("#;b"),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("(a #; . b)")
+        .result("(a . b)")
+        .diagnostic(5, 5, DiagnosticKind::err_parser_missing_datum)
+        .check();
 
-        datum::dotted_list(vec![
-            datum::ignored("("),
-            datum::symbol("a", pool.intern("a")),
-            datum::ignored(" "),
-            datum::ignored("#;")
-                .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum),
-            datum::ignored("."),
-            datum::ignored(" "),
-            datum::symbol("b", pool.intern("b")),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("(#;x #;y . z)")
+        .result("(z)")
+        .diagnostic(9, 10, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::ignored("#;x"),
-            datum::ignored(" "),
-            datum::ignored("#;y"),
-            datum::ignored(" "),
-            datum::ignored(".")
-                .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::symbol("z", pool.intern("z")),
-            datum::ignored(")"),
-        ]),
+    TestCase::new()
+        .input("(#; #;x #;y . z)")
+        .result("(z)")
+        .diagnostic( 3,  3, DiagnosticKind::err_parser_missing_datum)
+        .diagnostic(12, 13, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::ignored("#; #;x #;y")
-                .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum),
-            datum::ignored(" "),
-            datum::ignored(".")
-                .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::symbol("z", pool.intern("z")),
-            datum::ignored(")"),
-        ]),
-
-        datum::proper_list(vec![
-            datum::ignored("("),
-            datum::ignored("#; #;x")
-                .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum),
-            datum::ignored(" "),
-            datum::ignored(".")
-                .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot),
-            datum::ignored(" "),
-            datum::symbol("z", pool.intern("z")),
-            datum::ignored(")"),
-        ]),
-    ]));
+    TestCase::new()
+        .input("(#; #;x . z)")
+        .result("(z)")
+        .diagnostic(3, 3, DiagnosticKind::err_parser_missing_datum)
+        .diagnostic(8, 9, DiagnosticKind::err_parser_misplaced_dot)
+        .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -1575,76 +1031,136 @@ fn sexpr_comment_srfi_62_examples() {
 
 #[test]
 fn unmatched_paren_alone() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored(")")
-            .diagnostic(0, 1, DiagnosticKind::err_parser_extra_delimiter),
-    ]));
+    TestCase::new()
+        .input(")")
+        .result("")
+        .diagnostic(0, 1, DiagnosticKind::err_parser_extra_delimiter)
+        .check();
 }
 
 #[test]
 fn unmatched_paren_after_normal_comments() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#|{|#"),
-        datum::ignored("}")
-            .diagnostic(0, 1, DiagnosticKind::err_parser_extra_delimiter),
-    ]));
+    TestCase::new()
+        .input("#|{|#}")
+        .result("")
+        .diagnostic(5, 6, DiagnosticKind::err_parser_extra_delimiter)
+        .check();
 }
 
 #[test]
 fn unmatched_paren_after_sexpr_comment() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#;(9)"),
-        datum::ignored(")")
-            .diagnostic(0, 1, DiagnosticKind::err_parser_extra_delimiter),
-    ]));
+    TestCase::new()
+        .input("#;(9))")
+        .result("")
+        .diagnostic(5, 6, DiagnosticKind::err_parser_extra_delimiter)
+        .check();
 }
 
 #[test]
 fn unmatched_paren_after_sexpr_comment_with_missing_data() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored("#;)")
-            .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum)
-            .diagnostic(2, 3, DiagnosticKind::err_parser_extra_delimiter),
-    ]));
+    TestCase::new()
+        .input("#;)")
+        .result("")
+        .diagnostic(2, 2, DiagnosticKind::err_parser_missing_datum)
+        .diagnostic(2, 3, DiagnosticKind::err_parser_extra_delimiter)
+        .check();
 }
 
 #[test]
 fn unmatched_paren_after_misplaced_dot() {
-    let pool = InternPool::new();
-
-    check(&pool, datum::line_sequence(vec![
-        datum::ignored(". )")
-            .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot)
-            .diagnostic(2, 3, DiagnosticKind::err_parser_extra_delimiter),
-    ]));
+    TestCase::new()
+        .input(". )")
+        .result("")
+        .diagnostic(0, 1, DiagnosticKind::err_parser_misplaced_dot)
+        .diagnostic(2, 3, DiagnosticKind::err_parser_extra_delimiter)
+        .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
+use locus::diagnostics::{Diagnostic, Span};
+
+#[derive(Default)]
+struct TestCase {
+    input: Option<String>,
+    expected_result: Option<String>,
+    expected_diagnostics: Vec<Diagnostic>,
+}
+
+impl TestCase {
+    fn new() -> TestCase {
+        TestCase::default()
+    }
+
+    fn input<T: Into<String>>(mut self, input: T) -> Self {
+        assert!(self.input.is_none(), "don't set input twice");
+        self.input = Some(input.into());
+        self
+    }
+
+    fn result<T: Into<String>>(mut self, result: T) -> Self {
+        assert!(self.expected_result.is_none(), "don't set result twice");
+        self.expected_result = Some(result.into());
+        self
+    }
+
+    fn diagnostic(mut self, from: usize, to: usize, kind: DiagnosticKind) -> Self {
+        self.expected_diagnostics.push(Diagnostic {
+            kind: kind,
+            loc: Some(Span::new(from, to))
+        });
+        self
+    }
+
+    fn check(self) {
+        let input = self.input.expect("input not set");
+        let expected_result = self.expected_result.expect("result not set");
+
+        check(&input, &expected_result, &self.expected_diagnostics);
+    }
+}
+
 /// Check whether the parser produces expected results and reports expected diagnostics
 /// when given a sequence of tokens produced from a given string by `StringScanner`.
 /// Panic if this is not true.
-fn check(pool: &InternPool, test: DataTest) {
+fn check(input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
     use locus::utils::collect_diagnostics;
+    use reader::intern_pool::with_formatting_pool;
+
+    let pool = InternPool::new();
 
     let (data, diagnostics) = collect_diagnostics(|handler| {
-        let scanner = Box::new(StringScanner::new(&test.text, handler, pool));
-        let mut parser = Parser::new(scanner, pool, handler);
+        let scanner = Box::new(StringScanner::new(input, handler, &pool));
+        let mut parser = Parser::new(scanner, &pool, handler);
 
         let all_data = parser.parse_all_data();
         assert!(parser.parse_all_data().is_empty(), "parser did not consume the whole stream");
         all_data
     });
 
-    assert_eq!(data, test.data);
-    assert_eq!(diagnostics, test.diagnostics);
+    let result = with_formatting_pool(&pool,
+        || join(data.iter().map(|d| format!("{:?}", d)), " "));
+
+    assert_eq!(result, expected_result);
+    assert_eq!(diagnostics, expected_diagnostics);
+}
+
+fn join<I, T>(items: I, sep: &str) -> String
+    where I: IntoIterator<Item=T>,
+          T: AsRef<str>
+{
+    let mut result = String::new();
+
+    for item in items {
+        result.push_str(item.as_ref());
+        result.push_str(sep);
+    }
+
+    if !result.is_empty() {
+        let new_len = result.len() - sep.len();
+        result.truncate(new_len);
+    }
+
+    return result;
 }

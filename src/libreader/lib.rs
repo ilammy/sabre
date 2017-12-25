@@ -15,6 +15,7 @@ extern crate locus;
 extern crate unicode;
 
 pub mod datum;
+pub mod format;
 pub mod intern_pool;
 pub mod lexer;
 pub mod parser;
