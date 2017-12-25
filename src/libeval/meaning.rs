@@ -227,11 +227,11 @@ fn meaning_expression(
             ExpressionKind::Quotation(ref datum) =>
                 meaning_quote(datum, constants),
             ExpressionKind::Reference(name) =>
-                meaning_reference(diagnostic, name, &expression.span, environment),
+                meaning_reference(diagnostic, name, &expression.span, &expression.environment),
             ExpressionKind::Alternative(ref condition, ref consequent, ref alternate) =>
                 meaning_alternative(diagnostic, condition, consequent, alternate, environment, constants),
             ExpressionKind::Assignment(ref variable, ref value) =>
-                meaning_assignment(diagnostic, variable, value.as_ref(), environment, constants),
+                meaning_assignment(diagnostic, variable, value.as_ref(), &expression.environment, constants),
             ExpressionKind::Sequence(ref expressions) =>
                 meaning_sequence(diagnostic, expressions, environment, constants),
             ExpressionKind::Abstraction(ref arguments, ref body) =>
