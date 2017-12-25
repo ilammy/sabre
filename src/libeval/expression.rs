@@ -133,6 +133,8 @@ impl fmt::Debug for Expression {
 
 impl fmt::Debug for Literal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use reader::format::write_list;
+
         match *self {
             Literal::Boolean(value) =>
                 if value { write!(f, "#t") } else { write!(f, "#f") },
@@ -142,55 +144,21 @@ impl fmt::Debug for Literal {
                 write!(f, "#\\x{:04X}", char as u32),
             Literal::String(value) =>
                 write!(f, "\"{:?}\"", value),
-            Literal::Vector(ref values) => {
-                let mut first = true;
-                try!(write!(f, "#("));
-                for value in values {
-                    if first {
-                        first = false;
-                    } else {
-                        try!(write!(f, " "));
-                    }
-                    try!(write!(f, "{:?}", value));
-                }
-                try!(write!(f, ")"));
-                Ok(())
-            }
-            Literal::Bytevector(ref values) => {
-                let mut first = true;
-                try!(write!(f, "#u8("));
-                for value in values {
-                    if first {
-                        first = false;
-                    } else {
-                        try!(write!(f, " "));
-                    }
-                    try!(write!(f, "{:?}", value));
-                }
-                try!(write!(f, ")"));
-                Ok(())
-            }
+            Literal::Vector(ref values) =>
+                write_list(f, "#(", values, " ", ")"),
+            Literal::Bytevector(ref values) =>
+                write_list(f, "#u8(", values, " ", ")"),
         }
     }
 }
 
 impl fmt::Debug for Arguments {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use reader::format::write_list;
+
         match *self {
-            Arguments::Fixed(ref variables) => {
-                let mut first = true;
-                try!(write!(f, "("));
-                for variable in variables {
-                    if first {
-                        first = false;
-                    } else {
-                        try!(write!(f, " "));
-                    }
-                    try!(write!(f, "{:?}", variable.name));
-                }
-                try!(write!(f, ")"));
-                Ok(())
-            }
+            Arguments::Fixed(ref variables) =>
+                write_list(f, "(", variables.iter().map(|v| v.name), " ", ")")
         }
     }
 }

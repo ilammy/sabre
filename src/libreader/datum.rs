@@ -70,6 +70,8 @@ impl fmt::Debug for ScannedDatum {
 
 impl fmt::Debug for DatumValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use format::{write_list, write_dotted_list};
+
         match *self {
             DatumValue::Boolean(value) =>
                 write!(f, "{}", if value { "#t" } else { "#f" }),
@@ -95,58 +97,4 @@ impl fmt::Debug for DatumValue {
                 write!(f, "#{:?}#", label),
         }
     }
-}
-
-fn write_list<I, T>(f: &mut fmt::Formatter, prefix: &str, items: I, sep: &str, suffix: &str)
-    -> fmt::Result
-    where I: IntoIterator<Item=T>,
-          T: fmt::Debug,
-{
-    let mut first = true;
-
-    try!(f.write_str(prefix));
-    for item in items {
-        if first {
-            first = false;
-        } else {
-            try!(f.write_str(sep));
-        }
-        try!(write!(f, "{:?}", item));
-    }
-    try!(f.write_str(suffix));
-
-    return Ok(());
-}
-
-fn write_dotted_list<I, T>(f: &mut fmt::Formatter, prefix: &str, items: I, sep: &str, suffix: &str)
-    -> fmt::Result
-    where I: IntoIterator<Item=T>,
-          T: fmt::Debug,
-{
-    let mut iter = items.into_iter();
-    let mut curr = iter.next();
-    let mut first = true;
-
-    try!(f.write_str(prefix));
-    while let Some(item) = curr {
-        let next = iter.next();
-
-        if first {
-            first = false;
-        } else {
-            if next.is_some() {
-                try!(f.write_str(sep));
-            } else {
-                try!(f.write_str(sep));
-                try!(f.write_str("."));
-                try!(f.write_str(sep));
-            }
-        }
-        try!(write!(f, "{:?}", item));
-
-        curr = next;
-    }
-    try!(f.write_str(suffix));
-
-    return Ok(());
 }
