@@ -22,22 +22,17 @@ use expanders::{Expander, ExpansionResult};
 /// in programs. Ignore all non-atomic forms.
 ///
 /// This expander should be the root expander of the macro expander stack.
-pub struct BasicExpander<'a> {
-    /// Designated responsible for diagnostic processing.
-    diagnostic: &'a Handler,
-}
+pub struct BasicExpander;
 
-impl<'a> BasicExpander<'a> {
+impl BasicExpander {
     /// Make a new fixed expander.
-    pub fn new(handler: &Handler) -> BasicExpander {
-        BasicExpander {
-            diagnostic: handler,
-        }
+    pub fn new() -> BasicExpander {
+        BasicExpander
     }
 }
 
-impl<'a> Expander for BasicExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
+impl Expander for BasicExpander {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
         match datum.value {
             // Simple literal data.
             DatumValue::Boolean(value) => {
@@ -101,16 +96,16 @@ impl<'a> Expander for BasicExpander<'a> {
             // Labeled data cannot be used in programs, only in literal quoted data.
             // Report the error and assume the label never existed, reinvoking the expander.
             DatumValue::LabeledDatum(_, ref labeled_datum) => {
-                self.diagnostic.report(DiagnosticKind::err_expand_datum_label,
+                diagnostic.report(DiagnosticKind::err_expand_datum_label,
                     Span::new(datum.span.from, labeled_datum.span.from));
 
-                expander.expand(&labeled_datum, environment, expander)
+                expander.expand(&labeled_datum, environment, diagnostic, expander)
             }
 
             // Datum labels cannot be used in programs, only in literal quoted data.
             // Report the error and use some placeholder value instead.
             DatumValue::LabelReference(_) => {
-                self.diagnostic.report(DiagnosticKind::err_expand_datum_label,
+                diagnostic.report(DiagnosticKind::err_expand_datum_label,
                     datum.span);
 
                 ExpansionResult::Some(Expression {

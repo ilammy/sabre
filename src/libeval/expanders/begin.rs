@@ -18,26 +18,22 @@ use expression::{Expression, ExpressionKind};
 use expanders::{Expander, ExpansionResult};
 
 /// Expand `begin` special forms into sequences.
-pub struct BeginExpander<'a> {
+pub struct BeginExpander {
     /// Recognized `begin` atom.
     name: Atom,
-
-    /// Designated responsible for diagnostic processing.
-    diagnostic: &'a Handler,
 }
 
-impl<'a> BeginExpander<'a> {
+impl BeginExpander {
     /// Make a new `begin` expander for a given name.
-    pub fn new(name: Atom, handler: &Handler) -> BeginExpander {
+    pub fn new(name: Atom) -> BeginExpander {
         BeginExpander {
             name: name,
-            diagnostic: handler,
         }
     }
 }
 
-impl<'a> Expander for BeginExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
+impl Expander for BeginExpander {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
         use expanders::utils::{is_named_form, expect_list_length_at_least};
 
         // Filter out anything that certainly does not look as a begin form.
@@ -48,11 +44,11 @@ impl<'a> Expander for BeginExpander<'a> {
 
         // The only valid form is (begin expr1 expr2 ...).
         expect_list_length_at_least(datum, dotted, values, 2,
-            &self.diagnostic, DiagnosticKind::err_expand_invalid_begin);
+            diagnostic, DiagnosticKind::err_expand_invalid_begin);
 
         // Ignore any errors when recovering. Expand empty (begin) into an empty sequence.
         let expressions = values[1..].iter()
-            .filter_map(|datum| match expander.expand(datum, environment, expander) {
+            .filter_map(|datum| match expander.expand(datum, environment, diagnostic, expander) {
                 ExpansionResult::Some(expression) => Some(expression),
                 ExpansionResult::None => None,
                 ExpansionResult::Unknown => None,

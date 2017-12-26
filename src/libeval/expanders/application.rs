@@ -20,22 +20,17 @@ use expanders::{Expander, ExpansionResult};
 ///
 /// This expander should follow the basic expander, but come before all specific expanders that
 /// recognize special forms or macros.
-pub struct ApplicationExpander<'a> {
-    /// Designated responsible for diagnostic processing.
-    diagnostic: &'a Handler,
-}
+pub struct ApplicationExpander;
 
-impl<'a> ApplicationExpander<'a> {
-    /// Make a new application expander for a given name.
-    pub fn new(handler: &Handler) -> ApplicationExpander {
-        ApplicationExpander {
-            diagnostic: handler,
-        }
+impl ApplicationExpander {
+    /// Make a new application expander.
+    pub fn new() -> ApplicationExpander {
+        ApplicationExpander
     }
 }
 
-impl<'a> Expander for ApplicationExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
+impl Expander for ApplicationExpander {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
         use expanders::utils::{is_form, expect_list_length_at_least};
 
         // Filter out anything that certainly does not look as a form.
@@ -46,10 +41,10 @@ impl<'a> Expander for ApplicationExpander<'a> {
 
         // The only valid form is (procedure args ...).
         expect_list_length_at_least(datum, dotted, values, 1,
-            &self.diagnostic, DiagnosticKind::err_expand_invalid_application);
+            diagnostic, DiagnosticKind::err_expand_invalid_application);
 
         let expressions = values[..].iter()
-            .filter_map(|datum| match expander.expand(datum, environment, expander) {
+            .filter_map(|datum| match expander.expand(datum, environment, diagnostic, expander) {
                 ExpansionResult::Some(expression) => Some(expression),
                 ExpansionResult::None => None,
                 ExpansionResult::Unknown => None,

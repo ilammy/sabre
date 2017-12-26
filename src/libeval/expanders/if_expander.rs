@@ -18,26 +18,22 @@ use expression::{Expression, ExpressionKind, Literal};
 use expanders::{Expander, ExpansionResult};
 
 /// Expand `if` special forms into alternatives.
-pub struct IfExpander<'a> {
+pub struct IfExpander {
     /// Recognized `if` atom.
     name: Atom,
-
-    /// Designated responsible for diagnostic processing.
-    diagnostic: &'a Handler,
 }
 
-impl<'a> IfExpander<'a> {
+impl IfExpander {
     /// Make a new `if` expander for a given name.
-    pub fn new(name: Atom, handler: &Handler) -> IfExpander {
+    pub fn new(name: Atom) -> IfExpander {
         IfExpander {
             name: name,
-            diagnostic: handler,
         }
     }
 }
 
-impl<'a> Expander for IfExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
+impl Expander for IfExpander {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
         use expanders::utils::{is_named_form, expect_list_length_fixed};
 
         // Filter out anything that certainly does not look as a if form.
@@ -48,12 +44,12 @@ impl<'a> Expander for IfExpander<'a> {
 
         // The only valid form is (if condition consequence alternative).
         expect_list_length_fixed(datum, dotted, values, 4,
-            &self.diagnostic, DiagnosticKind::err_expand_invalid_if);
+            diagnostic, DiagnosticKind::err_expand_invalid_if);
 
         // Recover from errors by using #f as placeholder values.
         let expand_or_recover = |datum| {
             if let Some(datum) = datum {
-                let result = expander.expand(datum, environment, expander);
+                let result = expander.expand(datum, environment, diagnostic, expander);
                 if let ExpansionResult::Some(expression) = result {
                     return expression;
                 }

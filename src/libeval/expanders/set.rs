@@ -18,26 +18,22 @@ use expression::{Expression, ExpressionKind, Literal, Variable};
 use expanders::{Expander, ExpansionResult};
 
 /// Expand `set!` special forms into assignments.
-pub struct SetExpander<'a> {
+pub struct SetExpander {
     /// Recognized `set!` atom.
     name: Atom,
-
-    /// Designated responsible for diagnostic processing.
-    diagnostic: &'a Handler,
 }
 
-impl<'a> SetExpander<'a> {
+impl SetExpander {
     /// Make a new `set!` expander for a given name.
-    pub fn new(name: Atom, handler: &Handler) -> SetExpander {
+    pub fn new(name: Atom) -> SetExpander {
         SetExpander {
             name: name,
-            diagnostic: handler,
         }
     }
 }
 
-impl<'a> Expander for SetExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
+impl Expander for SetExpander {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
         use expanders::utils::{is_named_form, expect_list_length_fixed};
 
         // Filter out anything that certainly does not look as a set! form.
@@ -48,11 +44,11 @@ impl<'a> Expander for SetExpander<'a> {
 
         // The only valid form is (set! variable value).
         expect_list_length_fixed(datum, dotted, values, 3,
-            &self.diagnostic, DiagnosticKind::err_expand_invalid_set);
+            diagnostic, DiagnosticKind::err_expand_invalid_set);
 
         // The first element should be the variable name, followed by the new variable value.
-        let variable = self.expand_variable(values.get(1));
-        let value = self.expand_value(values.get(2), environment, expander);
+        let variable = expand_variable(values.get(1), diagnostic);
+        let value = expand_value(values.get(2), environment, diagnostic, expander);
 
         // If we have a variable to assign then use that variable. Otherwise leave only the value.
         return ExpansionResult::Some(
@@ -69,38 +65,34 @@ impl<'a> Expander for SetExpander<'a> {
     }
 }
 
-impl<'a> SetExpander<'a> {
-    /// Expand (as a no-op) the variable name in a set! expression.
-    ///
-    /// It may be missing, or not be a symbol. In either case recover with None.
-    fn expand_variable(&self, datum: Option<&ScannedDatum>) -> Option<Variable> {
-        if let Some(datum) = datum {
-            if let DatumValue::Symbol(name) = datum.value {
-                return Some(Variable {
-                    name: name,
-                    span: Some(datum.span),
-                });
-            }
-            self.diagnostic.report(DiagnosticKind::err_expand_invalid_set,
-                datum.span
-            );
+/// Expand (as a no-op) the variable name in a set! expression.
+///
+/// It may be missing, or not be a symbol. In either case recover with None.
+fn expand_variable(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Option<Variable> {
+    if let Some(datum) = datum {
+        if let DatumValue::Symbol(name) = datum.value {
+            return Some(Variable {
+                name: name,
+                span: Some(datum.span),
+            });
         }
-        return None;
+        diagnostic.report(DiagnosticKind::err_expand_invalid_set, datum.span);
     }
+    return None;
+}
 
-    /// Expand the subexpression denoting variable value in a set! expression.
-    ///
-    /// In case of errors return an #f literal as a placeholder.
-    fn expand_value(&self, datum: Option<&ScannedDatum>, environment: &Rc<Environment>, expander: &Expander) -> Expression {
-        if let Some(datum) = datum {
-            if let ExpansionResult::Some(expression) = expander.expand(datum, environment, expander) {
-                return expression;
-            }
+/// Expand the subexpression denoting variable value in a set! expression.
+///
+/// In case of errors return an #f literal as a placeholder.
+fn expand_value(datum: Option<&ScannedDatum>, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> Expression {
+    if let Some(datum) = datum {
+        if let ExpansionResult::Some(expression) = expander.expand(datum, environment, diagnostic, expander) {
+            return expression;
         }
-        return Expression {
-            kind: ExpressionKind::Literal(Literal::Boolean(false)),
-            span: None,
-            environment: environment.clone(),
-        };
     }
+    return Expression {
+        kind: ExpressionKind::Literal(Literal::Boolean(false)),
+        span: None,
+        environment: environment.clone(),
+    };
 }
