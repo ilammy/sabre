@@ -23,7 +23,7 @@ use std::rc::{Rc};
 use eval::expanders::{Expander, ExpanderStack, BasicExpander, ApplicationExpander,
     QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
 use eval::expression::{Variable};
-use eval::meaning::{Environment};
+use eval::environment::{Environment};
 use locus::diagnostics::{DiagnosticKind, Handler};
 use reader::intern_pool::{InternPool};
 
@@ -420,7 +420,7 @@ fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic],
 
     let data = parse(&pool, input);
     let expressions = expand(&pool, &data);
-    let (meaning, diagnostics) = treat(&pool, &expressions);
+    let (meaning, diagnostics) = treat(&expressions);
 
     let actual = format!("{:?}", meaning.sequence);
 
@@ -455,10 +455,11 @@ fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
     use locus::utils::collect_diagnostics;
 
     let (expansion_result, expansion_diagnostics) = collect_diagnostics(|handler| {
+        let environment = basic_scheme_environment(pool);
         let expander = standard_scheme(pool, handler);
 
         return data.iter()
-            .map(|d| expander.expand(d, expander.as_ref()))
+            .map(|d| expander.expand(d, &environment, expander.as_ref()))
             .map(|e| match e {
                 ExpansionResult::Some(e) => e,
                 _ => panic!("expander did not produce an expression"),
@@ -471,12 +472,10 @@ fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
     return expansion_result;
 }
 
-fn treat(pool: &InternPool, expressions: &[Expression]) -> (MeaningResult, Vec<Diagnostic>) {
+fn treat(expressions: &[Expression]) -> (MeaningResult, Vec<Diagnostic>) {
     use locus::utils::collect_diagnostics;
 
-    let environment = basic_scheme_environment(pool);
-
     collect_diagnostics(|handler| {
-        return meaning(handler, expressions, &environment);
+        return meaning(handler, expressions);
     })
 }

@@ -7,10 +7,13 @@
 
 //! `quote` expander.
 
+use std::rc::{Rc};
+
 use locus::diagnostics::{Handler, DiagnosticKind, Span};
 use reader::datum::{ScannedDatum, DatumValue};
 use reader::intern_pool::{Atom};
 
+use environment::{Environment};
 use expression::{Expression, ExpressionKind};
 use expanders::{Expander, ExpansionResult};
 
@@ -34,7 +37,7 @@ impl<'a> QuoteExpander<'a> {
 }
 
 impl<'a> Expander for QuoteExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, _expand: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, _expand: &Expander) -> ExpansionResult {
         use expanders::utils::{is_named_form, expect_list_length_fixed};
 
         // Filter out anything that certainly does not look as a quote form.
@@ -61,6 +64,7 @@ impl<'a> Expander for QuoteExpander<'a> {
         return ExpansionResult::Some(Expression {
             kind: ExpressionKind::Quotation(result),
             span: Some(datum.span),
+            environment: environment.clone(),
         });
     }
 }

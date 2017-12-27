@@ -7,8 +7,11 @@
 
 //! Macro expander interface.
 
+use std::rc::{Rc};
+
 use reader::datum::{ScannedDatum};
 
+use environment::{Environment};
 use expression::{Expression};
 
 /// Trait of all macro expanders.
@@ -17,11 +20,10 @@ pub trait Expander {
     ///
     /// Normally the provided expander will be the same as `self`, but syntactic binding forms
     /// may replace it with an extended version.
-    fn expand(&self, datum: &ScannedDatum, expand: &Expander) -> ExpansionResult;
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expand: &Expander) -> ExpansionResult;
 }
 
 /// Result of macro expansion.
-#[derive(Debug, Eq, PartialEq)]
 pub enum ExpansionResult {
     /// Successful expansion or error recovery.
     Some(Expression),

@@ -7,10 +7,13 @@
 
 //! `begin` expander.
 
+use std::rc::{Rc};
+
 use locus::diagnostics::{Handler, DiagnosticKind};
 use reader::datum::{ScannedDatum};
 use reader::intern_pool::{Atom};
 
+use environment::{Environment};
 use expression::{Expression, ExpressionKind};
 use expanders::{Expander, ExpansionResult};
 
@@ -34,7 +37,7 @@ impl<'a> BeginExpander<'a> {
 }
 
 impl<'a> Expander for BeginExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, expander: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
         use expanders::utils::{is_named_form, expect_list_length_at_least};
 
         // Filter out anything that certainly does not look as a begin form.
@@ -49,7 +52,7 @@ impl<'a> Expander for BeginExpander<'a> {
 
         // Ignore any errors when recovering. Expand empty (begin) into an empty sequence.
         let expressions = values[1..].iter()
-            .filter_map(|datum| match expander.expand(datum, expander) {
+            .filter_map(|datum| match expander.expand(datum, environment, expander) {
                 ExpansionResult::Some(expression) => Some(expression),
                 ExpansionResult::None => None,
                 ExpansionResult::Unknown => None,
@@ -59,6 +62,7 @@ impl<'a> Expander for BeginExpander<'a> {
         return ExpansionResult::Some(Expression {
             kind: ExpressionKind::Sequence(expressions),
             span: Some(datum.span),
+            environment: environment.clone(),
         });
     }
 }

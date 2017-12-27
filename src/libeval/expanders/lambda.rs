@@ -7,10 +7,13 @@
 
 //! `lambda` expander.
 
+use std::rc::{Rc};
+
 use locus::diagnostics::{Handler, DiagnosticKind, Span};
 use reader::datum::{ScannedDatum, DatumValue};
 use reader::intern_pool::{Atom};
 
+use environment::{Environment};
 use expression::{Expression, ExpressionKind, Variable, Arguments};
 use expanders::{Expander, ExpansionResult};
 
@@ -34,7 +37,7 @@ impl<'a> LambdaExpander<'a> {
 }
 
 impl<'a> Expander for LambdaExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, expander: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
         use expanders::utils::{is_named_form, expect_list_length_at_least};
 
         // Filter out anything that certainly does not look as a lambda form.
@@ -47,14 +50,16 @@ impl<'a> Expander for LambdaExpander<'a> {
         expect_list_length_at_least(datum, dotted, values, 3,
             &self.diagnostic, DiagnosticKind::err_expand_invalid_lambda);
 
-        // The first element describes the abstraction's arguments.
+        // The first element describes the abstraction's arguments. They form a new local
+        // environment for the procedure body.
         let arguments = self.expand_arguments(values.get(1));
+        let new_environment = new_local_environment(&arguments, environment);
 
         // All other elements (except for the first two) are the procedure body.
         // Expand them sequentially, as in the begin form.
         let expressions = values.iter()
             .skip(2)
-            .filter_map(|datum| match expander.expand(datum, expander) {
+            .filter_map(|datum| match expander.expand(datum, &new_environment, expander) {
                 ExpansionResult::Some(expression) => Some(expression),
                 ExpansionResult::None => None,
                 ExpansionResult::Unknown => None,
@@ -64,6 +69,7 @@ impl<'a> Expander for LambdaExpander<'a> {
         return ExpansionResult::Some(Expression {
             kind: ExpressionKind::Abstraction(arguments, expressions),
             span: Some(datum.span),
+            environment: environment.clone(), // note that this is *not* the new environment
         });
     }
 }
@@ -141,5 +147,14 @@ impl<'a> LambdaExpander<'a> {
         }
 
         return variables;
+    }
+}
+
+/// Extend the parent environment with new variables based on the argument list of a lambda form.
+fn new_local_environment(arguments: &Arguments, parent: &Rc<Environment>) -> Rc<Environment> {
+    match *arguments {
+        Arguments::Fixed(ref variables) => {
+            Environment::new_local(variables, parent)
+        }
     }
 }
