@@ -59,7 +59,7 @@ impl Expander for QuoteExpander {
 
         return ExpansionResult::Some(Expression {
             kind: ExpressionKind::Quotation(result),
-            span: Some(datum.span),
+            span: datum.span,
             environment: environment.clone(),
         });
     }

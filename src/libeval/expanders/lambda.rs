@@ -64,7 +64,7 @@ impl Expander for LambdaExpander {
 
         return ExpansionResult::Some(Expression {
             kind: ExpressionKind::Abstraction(arguments, expressions),
-            span: Some(datum.span),
+            span: datum.span,
             environment: environment.clone(), // note that this is *not* the new environment
         });
     }

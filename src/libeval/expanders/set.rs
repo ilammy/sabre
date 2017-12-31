@@ -48,14 +48,14 @@ impl Expander for SetExpander {
 
         // The first element should be the variable name, followed by the new variable value.
         let variable = expand_variable(values.get(1), diagnostic);
-        let value = expand_value(values.get(2), environment, diagnostic, expander);
+        let value = expand_value(datum, values.get(2), environment, diagnostic, expander);
 
         // If we have a variable to assign then use that variable. Otherwise leave only the value.
         return ExpansionResult::Some(
             if let Some(variable) = variable {
                 Expression {
                     kind: ExpressionKind::Assignment(variable, Box::new(value)),
-                    span: Some(datum.span),
+                    span: datum.span,
                     environment: environment.clone(),
                 }
             } else {
@@ -84,15 +84,24 @@ fn expand_variable(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Option
 /// Expand the subexpression denoting variable value in a set! expression.
 ///
 /// In case of errors return an #f literal as a placeholder.
-fn expand_value(datum: Option<&ScannedDatum>, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> Expression {
-    if let Some(datum) = datum {
-        if let ExpansionResult::Some(expression) = expander.expand(datum, environment, diagnostic, expander) {
+fn expand_value(datum: &ScannedDatum, term: Option<&ScannedDatum>, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> Expression {
+    use expanders::utils::missing_last_span;
+
+    if let Some(term) = term {
+        if let ExpansionResult::Some(expression) = expander.expand(term, environment, diagnostic, expander) {
             return expression;
+        } else {
+            return Expression {
+                kind: ExpressionKind::Literal(Literal::Boolean(false)),
+                span: term.span,
+                environment: environment.clone(),
+            };
         }
+    } else {
+        return Expression {
+            kind: ExpressionKind::Literal(Literal::Boolean(false)),
+            span: missing_last_span(datum),
+            environment: environment.clone(),
+        };
     }
-    return Expression {
-        kind: ExpressionKind::Literal(Literal::Boolean(false)),
-        span: None,
-        environment: environment.clone(),
-    };
 }
