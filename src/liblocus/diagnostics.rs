@@ -46,8 +46,8 @@ pub struct Diagnostic {
     /// The kind of a diagnostic.
     pub kind: DiagnosticKind,
 
-    /// Optional primary location of the offending code.
-    pub loc: Option<Span>,
+    /// Location of the offending code.
+    pub span: Span,
 }
 
 /// Diagnostic reporter interface.
@@ -59,7 +59,7 @@ pub trait Reporter {
     fn report(&mut self, diagnostic: Diagnostic);
 }
 
-/// Convenience wrapper for reporting diagnostics with known spans.
+/// Convenience wrapper for reporting diagnostics.
 pub struct Handler {
     /// Internal reporter implementation.
     reporter: RefCell<Box<Reporter>>,
@@ -75,9 +75,6 @@ impl Handler {
 
     /// Immediately report a single diagnostic.
     pub fn report(&self, kind: DiagnosticKind, span: Span) {
-        self.reporter.borrow_mut().report(Diagnostic {
-            kind: kind,
-            loc: Some(span),
-        });
+        self.reporter.borrow_mut().report(Diagnostic { kind, span });
     }
 }

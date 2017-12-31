@@ -749,7 +749,7 @@ impl TestCase {
     fn diagnostic(mut self, from: usize, to: usize, kind: DiagnosticKind) -> Self {
         self.expected_diagnostics.push(Diagnostic {
             kind: kind,
-            loc: Some(Span::new(from, to))
+            span: Span::new(from, to),
         });
         self
     }
