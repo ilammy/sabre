@@ -49,7 +49,15 @@ enum VariableKind {
     },
 }
 
-/// Type of a referenced variable.
+/// Reference to a variable from environment.
+pub struct VariableReference {
+    /// Kind of the variable referenced.
+    pub kind: ReferenceKind,
+    /// Location of the variable definition.
+    pub span: Span,
+}
+
+/// Kind of a referenced variable.
 pub enum ReferenceKind {
     /// Locally-bound variable, defined by a procedure.
     ///
@@ -115,10 +123,10 @@ impl Environment {
     }
 
     /// Resolve a variable in this environment.
-    pub fn resolve_variable(&self, name: Atom) -> ReferenceKind {
+    pub fn resolve_variable(&self, name: Atom) -> VariableReference {
         // First, try to resolve the name locally.
         if let Some(variable) = self.variables.get(&name) {
-            return match variable.kind {
+            let kind = match variable.kind {
                 VariableKind::Runtime { index } => {
                     match self.kind {
                         EnvironmentKind::Local => ReferenceKind::Local { index, depth: 0 },
@@ -127,20 +135,26 @@ impl Environment {
                     }
                 }
             };
+            return VariableReference { kind, span: variable.span };
         }
 
         // If that fails then look into parent environment (if it's available).
         if let Some(ref parent) = self.parent {
             let mut variable = parent.resolve_variable(name);
             // Bump the nesting depth for local variables.
-            if let ReferenceKind::Local { ref mut depth, .. } = variable {
+            if let ReferenceKind::Local { ref mut depth, .. } = variable.kind {
                 *depth += 1;
             }
             return variable;
         }
 
         // The variable cannot be resolved if it is absent in all environments.
-        return ReferenceKind::Unresolved;
+        return VariableReference {
+            kind: ReferenceKind::Unresolved,
+            // We can use bogus span for definition location here, the caller will use the correct
+            // span of the reference (which does not have a corresponding definition).
+            span: Span::new(0, 0),
+        };
     }
 }
 

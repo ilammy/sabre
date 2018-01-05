@@ -273,7 +273,9 @@ fn meaning_reference(
     name: Atom, span: Span,
     environment: &Rc<Environment>) -> MeaningKind
 {
-    match environment.resolve_variable(name)  {
+    let reference = environment.resolve_variable(name);
+
+    match reference.kind {
         ReferenceKind::Local { depth, index } => {
             if depth == 0 {
                 MeaningKind::ShallowArgumentReference(index)
@@ -315,23 +317,24 @@ fn meaning_assignment(
     environment: &Rc<Environment>,
     constants: &mut Vec<Value>) -> MeaningKind
 {
-    let reference_kind = environment.resolve_variable(variable.name);
+    let reference = environment.resolve_variable(variable.name);
 
     // Report the errors before computing the meaning of the assigned value
     // so that the reported diagnostics are ordered better.
-    if let ReferenceKind::Unresolved = reference_kind {
+    if let ReferenceKind::Unresolved = reference.kind {
         // TODO: provide suggestions based on the environment
         diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable,
             variable.span);
     }
-    if let ReferenceKind::Imported { .. } = reference_kind {
+    if let ReferenceKind::Imported { .. } = reference.kind {
+        // TODO: show where the variable is imported from
         diagnostic.report(DiagnosticKind::err_meaning_assign_to_imported_binding,
             variable.span);
     }
 
     let new_value = Box::new(meaning_expression(diagnostic, value, constants));
 
-    match reference_kind {
+    match reference.kind {
         ReferenceKind::Local { depth, index } => {
             if depth == 0 {
                 MeaningKind::ShallowArgumentSet(index, new_value)
