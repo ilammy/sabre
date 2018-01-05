@@ -19,7 +19,7 @@ use reader::datum::{ScannedDatum, DatumValue};
 use reader::intern_pool::{Atom};
 
 use expression::{Expression, ExpressionKind, Literal, Variable, Arguments};
-use environment::{Environment, VariableKind};
+use environment::{Environment, ReferenceKind};
 
 pub struct Meaning {
     pub kind: MeaningKind,
@@ -274,20 +274,20 @@ fn meaning_reference(
     environment: &Rc<Environment>) -> MeaningKind
 {
     match environment.resolve_variable(name)  {
-        VariableKind::Local { depth, index } => {
+        ReferenceKind::Local { depth, index } => {
             if depth == 0 {
                 MeaningKind::ShallowArgumentReference(index)
             } else {
                 MeaningKind::DeepArgumentReference(depth, index)
             }
         }
-        VariableKind::Global { index } => {
+        ReferenceKind::Global { index } => {
             MeaningKind::GlobalReference(index)
         }
-        VariableKind::Imported { index } => {
+        ReferenceKind::Imported { index } => {
             MeaningKind::ImportedReference(index)
         }
-        VariableKind::Unresolved => {
+        ReferenceKind::Unresolved => {
             // TODO: provide suggestions based on the environment
             diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable, span);
 
@@ -315,37 +315,37 @@ fn meaning_assignment(
     environment: &Rc<Environment>,
     constants: &mut Vec<Value>) -> MeaningKind
 {
-    let variable_kind = environment.resolve_variable(variable.name);
+    let reference_kind = environment.resolve_variable(variable.name);
 
     // Report the errors before computing the meaning of the assigned value
     // so that the reported diagnostics are ordered better.
-    if let VariableKind::Unresolved = variable_kind {
+    if let ReferenceKind::Unresolved = reference_kind {
         // TODO: provide suggestions based on the environment
         diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable,
             variable.span.expect("BUG: unresolved variable").clone());
     }
-    if let VariableKind::Imported { .. } = variable_kind {
+    if let ReferenceKind::Imported { .. } = reference_kind {
         diagnostic.report(DiagnosticKind::err_meaning_assign_to_imported_binding,
             variable.span.expect("BUG: unresolved variable").clone());
     }
 
     let new_value = Box::new(meaning_expression(diagnostic, value, constants));
 
-    match variable_kind {
-        VariableKind::Local { depth, index } => {
+    match reference_kind {
+        ReferenceKind::Local { depth, index } => {
             if depth == 0 {
                 MeaningKind::ShallowArgumentSet(index, new_value)
             } else {
                 MeaningKind::DeepArgumentSet(depth, index, new_value)
             }
         }
-        VariableKind::Global { index } => {
+        ReferenceKind::Global { index } => {
             MeaningKind::GlobalSet(index, new_value)
         }
         // Well... in these cases return the meaning of the new value being computed
         // in order to allow further passes to analyze it if necessary (and see any
         // side-effects and errors that the new value computation may contain).
-        VariableKind::Imported { .. } | VariableKind::Unresolved => {
+        ReferenceKind::Imported { .. } | ReferenceKind::Unresolved => {
             new_value.kind
         }
     }

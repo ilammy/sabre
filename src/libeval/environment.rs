@@ -29,8 +29,8 @@ enum EnvironmentKind {
     Imported,
 }
 
-/// Type of a variable.
-pub enum VariableKind {
+/// Type of a referenced variable.
+pub enum ReferenceKind {
     /// Locally-bound variable, defined by a procedure.
     ///
     /// Local variables are identified by their (zero-based) index in the activation record of
@@ -95,14 +95,14 @@ impl Environment {
     }
 
     /// Resolve a variable in this environment.
-    pub fn resolve_variable(&self, name: Atom) -> VariableKind {
+    pub fn resolve_variable(&self, name: Atom) -> ReferenceKind {
         // First, try to resolve the name locally.
         for (index, local) in self.variables.iter().enumerate() {
             if name == local.name {
                 return match self.kind {
-                    EnvironmentKind::Local => VariableKind::Local { index, depth: 0 },
-                    EnvironmentKind::Global => VariableKind::Global { index },
-                    EnvironmentKind::Imported => VariableKind::Imported { index },
+                    EnvironmentKind::Local => ReferenceKind::Local { index, depth: 0 },
+                    EnvironmentKind::Global => ReferenceKind::Global { index },
+                    EnvironmentKind::Imported => ReferenceKind::Imported { index },
                 };
             }
         }
@@ -111,13 +111,13 @@ impl Environment {
         if let Some(ref parent) = self.parent {
             let mut variable = parent.resolve_variable(name);
             // Bump the nesting depth for local variables.
-            if let VariableKind::Local { ref mut depth, .. } = variable {
+            if let ReferenceKind::Local { ref mut depth, .. } = variable {
                 *depth += 1;
             }
             return variable;
         }
 
         // The variable cannot be resolved if it is absent in all environments.
-        return VariableKind::Unresolved;
+        return ReferenceKind::Unresolved;
     }
 }
