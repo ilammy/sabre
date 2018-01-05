@@ -22,77 +22,42 @@ use expanders::{Expander, ExpansionResult};
 /// in programs. Ignore all non-atomic forms.
 ///
 /// This expander should be the root expander of the macro expander stack.
-pub struct BasicExpander<'a> {
-    /// Designated responsible for diagnostic processing.
-    diagnostic: &'a Handler,
-}
+pub struct BasicExpander;
 
-impl<'a> BasicExpander<'a> {
+impl BasicExpander {
     /// Make a new fixed expander.
-    pub fn new(handler: &Handler) -> BasicExpander {
-        BasicExpander {
-            diagnostic: handler,
-        }
+    pub fn new() -> BasicExpander {
+        BasicExpander
     }
 }
 
-impl<'a> Expander for BasicExpander<'a> {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expander: &Expander) -> ExpansionResult {
+impl Expander for BasicExpander {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
         match datum.value {
             // Simple literal data.
-            DatumValue::Boolean(value) => {
-                ExpansionResult::Some(Expression {
-                    kind: ExpressionKind::Literal(Literal::Boolean(value)),
-                    span: Some(datum.span),
-                    environment: environment.clone(),
-                })
-            }
-            DatumValue::Number(value) => {
-                ExpansionResult::Some(Expression {
-                    kind: ExpressionKind::Literal(Literal::Number(value)),
-                    span: Some(datum.span),
-                    environment: environment.clone(),
-                })
-            }
-            DatumValue::Character(value) => {
-                ExpansionResult::Some(Expression {
-                    kind: ExpressionKind::Literal(Literal::Character(value)),
-                    span: Some(datum.span),
-                    environment: environment.clone(),
-                })
-            }
-            DatumValue::String(value) => {
-                ExpansionResult::Some(Expression {
-                    kind: ExpressionKind::Literal(Literal::String(value)),
-                    span: Some(datum.span),
-                    environment: environment.clone(),
-                })
-            }
+            DatumValue::Boolean(value) =>
+                literal(datum, environment, Literal::Boolean(value)),
+            DatumValue::Number(value) =>
+                literal(datum, environment, Literal::Number(value)),
+            DatumValue::Character(value) =>
+                literal(datum, environment, Literal::Character(value)),
+            DatumValue::String(value) =>
+                literal(datum, environment, Literal::String(value)),
 
             // Bare symbols mean variable references.
             DatumValue::Symbol(name) => {
                 ExpansionResult::Some(Expression {
                     kind: ExpressionKind::Reference(name),
-                    span: Some(datum.span),
+                    span: datum.span,
                     environment: environment.clone(),
                 })
             }
 
             // Vectors and bytevectors contain literal data.
-            DatumValue::Vector(ref elements) => {
-                ExpansionResult::Some(Expression {
-                    kind: ExpressionKind::Literal(Literal::Vector(elements.clone())),
-                    span: Some(datum.span),
-                    environment: environment.clone(),
-                })
-            }
-            DatumValue::Bytevector(ref elements) => {
-                ExpansionResult::Some(Expression {
-                    kind: ExpressionKind::Literal(Literal::Bytevector(elements.clone())),
-                    span: Some(datum.span),
-                    environment: environment.clone(),
-                })
-            }
+            DatumValue::Vector(ref elements) =>
+                literal(datum, environment, Literal::Vector(elements.clone())),
+            DatumValue::Bytevector(ref elements) =>
+                literal(datum, environment, Literal::Bytevector(elements.clone())),
 
             // These are not literal data, so we ignore them.
             DatumValue::ProperList(_) => ExpansionResult::Unknown,
@@ -101,24 +66,30 @@ impl<'a> Expander for BasicExpander<'a> {
             // Labeled data cannot be used in programs, only in literal quoted data.
             // Report the error and assume the label never existed, reinvoking the expander.
             DatumValue::LabeledDatum(_, ref labeled_datum) => {
-                self.diagnostic.report(DiagnosticKind::err_expand_datum_label,
+                diagnostic.report(DiagnosticKind::err_expand_datum_label,
                     Span::new(datum.span.from, labeled_datum.span.from));
 
-                expander.expand(&labeled_datum, environment, expander)
+                expander.expand(&labeled_datum, environment, diagnostic, expander)
             }
 
             // Datum labels cannot be used in programs, only in literal quoted data.
             // Report the error and use some placeholder value instead.
             DatumValue::LabelReference(_) => {
-                self.diagnostic.report(DiagnosticKind::err_expand_datum_label,
+                diagnostic.report(DiagnosticKind::err_expand_datum_label,
                     datum.span);
 
-                ExpansionResult::Some(Expression {
-                    kind: ExpressionKind::Literal(Literal::Boolean(false)),
-                    span: Some(datum.span),
-                    environment: environment.clone(),
-                })
+                literal(datum, environment, Literal::Boolean(false))
             }
         }
     }
+}
+
+fn literal(datum: &ScannedDatum, environment: &Rc<Environment>, value: Literal)
+    -> ExpansionResult
+{
+    ExpansionResult::Some(Expression {
+        kind: ExpressionKind::Literal(value),
+        span: datum.span,
+        environment: environment.clone(),
+    })
 }

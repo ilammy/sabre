@@ -72,11 +72,11 @@ mod tests {
         assert_eq!(diagnostics, vec![
             Diagnostic {
                 kind: DiagnosticKind::fatal_lexer_unterminated_comment,
-                loc: Some(Span::new(0, 1)),
+                span: Span::new(0, 1),
             },
             Diagnostic {
                 kind: DiagnosticKind::err_parser_misplaced_dot,
-                loc: Some(Span::new(34, 51)),
+                span: Span::new(34, 51),
             },
         ]);
     }

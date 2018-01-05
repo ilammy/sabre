@@ -4003,8 +4003,8 @@ fn compute_expected_results(test_slices: &[ScannerTestSlice]) -> ScannerTestResu
 
             diagnostics.push(Diagnostic {
                 kind: diagnostic.kind.clone(),
-                loc: Some(Span::new(byte_offset + diagnostic.from,
-                                    byte_offset + diagnostic.to)),
+                span: Span::new(byte_offset + diagnostic.from,
+                                byte_offset + diagnostic.to),
             });
         }
 
@@ -4097,18 +4097,12 @@ fn print_token(token: &ScannedToken, buf: &str, pool: &InternPool) -> String {
 
 /// Pretty-print a diagnostic in diffs.
 fn print_diagnostic(diagnostic: &Diagnostic, buf: &str) -> String {
-    if let Some(ref loc) = diagnostic.loc {
-        format!("{diagnostic} @ [{from}, {to}] = {slice:?}",
-            diagnostic = pretty_print_diagnostic(diagnostic),
-            from       = loc.from,
-            to         = loc.to,
-            slice      = &buf[loc.from..loc.to],
-        )
-    } else {
-        format!("{diagnostic} @ nowhere",
-            diagnostic = pretty_print_diagnostic(diagnostic),
-        )
-    }
+    format!("{diagnostic} @ [{from}, {to}] = {slice:?}",
+        diagnostic = pretty_print_diagnostic(diagnostic),
+        from       = diagnostic.span.from,
+        to         = diagnostic.span.to,
+        slice      = &buf[diagnostic.span.from..diagnostic.span.to],
+    )
 }
 
 /// Pretty-print a token.

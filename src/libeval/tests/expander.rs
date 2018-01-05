@@ -18,7 +18,7 @@ use std::rc::{Rc};
 use eval::environment::{Environment};
 use eval::expanders::{Expander, ExpansionResult, ExpanderStack, BasicExpander,
     ApplicationExpander, QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
-use locus::diagnostics::{Handler, DiagnosticKind};
+use locus::diagnostics::{DiagnosticKind};
 use reader::intern_pool::{InternPool};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -45,14 +45,14 @@ impl Default for SchemeBase {
 }
 
 impl SchemeBase {
-    fn make<'a>(&self, pool: &InternPool, handler: &'a Handler) -> ExpanderStack<'a> {
-        ExpanderStack::new(Box::new(BasicExpander::new(handler)))
-            .push(Box::new(ApplicationExpander::new(handler)))
-            .push(Box::new( QuoteExpander::new(pool.intern(self.quote),  handler)))
-            .push(Box::new( BeginExpander::new(pool.intern(self.begin),  handler)))
-            .push(Box::new(    IfExpander::new(pool.intern(self.if_),    handler)))
-            .push(Box::new(   SetExpander::new(pool.intern(self.set),    handler)))
-            .push(Box::new(LambdaExpander::new(pool.intern(self.lambda), handler)))
+    fn make(&self, pool: &InternPool) -> ExpanderStack {
+        ExpanderStack::new(Box::new(BasicExpander::new()))
+            .push(Box::new(ApplicationExpander::new()))
+            .push(Box::new( QuoteExpander::new(pool.intern(self.quote))))
+            .push(Box::new( BeginExpander::new(pool.intern(self.begin))))
+            .push(Box::new(    IfExpander::new(pool.intern(self.if_))))
+            .push(Box::new(   SetExpander::new(pool.intern(self.set))))
+            .push(Box::new(LambdaExpander::new(pool.intern(self.lambda))))
     }
 }
 
@@ -749,7 +749,7 @@ impl TestCase {
     fn diagnostic(mut self, from: usize, to: usize, kind: DiagnosticKind) -> Self {
         self.expected_diagnostics.push(Diagnostic {
             kind: kind,
-            loc: Some(Span::new(from, to))
+            span: Span::new(from, to),
         });
         self
     }
@@ -793,9 +793,9 @@ fn check(expander_factory: &SchemeBase, input: &str, expected_result: &str, expe
     let (expand_result, expand_diagnostics) = collect_diagnostics(|handler| {
         let environment = basic_scheme_environment(&pool);
 
-        let expander = expander_factory.make(&pool, handler);
+        let expander = expander_factory.make(&pool);
 
-        expander.expand(&datum, &environment, &expander)
+        expander.expand(&datum, &environment, &handler, &expander)
     });
 
     let expand_result = match expand_result {

@@ -67,8 +67,7 @@ pub fn expect_list_length_fixed(datum: &ScannedDatum, dotted: bool, elements: &[
     let last = elements.len() - 1;
 
     if elements.len() < expected_length {
-        diagnostic.report(kind,
-            Span::new(elements[last].span.to, datum.span.to - 1));
+        diagnostic.report(kind, missing_last_span(datum));
     }
 
     if elements.len() > expected_length {
@@ -102,13 +101,28 @@ pub fn expect_list_length_at_least(datum: &ScannedDatum, dotted: bool, elements:
     let last = elements.len() - 1;
 
     if elements.len() < expected_length {
-        diagnostic.report(kind,
-            Span::new(elements[last].span.to, datum.span.to - 1));
+        diagnostic.report(kind, missing_last_span(datum));
     }
 
     if dotted && (elements.len() >= expected_length || expected_length > 2) {
         assert!(elements.len() >= 2);
         diagnostic.report(kind,
             Span::new(elements[last - 1].span.to, elements[last].span.from));
+    }
+}
+
+/// Return a span between the last term and the closing parenthesis.
+///
+/// `datum` must represent a non-empty list or vector (otherwise the function panics).
+pub fn missing_last_span(datum: &ScannedDatum) -> Span {
+    match datum.value {
+        DatumValue::ProperList(ref terms) |
+        DatumValue::DottedList(ref terms) |
+        DatumValue::Vector(ref terms) => {
+            assert!(terms.len() >= 1, "the list must be non-empty");
+            let last_span = terms.last().unwrap().span;
+            Span::new(last_span.to, datum.span.to - 1)
+        }
+        _ => panic!("datum must be a list or a vector")
     }
 }

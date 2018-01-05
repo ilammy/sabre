@@ -24,18 +24,18 @@ use eval::expanders::{Expander, ExpanderStack, BasicExpander, ApplicationExpande
     QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
 use eval::expression::{Variable};
 use eval::environment::{Environment};
-use locus::diagnostics::{DiagnosticKind, Handler};
+use locus::diagnostics::{DiagnosticKind};
 use reader::intern_pool::{InternPool};
 
-fn standard_scheme<'a>(pool: &'a InternPool, handler: &'a Handler) -> Box<Expander +'a> {
+fn standard_scheme(pool: &InternPool) -> Box<Expander> {
     Box::new(
-        ExpanderStack::new(Box::new(BasicExpander::new(handler)))
-            .push(Box::new(ApplicationExpander::new(handler)))
-            .push(Box::new( QuoteExpander::new(pool.intern("quote"),  handler)))
-            .push(Box::new( BeginExpander::new(pool.intern("begin"),  handler)))
-            .push(Box::new(    IfExpander::new(pool.intern("if"),     handler)))
-            .push(Box::new(   SetExpander::new(pool.intern("set!"),   handler)))
-            .push(Box::new(LambdaExpander::new(pool.intern("lambda"), handler)))
+        ExpanderStack::new(Box::new(BasicExpander::new()))
+            .push(Box::new(ApplicationExpander::new()))
+            .push(Box::new( QuoteExpander::new(pool.intern("quote"))))
+            .push(Box::new( BeginExpander::new(pool.intern("begin"))))
+            .push(Box::new(    IfExpander::new(pool.intern("if"))))
+            .push(Box::new(   SetExpander::new(pool.intern("set!"))))
+            .push(Box::new(LambdaExpander::new(pool.intern("lambda"))))
     )
 }
 
@@ -53,6 +53,25 @@ fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
     let global_env = Environment::new_global(&global_vars, &imported_env);
 
     return global_env;
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Edge cases
+
+#[test]
+fn empty_file() {
+    TestCase::new()
+        .input("")
+        .meaning("(Sequence)")
+        .check();
+}
+
+#[test]
+fn only_comments() {
+    TestCase::new()
+        .input("; test test")
+        .meaning("(Sequence)")
+        .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -397,7 +416,7 @@ impl TestCase {
     fn diagnostic(mut self, from: usize, to: usize, kind: DiagnosticKind) -> Self {
         self.expected_diagnostics.push(Diagnostic {
             kind: kind,
-            loc: Some(Span::new(from, to))
+            span: Span::new(from, to),
         });
         self
     }
@@ -456,10 +475,10 @@ fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
 
     let (expansion_result, expansion_diagnostics) = collect_diagnostics(|handler| {
         let environment = basic_scheme_environment(pool);
-        let expander = standard_scheme(pool, handler);
+        let expander = standard_scheme(pool);
 
         return data.iter()
-            .map(|d| expander.expand(d, &environment, expander.as_ref()))
+            .map(|d| expander.expand(d, &environment, &handler, expander.as_ref()))
             .map(|e| match e {
                 ExpansionResult::Some(e) => e,
                 _ => panic!("expander did not produce an expression"),

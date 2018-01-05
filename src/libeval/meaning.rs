@@ -23,7 +23,7 @@ use environment::{Environment, VariableKind};
 
 pub struct Meaning {
     pub kind: MeaningKind,
-    pub span: Option<Span>,
+    pub span: Span,
 }
 
 pub enum MeaningKind {
@@ -198,15 +198,18 @@ fn meaning_body(
     }
 }
 
-fn expressions_span(expressions: &[Expression]) -> Option<Span> {
-    let first = expressions.first().map(|e| e.span).unwrap_or(None);
-    let last = expressions.last().map(|e| e.span).unwrap_or(None);
-
-    if let (Some(first), Some(last)) = (first, last) {
-        Some(Span::new(first.from, last.to))
-    } else {
-        None
+fn expressions_span(expressions: &[Expression]) -> Span {
+    // Well, meaning() should not be called with no expressions, but if it does get called then
+    // return some bogus span. It's not really an error, but the scanner returns no tokens (and
+    // thus no spans) if the file is empty or consists only of comments.
+    if expressions.is_empty() {
+        return Span::new(0, 0);
     }
+
+    let first = expressions.first().unwrap().span;
+    let last = expressions.last().unwrap().span;
+
+    return Span::new(first.from, last.to);
 }
 
 fn meaning_expression(
@@ -221,7 +224,7 @@ fn meaning_expression(
             ExpressionKind::Quotation(ref datum) =>
                 meaning_quote(datum, constants),
             ExpressionKind::Reference(name) =>
-                meaning_reference(diagnostic, name, &expression.span, &expression.environment),
+                meaning_reference(diagnostic, name, expression.span, &expression.environment),
             ExpressionKind::Alternative(ref condition, ref consequent, ref alternate) =>
                 meaning_alternative(diagnostic, condition, consequent, alternate, constants),
             ExpressionKind::Assignment(ref variable, ref value) =>
@@ -233,7 +236,7 @@ fn meaning_expression(
             ExpressionKind::Application(ref terms) =>
                 meaning_application(diagnostic, terms, constants),
         },
-        span: expression.span.clone(),
+        span: expression.span,
     }
 }
 
@@ -267,7 +270,7 @@ fn meaning_quote(datum: &ScannedDatum, constants: &mut Vec<Value>) -> MeaningKin
 
 fn meaning_reference(
     diagnostic: &Handler,
-    name: Atom, span: &Option<Span>,
+    name: Atom, span: Span,
     environment: &Rc<Environment>) -> MeaningKind
 {
     match environment.resolve_variable(name)  {
@@ -286,8 +289,7 @@ fn meaning_reference(
         }
         VariableKind::Unresolved => {
             // TODO: provide suggestions based on the environment
-            diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable,
-                span.expect("BUG: unresolved variable").clone());
+            diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable, span);
 
             // We cannot return an actual value or reference here, so return a poisoned value.
             MeaningKind::Undefined

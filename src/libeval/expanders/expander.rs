@@ -9,6 +9,7 @@
 
 use std::rc::{Rc};
 
+use locus::diagnostics::{Handler};
 use reader::datum::{ScannedDatum};
 
 use environment::{Environment};
@@ -20,7 +21,8 @@ pub trait Expander {
     ///
     /// Normally the provided expander will be the same as `self`, but syntactic binding forms
     /// may replace it with an extended version.
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, expand: &Expander) -> ExpansionResult;
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnosic: &Handler,
+        expand: &Expander) -> ExpansionResult;
 }
 
 /// Result of macro expansion.

@@ -24,8 +24,8 @@ pub struct Expression {
     /// Environment available at this expression.
     pub environment: Rc<Environment>,
 
-    /// Closest known source of the expression.
-    pub span: Option<Span>,
+    /// Source of the expression.
+    pub span: Span,
 }
 
 /// Kind of an expression.
