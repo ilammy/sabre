@@ -273,29 +273,28 @@ fn meaning_reference(
     name: Atom, span: Span,
     environment: &Rc<Environment>) -> MeaningKind
 {
-    let reference = environment.resolve_variable(name);
-
-    match reference.kind {
-        ReferenceKind::Local { depth, index } => {
-            if depth == 0 {
-                MeaningKind::ShallowArgumentReference(index)
-            } else {
-                MeaningKind::DeepArgumentReference(depth, index)
+    if let Some(reference) = environment.resolve_variable(name) {
+        match reference.kind {
+            ReferenceKind::Local { depth, index } => {
+                if depth == 0 {
+                    MeaningKind::ShallowArgumentReference(index)
+                } else {
+                    MeaningKind::DeepArgumentReference(depth, index)
+                }
+            }
+            ReferenceKind::Global { index } => {
+                MeaningKind::GlobalReference(index)
+            }
+            ReferenceKind::Imported { index } => {
+                MeaningKind::ImportedReference(index)
             }
         }
-        ReferenceKind::Global { index } => {
-            MeaningKind::GlobalReference(index)
-        }
-        ReferenceKind::Imported { index } => {
-            MeaningKind::ImportedReference(index)
-        }
-        ReferenceKind::Unresolved => {
-            // TODO: provide suggestions based on the environment
-            diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable, span);
+    } else {
+        // TODO: provide suggestions based on the environment
+        diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable, span);
 
-            // We cannot return an actual value or reference here, so return a poisoned value.
-            MeaningKind::Undefined
-        }
+        // We cannot return an actual value or reference here, so return a poisoned value.
+        MeaningKind::Undefined
     }
 }
 
@@ -321,36 +320,43 @@ fn meaning_assignment(
 
     // Report the errors before computing the meaning of the assigned value
     // so that the reported diagnostics are ordered better.
-    if let ReferenceKind::Unresolved = reference.kind {
+    if let Some(ref reference) = reference {
+        if let ReferenceKind::Imported { .. } = reference.kind {
+            // TODO: show where the variable is imported from
+            diagnostic.report(DiagnosticKind::err_meaning_assign_to_imported_binding,
+                variable.span);
+        }
+    } else {
         // TODO: provide suggestions based on the environment
         diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable,
-            variable.span);
-    }
-    if let ReferenceKind::Imported { .. } = reference.kind {
-        // TODO: show where the variable is imported from
-        diagnostic.report(DiagnosticKind::err_meaning_assign_to_imported_binding,
             variable.span);
     }
 
     let new_value = Box::new(meaning_expression(diagnostic, value, constants));
 
-    match reference.kind {
-        ReferenceKind::Local { depth, index } => {
-            if depth == 0 {
-                MeaningKind::ShallowArgumentSet(index, new_value)
-            } else {
-                MeaningKind::DeepArgumentSet(depth, index, new_value)
+    if let Some(ref reference) = reference {
+        match reference.kind {
+            ReferenceKind::Local { depth, index } => {
+                if depth == 0 {
+                    MeaningKind::ShallowArgumentSet(index, new_value)
+                } else {
+                    MeaningKind::DeepArgumentSet(depth, index, new_value)
+                }
+            }
+            ReferenceKind::Global { index } => {
+                MeaningKind::GlobalSet(index, new_value)
+            }
+            // We really can't assign to the imported variable, so return the meaning of the new
+            // value being computed in order to allow further passes to analyze it if necessary
+            // (and see any side-effects and errors that the new value computation may contain).
+            ReferenceKind::Imported { .. } => {
+                new_value.kind
             }
         }
-        ReferenceKind::Global { index } => {
-            MeaningKind::GlobalSet(index, new_value)
-        }
-        // Well... in these cases return the meaning of the new value being computed
-        // in order to allow further passes to analyze it if necessary (and see any
-        // side-effects and errors that the new value computation may contain).
-        ReferenceKind::Imported { .. } | ReferenceKind::Unresolved => {
-            new_value.kind
-        }
+    } else {
+        // The same goes for assignments to unresolved variables. Instead of replacing them with
+        // MeaningKind::Undefined return the computation of the new value.
+        new_value.kind
     }
 }
 

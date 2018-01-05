@@ -79,11 +79,6 @@ pub enum ReferenceKind {
     Imported {
         index: usize,
     },
-    /// An unresolved variable.
-    ///
-    /// No environment contains a definition of the requested variable. It is an error to use
-    /// such variables.
-    Unresolved,
 }
 
 impl Environment {
@@ -123,7 +118,10 @@ impl Environment {
     }
 
     /// Resolve a variable in this environment.
-    pub fn resolve_variable(&self, name: Atom) -> VariableReference {
+    ///
+    /// Returns Some variable from the environment or its parents, or None if the variable
+    /// could not be found in any environment.
+    pub fn resolve_variable(&self, name: Atom) -> Option<VariableReference> {
         // First, try to resolve the name locally.
         if let Some(variable) = self.variables.get(&name) {
             let kind = match variable.kind {
@@ -135,26 +133,22 @@ impl Environment {
                     }
                 }
             };
-            return VariableReference { kind, span: variable.span };
+            return Some(VariableReference { kind, span: variable.span });
         }
 
         // If that fails then look into parent environment (if it's available).
         if let Some(ref parent) = self.parent {
-            let mut variable = parent.resolve_variable(name);
-            // Bump the nesting depth for local variables.
-            if let ReferenceKind::Local { ref mut depth, .. } = variable.kind {
-                *depth += 1;
+            if let Some(mut variable) = parent.resolve_variable(name) {
+                // Bump the nesting depth for local variables.
+                if let ReferenceKind::Local { ref mut depth, .. } = variable.kind {
+                    *depth += 1;
+                }
+                return Some(variable);
             }
-            return variable;
         }
 
         // The variable cannot be resolved if it is absent in all environments.
-        return VariableReference {
-            kind: ReferenceKind::Unresolved,
-            // We can use bogus span for definition location here, the caller will use the correct
-            // span of the reference (which does not have a corresponding definition).
-            span: Span::new(0, 0),
-        };
+        return None;
     }
 }
 
