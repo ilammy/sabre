@@ -322,11 +322,11 @@ fn meaning_assignment(
     if let ReferenceKind::Unresolved = reference_kind {
         // TODO: provide suggestions based on the environment
         diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable,
-            variable.span.expect("BUG: unresolved variable").clone());
+            variable.span);
     }
     if let ReferenceKind::Imported { .. } = reference_kind {
         diagnostic.report(DiagnosticKind::err_meaning_assign_to_imported_binding,
-            variable.span.expect("BUG: unresolved variable").clone());
+            variable.span);
     }
 
     let new_value = Box::new(meaning_expression(diagnostic, value, constants));

@@ -79,7 +79,7 @@ fn expand_arguments(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Argum
         let raw_variables: Vec<Variable> = arguments.iter()
             .filter_map(|argument| {
                 if let DatumValue::Symbol(name) = argument.value {
-                    Some(Variable { name: name, span: Some(argument.span) })
+                    Some(Variable { name: name, span: argument.span })
                 } else {
                     diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
                         argument.span);
@@ -133,7 +133,7 @@ fn deduplicate_variables(raw_variables: Vec<Variable>, diagnostic: &Handler) -> 
         for previous in &variables {
             if variable.name == previous.name {
                 diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
-                    variable.span.expect("all lambda args have spans"));
+                    variable.span);
 
                 continue 'next_variable;
             }

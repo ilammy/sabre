@@ -73,7 +73,7 @@ fn expand_variable(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Option
         if let DatumValue::Symbol(name) = datum.value {
             return Some(Variable {
                 name: name,
-                span: Some(datum.span),
+                span: datum.span,
             });
         }
         diagnostic.report(DiagnosticKind::err_expand_invalid_set, datum.span);
