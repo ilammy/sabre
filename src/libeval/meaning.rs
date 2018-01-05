@@ -23,7 +23,7 @@ use environment::{Environment, VariableKind};
 
 pub struct Meaning {
     pub kind: MeaningKind,
-    pub span: Option<Span>,
+    pub span: Span,
 }
 
 pub enum MeaningKind {
@@ -198,15 +198,18 @@ fn meaning_body(
     }
 }
 
-fn expressions_span(expressions: &[Expression]) -> Option<Span> {
-    let first = expressions.first().map(|e| e.span);
-    let last = expressions.last().map(|e| e.span);
-
-    if let (Some(first), Some(last)) = (first, last) {
-        Some(Span::new(first.from, last.to))
-    } else {
-        None
+fn expressions_span(expressions: &[Expression]) -> Span {
+    // Well, meaning() should not be called with no expressions, but if it does get called then
+    // return some bogus span. It's not really an error, but the scanner returns no tokens (and
+    // thus no spans) if the file is empty or consists only of comments.
+    if expressions.is_empty() {
+        return Span::new(0, 0);
     }
+
+    let first = expressions.first().unwrap().span;
+    let last = expressions.last().unwrap().span;
+
+    return Span::new(first.from, last.to);
 }
 
 fn meaning_expression(
@@ -233,7 +236,7 @@ fn meaning_expression(
             ExpressionKind::Application(ref terms) =>
                 meaning_application(diagnostic, terms, constants),
         },
-        span: Some(expression.span),
+        span: expression.span,
     }
 }
 

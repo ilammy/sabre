@@ -56,6 +56,25 @@ fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Edge cases
+
+#[test]
+fn empty_file() {
+    TestCase::new()
+        .input("")
+        .meaning("(Sequence)")
+        .check();
+}
+
+#[test]
+fn only_comments() {
+    TestCase::new()
+        .input("; test test")
+        .meaning("(Sequence)")
+        .check();
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Constants
 
 #[test]
