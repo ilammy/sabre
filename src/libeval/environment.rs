@@ -7,8 +7,10 @@
 
 //! Lexical environments.
 
+use std::collections::HashMap;
 use std::rc::{Rc};
 
+use locus::diagnostics::Span;
 use reader::intern_pool::{Atom};
 
 use expression::{Variable};
@@ -19,7 +21,7 @@ use expression::{Variable};
 /// visibility scopes which are nested one into another.
 pub struct Environment {
     kind: EnvironmentKind,
-    variables: Vec<Variable>,
+    variables: HashMap<Atom, EnvironmentVariable>,
     parent: Option<Rc<Environment>>,
 }
 
@@ -27,6 +29,24 @@ enum EnvironmentKind {
     Local,
     Global,
     Imported,
+}
+
+struct EnvironmentVariable {
+    /// Kind of a variable stored in the environment.
+    kind: VariableKind,
+    /// Definition site of the variable.
+    span: Span,
+}
+
+enum VariableKind {
+    /// Run-time variable requiring storage.
+    Runtime {
+        /// Index of the variable storage location.
+        ///
+        /// For local variables it's the stack frame, for global variables it's the global table,
+        /// for imported variables it's the import table.
+        index: usize,
+    },
 }
 
 /// Type of a referenced variable.
@@ -63,7 +83,7 @@ impl Environment {
     pub fn new_local(variables: &[Variable], parent: &Rc<Environment>) -> Rc<Environment> {
         Rc::new(Environment {
             kind: EnvironmentKind::Local,
-            variables: variables.to_vec(),
+            variables: enumerate_runtime_variables(variables),
             parent: Some(parent.clone()),
         })
     }
@@ -78,7 +98,7 @@ impl Environment {
         assert!(match parent.kind { EnvironmentKind::Imported => true, _ => false });
         Rc::new(Environment {
             kind: EnvironmentKind::Global,
-            variables: variables.to_vec(),
+            variables: enumerate_runtime_variables(variables),
             parent: Some(parent.clone()),
         })
     }
@@ -89,7 +109,7 @@ impl Environment {
     pub fn new_imported(variables: &[Variable]) -> Rc<Environment> {
         Rc::new(Environment {
             kind: EnvironmentKind::Imported,
-            variables: variables.to_vec(),
+            variables: enumerate_runtime_variables(variables),
             parent: None,
         })
     }
@@ -97,14 +117,16 @@ impl Environment {
     /// Resolve a variable in this environment.
     pub fn resolve_variable(&self, name: Atom) -> ReferenceKind {
         // First, try to resolve the name locally.
-        for (index, local) in self.variables.iter().enumerate() {
-            if name == local.name {
-                return match self.kind {
-                    EnvironmentKind::Local => ReferenceKind::Local { index, depth: 0 },
-                    EnvironmentKind::Global => ReferenceKind::Global { index },
-                    EnvironmentKind::Imported => ReferenceKind::Imported { index },
-                };
-            }
+        if let Some(variable) = self.variables.get(&name) {
+            return match variable.kind {
+                VariableKind::Runtime { index } => {
+                    match self.kind {
+                        EnvironmentKind::Local => ReferenceKind::Local { index, depth: 0 },
+                        EnvironmentKind::Global => ReferenceKind::Global { index },
+                        EnvironmentKind::Imported => ReferenceKind::Imported { index },
+                    }
+                }
+            };
         }
 
         // If that fails then look into parent environment (if it's available).
@@ -120,4 +142,16 @@ impl Environment {
         // The variable cannot be resolved if it is absent in all environments.
         return ReferenceKind::Unresolved;
     }
+}
+
+fn enumerate_runtime_variables(variables: &[Variable]) -> HashMap<Atom, EnvironmentVariable> {
+    variables.iter()
+        .enumerate()
+        .map(|(index, variable)| {
+            (variable.name, EnvironmentVariable {
+                kind: VariableKind::Runtime { index },
+                span: variable.span,
+            })
+        })
+        .collect()
 }
