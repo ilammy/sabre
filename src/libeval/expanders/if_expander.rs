@@ -9,13 +9,14 @@
 
 use std::rc::{Rc};
 
-use locus::diagnostics::{Handler, DiagnosticKind};
+use locus::diagnostics::{Handler, DiagnosticKind, Span};
 use reader::datum::{ScannedDatum};
 use reader::intern_pool::{Atom};
 
 use environment::{Environment};
 use expression::{Expression, ExpressionKind, Literal};
-use expanders::{Expander, ExpansionResult};
+use expand::Expander;
+use expanders::{Expander as OldExpander, ExpansionResult};
 
 /// Expand `if` special forms into alternatives.
 pub struct IfExpander {
@@ -32,8 +33,8 @@ impl IfExpander {
     }
 }
 
-impl Expander for IfExpander {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
+impl OldExpander for IfExpander {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &OldExpander) -> ExpansionResult {
         use expanders::utils::{is_named_form, expect_list_length_fixed, missing_last_span};
 
         // Filter out anything that certainly does not look as a if form.
@@ -72,4 +73,65 @@ impl Expander for IfExpander {
             environment: environment.clone(),
         });
     }
+}
+
+impl Expander for IfExpander {
+    fn expand_form(
+        &self,
+        datum: &ScannedDatum,
+        environment: &Rc<Environment>,
+        diagnostic: &Handler,
+    ) -> Expression {
+        use expand::expand;
+        use expanders::utils::missing_last_span;
+
+        // The only valid form is (if condition consequent alternative). Expand the terms before
+        // gathering them up. Replace any missing terms with placeholder values.
+        let terms = expect_if_form(self.name, datum, diagnostic);
+
+        let expand_or_recover = |term: Option<&ScannedDatum>| {
+            term.map(|datum| expand(datum, environment, diagnostic))
+                .unwrap_or(Expression {
+                    kind: ExpressionKind::Literal(Literal::Boolean(false)),
+                    span: missing_last_span(datum),
+                    environment: environment.clone(),
+                })
+        };
+        let condition   = Box::new(expand_or_recover(terms.get(0)));
+        let consequent  = Box::new(expand_or_recover(terms.get(1)));
+        let alternative = Box::new(expand_or_recover(terms.get(2)));
+
+        return Expression {
+            kind: ExpressionKind::Alternative(condition, consequent, alternative),
+            span: datum.span,
+            environment: environment.clone(),
+        };
+    }
+}
+
+fn expect_if_form<'a>(
+    keyword: Atom,
+    datum: &'a ScannedDatum,
+    diagnostic: &Handler,
+) -> &'a [ScannedDatum] {
+    use expanders::utils::{expect_form, missing_last_span};
+
+    let (dotted, terms) = expect_form(keyword, datum);
+    let last = terms.len() - 1;
+
+    if terms.len() < 4 {
+        diagnostic.report(DiagnosticKind::err_expand_invalid_if, missing_last_span(datum));
+    }
+    if terms.len() > 4 {
+        let extra_forms = Span::new(terms[4].span.from, terms[last].span.to);
+        diagnostic.report(DiagnosticKind::err_expand_invalid_if, extra_forms);
+    }
+
+    if dotted {
+        assert!(terms.len() >= 2);
+        let around_dot = Span::new(terms[last - 1].span.to, terms[last].span.from);
+        diagnostic.report(DiagnosticKind::err_expand_invalid_if, around_dot);
+    }
+
+    return &terms[1..];
 }
