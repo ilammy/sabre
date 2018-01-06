@@ -13,6 +13,7 @@ extern crate locus;
 extern crate reader;
 
 pub mod expression;
+pub mod expand;
 pub mod expanders;
 pub mod meaning;
 pub mod environment;
