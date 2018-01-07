@@ -57,7 +57,7 @@ impl SchemeBase {
 }
 
 fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
-    Environment::new_imported(&[])
+    Environment::new_imported(&[], vec![])
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -

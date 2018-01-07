@@ -121,10 +121,13 @@ impl Environment {
     /// Create a new imported environment with specified variables.
     ///
     /// Import environment is the base environment of a Scheme module, it does not have a parent.
-    pub fn new_imported(variables: &[Variable]) -> Rc<Environment> {
+    pub fn new_imported(
+        runtime_variables: &[Variable],
+        syntactic_variables: Vec<(Variable, Box<Expander>)>,
+    ) -> Rc<Environment> {
         Rc::new(Environment {
             kind: EnvironmentKind::Imported,
-            variables: enumerate_runtime_variables(variables),
+            variables: combine_variables(runtime_variables, syntactic_variables),
             parent: None,
         })
     }
@@ -177,4 +180,37 @@ fn enumerate_runtime_variables(variables: &[Variable]) -> HashMap<Atom, Environm
             })
         })
         .collect()
+}
+
+fn combine_variables(
+    runtime_variables: &[Variable],
+    syntactic_variables: Vec<(Variable, Box<Expander>)>
+) -> HashMap<Atom, EnvironmentVariable> {
+    let mut variables = HashMap::new();
+
+    for (index, variable) in runtime_variables.iter().enumerate() {
+        let entry = EnvironmentVariable {
+            kind: VariableKind::Runtime { index },
+            span: variable.span,
+        };
+        let previous = variables.insert(variable.name, entry);
+
+        if previous.is_some() {
+            panic!("duplicate variable name: {:?}", variable.name);
+        }
+    }
+
+    for (variable, expander) in syntactic_variables {
+        let entry = EnvironmentVariable {
+            kind: VariableKind::Syntactic { expander },
+            span: variable.span,
+        };
+        let previous = variables.insert(variable.name, entry);
+
+        if previous.is_some() {
+            panic!("duplicate variable name: {:?}", variable.name);
+        }
+    }
+
+    return variables;
 }

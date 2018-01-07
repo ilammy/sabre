@@ -49,7 +49,7 @@ fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
         Variable { name: pool.intern("*global*"), span: Span::new(0, 0) },
     ];
 
-    let imported_env = Environment::new_imported(&imported_vars);
+    let imported_env = Environment::new_imported(&imported_vars, vec![]);
     let global_env = Environment::new_global(&global_vars, &imported_env);
 
     return global_env;
