@@ -16,7 +16,6 @@ use reader::intern_pool::{Atom};
 use environment::{Environment};
 use expression::{Expression, ExpressionKind, Variable, Arguments};
 use expand::Expander;
-use expanders::{Expander as OldExpander, ExpansionResult};
 
 /// Expand `lambda` special forms into abstractions.
 pub struct LambdaExpander {
@@ -30,44 +29,6 @@ impl LambdaExpander {
         LambdaExpander {
             name: name,
         }
-    }
-}
-
-impl OldExpander for LambdaExpander {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &OldExpander) -> ExpansionResult {
-        use expanders::utils::{is_named_form, expect_list_length_at_least};
-
-        // Filter out anything that certainly does not look as a lambda form.
-        let (dotted, values) = match is_named_form(datum, self.name) {
-            Some(v) => v,
-            None => { return ExpansionResult::Unknown; }
-        };
-
-        // The only valid form is (lambda (variable...) body1 body2...).
-        expect_list_length_at_least(datum, dotted, values, 3,
-            diagnostic, DiagnosticKind::err_expand_invalid_lambda);
-
-        // The first element describes the abstraction's arguments. They form a new local
-        // environment for the procedure body.
-        let arguments = expand_arguments(values.get(1), diagnostic);
-        let new_environment = new_local_environment(&arguments, environment);
-
-        // All other elements (except for the first two) are the procedure body.
-        // Expand them sequentially, as in the begin form.
-        let expressions = values.iter()
-            .skip(2)
-            .filter_map(|datum| match expander.expand(datum, &new_environment, diagnostic, expander) {
-                ExpansionResult::Some(expression) => Some(expression),
-                ExpansionResult::None => None,
-                ExpansionResult::Unknown => None,
-            })
-            .collect();
-
-        return ExpansionResult::Some(Expression {
-            kind: ExpressionKind::Abstraction(arguments, expressions),
-            span: datum.span,
-            environment: environment.clone(), // note that this is *not* the new environment
-        });
     }
 }
 

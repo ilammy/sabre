@@ -16,7 +16,6 @@ use reader::intern_pool::{Atom};
 use environment::{Environment};
 use expression::{Expression, ExpressionKind, Literal, Variable};
 use expand::Expander;
-use expanders::{Expander as OldExpander, ExpansionResult};
 
 /// Expand `set!` special forms into assignments.
 pub struct SetExpander {
@@ -30,39 +29,6 @@ impl SetExpander {
         SetExpander {
             name: name,
         }
-    }
-}
-
-impl OldExpander for SetExpander {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &OldExpander) -> ExpansionResult {
-        use expanders::utils::{is_named_form, expect_list_length_fixed};
-
-        // Filter out anything that certainly does not look as a set! form.
-        let (dotted, values) = match is_named_form(datum, self.name) {
-            Some(v) => v,
-            None => { return ExpansionResult::Unknown; }
-        };
-
-        // The only valid form is (set! variable value).
-        expect_list_length_fixed(datum, dotted, values, 3,
-            diagnostic, DiagnosticKind::err_expand_invalid_set);
-
-        // The first element should be the variable name, followed by the new variable value.
-        let variable = expand_variable(values.get(1), diagnostic);
-        let value = expand_value(datum, values.get(2), environment, diagnostic, expander);
-
-        // If we have a variable to assign then use that variable. Otherwise leave only the value.
-        return ExpansionResult::Some(
-            if let Some(variable) = variable {
-                Expression {
-                    kind: ExpressionKind::Assignment(variable, Box::new(value)),
-                    span: datum.span,
-                    environment: environment.clone(),
-                }
-            } else {
-                value
-            }
-        );
     }
 }
 
@@ -135,31 +101,6 @@ fn expand_variable(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Option
         diagnostic.report(DiagnosticKind::err_expand_invalid_set, datum.span);
     }
     return None;
-}
-
-/// Expand the subexpression denoting variable value in a set! expression.
-///
-/// In case of errors return an #f literal as a placeholder.
-fn expand_value(datum: &ScannedDatum, term: Option<&ScannedDatum>, environment: &Rc<Environment>, diagnostic: &Handler, expander: &OldExpander) -> Expression {
-    use expanders::utils::missing_last_span;
-
-    if let Some(term) = term {
-        if let ExpansionResult::Some(expression) = expander.expand(term, environment, diagnostic, expander) {
-            return expression;
-        } else {
-            return Expression {
-                kind: ExpressionKind::Literal(Literal::Boolean(false)),
-                span: term.span,
-                environment: environment.clone(),
-            };
-        }
-    } else {
-        return Expression {
-            kind: ExpressionKind::Literal(Literal::Boolean(false)),
-            span: missing_last_span(datum),
-            environment: environment.clone(),
-        };
-    }
 }
 
 /// Expand the subexpression denoting variable value in a set! expression.
