@@ -397,7 +397,7 @@ fn set_nested() {
 fn set_forms_0() {
     TestCase::new()
         .input("(set!)")
-        .result("(Literal #f)")
+        .result("(Undefined)")
         .diagnostic(5, 5, DiagnosticKind::err_expand_invalid_set)
         .check();
 }
@@ -406,7 +406,7 @@ fn set_forms_0() {
 fn set_forms_1() {
     TestCase::new()
         .input("(set! i)")
-        .result("(Assignment i (Literal #f))")
+        .result("(Assignment i (Undefined))")
         .diagnostic(7, 7, DiagnosticKind::err_expand_invalid_set)
         .check();
 }
@@ -415,7 +415,7 @@ fn set_forms_1() {
 fn set_forms_1_dotted() {
     TestCase::new()
         .input("(set! . i)")
-        .result("(Assignment i (Literal #f))")
+        .result("(Assignment i (Undefined))")
         .diagnostic(9, 9, DiagnosticKind::err_expand_invalid_set)
         .diagnostic(5, 8, DiagnosticKind::err_expand_invalid_set)
         .check();
@@ -475,7 +475,7 @@ fn set_renaming() {
     TestCase::new()
         .input("(!!!SUMMER-ASSIGNMENT!!!)")
         .keywords(MagicKeywords { set: "!!!SUMMER-ASSIGNMENT!!!", ..Default::default() })
-        .result("(Literal #f)")
+        .result("(Undefined)")
         .diagnostic(24, 24, DiagnosticKind::err_expand_invalid_set)
         .check();
 }
