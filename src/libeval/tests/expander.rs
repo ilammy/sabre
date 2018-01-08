@@ -161,7 +161,7 @@ fn quote_nested() {
 fn quote_empty() {
     TestCase::new()
         .input("(quote)")
-        .result("(Quotation #f)")
+        .result("(Undefined)")
         .diagnostic(6, 6, DiagnosticKind::err_expand_invalid_quote)
         .check();
 }
