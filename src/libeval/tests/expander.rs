@@ -238,7 +238,7 @@ fn begin_nested() {
 fn begin_empty() {
     TestCase::new()
         .input("(begin)")
-        .result("(Sequence)")
+        .result("(Undefined)")
         .diagnostic(6, 6, DiagnosticKind::err_expand_invalid_begin)
         .check();
 }
