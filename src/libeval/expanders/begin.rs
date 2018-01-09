@@ -9,7 +9,7 @@
 
 use std::rc::{Rc};
 
-use locus::diagnostics::{Handler, DiagnosticKind, Span};
+use locus::diagnostics::{Handler, DiagnosticKind};
 use reader::datum::{ScannedDatum};
 use reader::intern_pool::{Atom};
 
@@ -40,12 +40,14 @@ impl Expander for BeginExpander {
         diagnostic: &Handler,
     ) -> Expression {
         use expand::expand;
+        use expanders::utils::expect_macro_use;
 
         // The only valid form is (begin expr1 expr2 ...). Expand nested terms in sequence.
         // Expand anything erroneous into an empty sequence after reporting it to the handler.
-        let expressions =
-            expect_begin_form(self.name, datum, diagnostic)
-            .iter()
+        let terms = expect_macro_use(datum, self.name, 2.., diagnostic,
+            DiagnosticKind::err_expand_invalid_begin);
+
+        let expressions = terms.iter()
             .map(|datum| expand(datum, environment, diagnostic))
             .collect::<Vec<_>>();
 
@@ -59,27 +61,4 @@ impl Expander for BeginExpander {
             environment: environment.clone(),
         };
     }
-}
-
-fn expect_begin_form<'a>(
-    keyword: Atom,
-    datum: &'a ScannedDatum,
-    diagnostic: &Handler,
-) -> &'a [ScannedDatum] {
-    use expanders::utils::{expect_form, missing_last_span};
-
-    let (dotted, terms) = expect_form(keyword, datum);
-
-    if terms.len() < 2 {
-        diagnostic.report(DiagnosticKind::err_expand_invalid_begin, missing_last_span(datum));
-    }
-
-    if dotted && (terms.len() >= 2) {
-        assert!(terms.len() >= 2);
-        let last = terms.len() - 1;
-        let around_dot = Span::new(terms[last - 1].span.to, terms[last].span.from);
-        diagnostic.report(DiagnosticKind::err_expand_invalid_begin, around_dot);
-    }
-
-    return &terms[1..];
 }
