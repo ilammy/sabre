@@ -15,7 +15,7 @@ use reader::intern_pool::{Atom};
 
 use environment::{Environment};
 use expression::{Expression, ExpressionKind, Variable, Arguments};
-use expanders::{Expander, ExpansionResult};
+use expand::Expander;
 
 /// Expand `lambda` special forms into abstractions.
 pub struct LambdaExpander {
@@ -33,41 +33,56 @@ impl LambdaExpander {
 }
 
 impl Expander for LambdaExpander {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
-        use expanders::utils::{is_named_form, expect_list_length_at_least};
+    fn expand_form(
+        &self,
+        datum: &ScannedDatum,
+        environment: &Rc<Environment>,
+        diagnostic: &Handler,
+    ) -> Expression {
+        use expand::expand;
 
-        // Filter out anything that certainly does not look as a lambda form.
-        let (dotted, values) = match is_named_form(datum, self.name) {
-            Some(v) => v,
-            None => { return ExpansionResult::Unknown; }
-        };
-
-        // The only valid form is (lambda (variable...) body1 body2...).
-        expect_list_length_at_least(datum, dotted, values, 3,
-            diagnostic, DiagnosticKind::err_expand_invalid_lambda);
-
-        // The first element describes the abstraction's arguments. They form a new local
+        // The only valid form is (lambda (variable...) body1 body2...). We need to expand only
+        // the procedure body. Arguments have their own peculiar syntax and describe the new
         // environment for the procedure body.
-        let arguments = expand_arguments(values.get(1), diagnostic);
+        let terms = expect_lambda_form(self.name, datum, diagnostic);
+
+        let arguments = expand_arguments(terms.get(0), diagnostic);
         let new_environment = new_local_environment(&arguments, environment);
 
-        // All other elements (except for the first two) are the procedure body.
-        // Expand them sequentially, as in the begin form.
-        let expressions = values.iter()
-            .skip(2)
-            .filter_map(|datum| match expander.expand(datum, &new_environment, diagnostic, expander) {
-                ExpansionResult::Some(expression) => Some(expression),
-                ExpansionResult::None => None,
-                ExpansionResult::Unknown => None,
-            })
+        let expressions = terms.iter()
+            .skip(1)
+            .map(|datum| expand(datum, &new_environment, diagnostic))
             .collect();
 
-        return ExpansionResult::Some(Expression {
+        return Expression {
             kind: ExpressionKind::Abstraction(arguments, expressions),
             span: datum.span,
-            environment: environment.clone(), // note that this is *not* the new environment
-        });
+            environment: environment.clone(),
+        };
     }
+}
+
+fn expect_lambda_form<'a>(
+    keyword: Atom,
+    datum: &'a ScannedDatum,
+    diagnostic: &Handler,
+) -> &'a [ScannedDatum] {
+    use expanders::utils::{expect_form, missing_last_span};
+
+    let (dotted, terms) = expect_form(keyword, datum);
+    let last = terms.len() - 1;
+
+    if terms.len() < 3 {
+        diagnostic.report(DiagnosticKind::err_expand_invalid_lambda, missing_last_span(datum));
+    }
+
+    if dotted {
+        assert!(terms.len() >= 2);
+        let around_dot = Span::new(terms[last - 1].span.to, terms[last].span.from);
+        diagnostic.report(DiagnosticKind::err_expand_invalid_lambda, around_dot);
+    }
+
+    return &terms[1..];
 }
 
 /// Expand the argument list.

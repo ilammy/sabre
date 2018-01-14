@@ -16,15 +16,15 @@ extern crate reader;
 use std::rc::{Rc};
 
 use eval::environment::{Environment};
-use eval::expanders::{Expander, ExpansionResult, ExpanderStack, BasicExpander,
-    ApplicationExpander, QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
-use locus::diagnostics::{DiagnosticKind};
+use eval::expanders::{QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
+use eval::expression::{Variable};
+use locus::diagnostics::{DiagnosticKind, Span};
 use reader::intern_pool::{InternPool};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Tested expanders
 
-struct SchemeBase {
+struct MagicKeywords {
     quote: &'static str,
     begin: &'static str,
     if_: &'static str,
@@ -32,9 +32,9 @@ struct SchemeBase {
     lambda: &'static str,
 }
 
-impl Default for SchemeBase {
-    fn default() -> SchemeBase {
-        SchemeBase {
+impl Default for MagicKeywords {
+    fn default() -> MagicKeywords {
+        MagicKeywords {
             quote: "quote",
             begin: "begin",
             if_: "if",
@@ -44,20 +44,21 @@ impl Default for SchemeBase {
     }
 }
 
-impl SchemeBase {
-    fn make(&self, pool: &InternPool) -> ExpanderStack {
-        ExpanderStack::new(Box::new(BasicExpander::new()))
-            .push(Box::new(ApplicationExpander::new()))
-            .push(Box::new( QuoteExpander::new(pool.intern(self.quote))))
-            .push(Box::new( BeginExpander::new(pool.intern(self.begin))))
-            .push(Box::new(    IfExpander::new(pool.intern(self.if_))))
-            .push(Box::new(   SetExpander::new(pool.intern(self.set))))
-            .push(Box::new(LambdaExpander::new(pool.intern(self.lambda))))
-    }
+macro_rules! syntax {
+    ($pool:expr, $name:expr, $type:ty) => ({
+        let name = $pool.intern($name);
+        (Variable { name, span: Span::new(0, 0) }, Box::new(<$type>::new(name)))
+    })
 }
 
-fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
-    Environment::new_imported(&[])
+fn basic_scheme_environment(pool: &InternPool, names: &MagicKeywords) -> Rc<Environment> {
+    Environment::new_imported(&[], vec![
+        syntax!(pool, names.quote,  QuoteExpander),
+        syntax!(pool, names.begin,  BeginExpander),
+        syntax!(pool, names.if_,    IfExpander),
+        syntax!(pool, names.set,    SetExpander),
+        syntax!(pool, names.lambda, LambdaExpander),
+    ])
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -178,7 +179,7 @@ fn quote_dotted() {
 fn quote_extra() {
     TestCase::new()
         .input("(quote 1 2 3)")
-        .result("(Quotation 3)")
+        .result("(Quotation 1)")
         .diagnostic(9, 12, DiagnosticKind::err_expand_invalid_quote)
         .check();
 }
@@ -187,7 +188,7 @@ fn quote_extra() {
 fn quote_extra_dotted() {
     TestCase::new()
         .input("(quote 1 2 . 3)")
-        .result("(Quotation 3)")
+        .result("(Quotation 1)")
         .diagnostic(9, 14, DiagnosticKind::err_expand_invalid_quote)
         .check();
 }
@@ -196,14 +197,14 @@ fn quote_extra_dotted() {
 fn quote_renaming() {
     TestCase::new()
         .input("'(1 2 3)")
-        .expander(SchemeBase { quote: "not-a-quote", ..Default::default() })
+        .keywords(MagicKeywords { quote: "not-a-quote", ..Default::default() })
         .result("(Application (Reference quote) \
                   (Application (Literal 1) (Literal 2) (Literal 3)))")
         .check();
 
     TestCase::new()
         .input("(a-quote 5)")
-        .expander(SchemeBase { quote: "a-quote", ..Default::default() })
+        .keywords(MagicKeywords { quote: "a-quote", ..Default::default() })
         .result("(Quotation 5)")
         .check();
 }
@@ -261,7 +262,7 @@ fn begin_dotted() {
 fn begin_renaming() {
     TestCase::new()
         .input("(seq 1 (seq 2 3))")
-        .expander(SchemeBase { begin: "seq", ..Default::default() })
+        .keywords(MagicKeywords { begin: "seq", ..Default::default() })
         .result("(Sequence (Literal 1) (Sequence (Literal 2) (Literal 3)))")
         .check();
 }
@@ -366,7 +367,7 @@ fn if_forms_5_dotted() {
 fn if_renaming() {
     TestCase::new()
         .input("(whether #false or not)")
-        .expander(SchemeBase { if_: "whether", ..Default::default() })
+        .keywords(MagicKeywords { if_: "whether", ..Default::default() })
         .result("(Alternative (Literal #f) (Reference or) (Reference not))")
         .check();
 }
@@ -473,7 +474,7 @@ fn set_non_variable() {
 fn set_renaming() {
     TestCase::new()
         .input("(!!!SUMMER-ASSIGNMENT!!!)")
-        .expander(SchemeBase { set: "!!!SUMMER-ASSIGNMENT!!!", ..Default::default() })
+        .keywords(MagicKeywords { set: "!!!SUMMER-ASSIGNMENT!!!", ..Default::default() })
         .result("(Literal #f)")
         .diagnostic(24, 24, DiagnosticKind::err_expand_invalid_set)
         .check();
@@ -622,7 +623,7 @@ fn lambda_args_non_unique() {
 fn lambda_renaming() {
     TestCase::new()
         .input("(\u{03BB} (a) #f)")
-        .expander(SchemeBase { lambda: "\u{03BB}", ..Default::default() })
+        .keywords(MagicKeywords { lambda: "\u{03BB}", ..Default::default() })
         .result("(Abstraction (a) (Literal #f))")
         .check();
 }
@@ -717,7 +718,7 @@ fn altogether() {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use locus::diagnostics::{Span, Diagnostic};
+use locus::diagnostics::{Diagnostic};
 use reader::lexer::{StringScanner};
 use reader::parser::{Parser};
 
@@ -726,7 +727,7 @@ struct TestCase {
     input: Option<String>,
     expected_result: Option<String>,
     expected_diagnostics: Vec<Diagnostic>,
-    expander_factory: Option<SchemeBase>,
+    keywords: Option<MagicKeywords>,
 }
 
 impl TestCase {
@@ -754,9 +755,9 @@ impl TestCase {
         self
     }
 
-    fn expander(mut self, factory: SchemeBase) -> Self {
-        assert!(self.expander_factory.is_none(), "don't set expander twice");
-        self.expander_factory = Some(factory);
+    fn keywords(mut self, keywords: MagicKeywords) -> Self {
+        assert!(self.keywords.is_none(), "don't set keywords twice");
+        self.keywords = Some(keywords);
         self
     }
 
@@ -764,15 +765,16 @@ impl TestCase {
         let input = self.input.expect("input not set");
         let expected_result = self.expected_result.expect("result not set");
         let expected_diagnostics = self.expected_diagnostics;
-        let expander_factory = self.expander_factory.unwrap_or_default();
+        let keywords = self.keywords.unwrap_or_default();
 
-        check(&expander_factory, &input, &expected_result, &expected_diagnostics);
+        check(&keywords, &input, &expected_result, &expected_diagnostics);
     }
 }
 
 /// Check whether the given expander produces expected results and reports expected diagnostics.
 /// Panic if this is not true.
-fn check(expander_factory: &SchemeBase, input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
+fn check(keywords: &MagicKeywords, input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
+    use eval::expand::expand;
     use locus::utils::collect_diagnostics;
     use reader::intern_pool::with_formatting_pool;
 
@@ -791,19 +793,12 @@ fn check(expander_factory: &SchemeBase, input: &str, expected_result: &str, expe
     assert!(parsing_diagnostics.is_empty(), "parsing produced diagnostics");
 
     let (expand_result, expand_diagnostics) = collect_diagnostics(|handler| {
-        let environment = basic_scheme_environment(&pool);
+        let environment = basic_scheme_environment(&pool, keywords);
 
-        let expander = expander_factory.make(&pool);
+        let expression = expand(&datum, &environment, handler);
 
-        expander.expand(&datum, &environment, &handler, &expander)
+        with_formatting_pool(&pool, || format!("{:?}", expression))
     });
-
-    let expand_result = match expand_result {
-        ExpansionResult::Some(expand_result) =>
-            with_formatting_pool(&pool, || format!("{:?}", expand_result)),
-        ExpansionResult::None => format!("None"),
-        ExpansionResult::Unknown => format!("Unknown"),
-    };
 
     assert_eq!(expand_result, expected_result);
     assert_eq!(expand_diagnostics, expected_diagnostics);

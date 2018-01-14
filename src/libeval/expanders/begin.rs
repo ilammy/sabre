@@ -9,13 +9,13 @@
 
 use std::rc::{Rc};
 
-use locus::diagnostics::{Handler, DiagnosticKind};
+use locus::diagnostics::{Handler, DiagnosticKind, Span};
 use reader::datum::{ScannedDatum};
 use reader::intern_pool::{Atom};
 
 use environment::{Environment};
 use expression::{Expression, ExpressionKind};
-use expanders::{Expander, ExpansionResult};
+use expand::Expander;
 
 /// Expand `begin` special forms into sequences.
 pub struct BeginExpander {
@@ -33,32 +33,49 @@ impl BeginExpander {
 }
 
 impl Expander for BeginExpander {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
-        use expanders::utils::{is_named_form, expect_list_length_at_least};
+    fn expand_form(
+        &self,
+        datum: &ScannedDatum,
+        environment: &Rc<Environment>,
+        diagnostic: &Handler,
+    ) -> Expression {
+        use expand::expand;
 
-        // Filter out anything that certainly does not look as a begin form.
-        let (dotted, values) = match is_named_form(datum, self.name) {
-            Some(v) => v,
-            None => { return ExpansionResult::Unknown; }
-        };
-
-        // The only valid form is (begin expr1 expr2 ...).
-        expect_list_length_at_least(datum, dotted, values, 2,
-            diagnostic, DiagnosticKind::err_expand_invalid_begin);
-
-        // Ignore any errors when recovering. Expand empty (begin) into an empty sequence.
-        let expressions = values[1..].iter()
-            .filter_map(|datum| match expander.expand(datum, environment, diagnostic, expander) {
-                ExpansionResult::Some(expression) => Some(expression),
-                ExpansionResult::None => None,
-                ExpansionResult::Unknown => None,
-            })
+        // The only valid form is (begin expr1 expr2 ...). Expand nested terms in sequence.
+        // Expand anything erroneous into an empty sequence after reporting it to the handler.
+        let expressions =
+            expect_begin_form(self.name, datum, diagnostic)
+            .iter()
+            .map(|datum| expand(datum, environment, diagnostic))
             .collect();
 
-        return ExpansionResult::Some(Expression {
+        return Expression {
             kind: ExpressionKind::Sequence(expressions),
             span: datum.span,
             environment: environment.clone(),
-        });
+        };
     }
+}
+
+fn expect_begin_form<'a>(
+    keyword: Atom,
+    datum: &'a ScannedDatum,
+    diagnostic: &Handler,
+) -> &'a [ScannedDatum] {
+    use expanders::utils::{expect_form, missing_last_span};
+
+    let (dotted, terms) = expect_form(keyword, datum);
+
+    if terms.len() < 2 {
+        diagnostic.report(DiagnosticKind::err_expand_invalid_begin, missing_last_span(datum));
+    }
+
+    if dotted && (terms.len() >= 2) {
+        assert!(terms.len() >= 2);
+        let last = terms.len() - 1;
+        let around_dot = Span::new(terms[last - 1].span.to, terms[last].span.from);
+        diagnostic.report(DiagnosticKind::err_expand_invalid_begin, around_dot);
+    }
+
+    return &terms[1..];
 }

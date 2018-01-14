@@ -13,6 +13,7 @@ use std::rc::{Rc};
 use locus::diagnostics::Span;
 use reader::intern_pool::{Atom};
 
+use expand::Expander;
 use expression::{Variable};
 
 /// Lexical environment.
@@ -47,18 +48,23 @@ enum VariableKind {
         /// for imported variables it's the import table.
         index: usize,
     },
+    /// Syntactic variable bound to a macro expander.
+    Syntactic {
+        /// The macro expander.
+        expander: Box<Expander>,
+    }
 }
 
 /// Reference to a variable from environment.
-pub struct VariableReference {
+pub struct VariableReference<'a> {
     /// Kind of the variable referenced.
-    pub kind: ReferenceKind,
+    pub kind: ReferenceKind<'a>,
     /// Location of the variable definition.
     pub span: Span,
 }
 
 /// Kind of a referenced variable.
-pub enum ReferenceKind {
+pub enum ReferenceKind<'a> {
     /// Locally-bound variable, defined by a procedure.
     ///
     /// Local variables are identified by their (zero-based) index in the activation record of
@@ -79,6 +85,12 @@ pub enum ReferenceKind {
     Imported {
         index: usize,
     },
+    /// Syntactic variable.
+    ///
+    /// Syntactic variables are bound to macro expanders.
+    Syntactic {
+        expander: &'a Expander,
+    }
 }
 
 impl Environment {
@@ -109,10 +121,13 @@ impl Environment {
     /// Create a new imported environment with specified variables.
     ///
     /// Import environment is the base environment of a Scheme module, it does not have a parent.
-    pub fn new_imported(variables: &[Variable]) -> Rc<Environment> {
+    pub fn new_imported(
+        runtime_variables: &[Variable],
+        syntactic_variables: Vec<(Variable, Box<Expander>)>,
+    ) -> Rc<Environment> {
         Rc::new(Environment {
             kind: EnvironmentKind::Imported,
-            variables: enumerate_runtime_variables(variables),
+            variables: combine_variables(runtime_variables, syntactic_variables),
             parent: None,
         })
     }
@@ -131,6 +146,9 @@ impl Environment {
                         EnvironmentKind::Global => ReferenceKind::Global { index },
                         EnvironmentKind::Imported => ReferenceKind::Imported { index },
                     }
+                }
+                VariableKind::Syntactic { ref expander } => {
+                    ReferenceKind::Syntactic { expander: expander.as_ref() }
                 }
             };
             return Some(VariableReference { kind, span: variable.span });
@@ -162,4 +180,37 @@ fn enumerate_runtime_variables(variables: &[Variable]) -> HashMap<Atom, Environm
             })
         })
         .collect()
+}
+
+fn combine_variables(
+    runtime_variables: &[Variable],
+    syntactic_variables: Vec<(Variable, Box<Expander>)>
+) -> HashMap<Atom, EnvironmentVariable> {
+    let mut variables = HashMap::new();
+
+    for (index, variable) in runtime_variables.iter().enumerate() {
+        let entry = EnvironmentVariable {
+            kind: VariableKind::Runtime { index },
+            span: variable.span,
+        };
+        let previous = variables.insert(variable.name, entry);
+
+        if previous.is_some() {
+            panic!("duplicate variable name: {:?}", variable.name);
+        }
+    }
+
+    for (variable, expander) in syntactic_variables {
+        let entry = EnvironmentVariable {
+            kind: VariableKind::Syntactic { expander },
+            span: variable.span,
+        };
+        let previous = variables.insert(variable.name, entry);
+
+        if previous.is_some() {
+            panic!("duplicate variable name: {:?}", variable.name);
+        }
+    }
+
+    return variables;
 }

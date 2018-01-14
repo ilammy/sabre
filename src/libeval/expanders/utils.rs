@@ -7,109 +7,9 @@
 
 //! Miscellaneous expander utilities.
 
-use locus::diagnostics::{Handler, DiagnosticKind, Span};
+use locus::diagnostics::{Span};
 use reader::datum::{ScannedDatum, DatumValue};
 use reader::intern_pool::{Atom};
-
-/// Check if `datum` is a form (possibly empty).
-/// Return `Some((dotted, values))` if it is, `None` otherwise.
-pub fn is_form(datum: &ScannedDatum) -> Option<(bool, &[ScannedDatum])> {
-    match datum.value {
-        DatumValue::ProperList(ref values) => Some((false, values)),
-        DatumValue::DottedList(ref values) => Some((true, values)),
-        _ => None,
-    }
-}
-
-/// Check if `datum` is a form with `expected_name` as its car.
-/// Return `Some((dotted, values))` if it is, `None` otherwise.
-pub fn is_named_form(datum: &ScannedDatum, expected_name: Atom)
-    -> Option<(bool, &[ScannedDatum])>
-{
-    let (dotted, values) = match is_form(datum) {
-        Some(v) => v,
-        None => { return None; }
-    };
-
-    if values.is_empty() {
-        return None;
-    }
-    match values[0].value {
-        DatumValue::Symbol(actual_name) => {
-            if actual_name != expected_name {
-                return None;
-            }
-        }
-        _ => {
-            return None;
-        }
-    }
-
-    return Some((dotted, values));
-}
-
-/// Check that a proper list has given number of elements.
-///
-/// `datum` is a the datum to be tested. It must be a proper or dotted list (as specified by
-/// `dotted`), with `elements` being its elements. The list must have exactly `expected_length`.
-/// If any of the above is not true then diagnostic `kind` is reported to provided `diagnostic`
-/// handler with the offending range.
-pub fn expect_list_length_fixed(datum: &ScannedDatum, dotted: bool, elements: &[ScannedDatum],
-    expected_length: usize, diagnostic: &Handler, kind: DiagnosticKind)
-{
-    if elements.is_empty() {
-        diagnostic.report(kind,
-            Span::new(datum.span.from + 1, datum.span.to - 1));
-
-        return;
-    }
-
-    let last = elements.len() - 1;
-
-    if elements.len() < expected_length {
-        diagnostic.report(kind, missing_last_span(datum));
-    }
-
-    if elements.len() > expected_length {
-        diagnostic.report(kind,
-            Span::new(elements[expected_length].span.from, elements[last].span.to));
-    }
-
-    if dotted && (elements.len() == expected_length || expected_length > 2) {
-        assert!(elements.len() >= 2);
-        diagnostic.report(kind,
-            Span::new(elements[last - 1].span.to, elements[last].span.from));
-    }
-}
-
-/// Check that a proper list has at least given number of elements.
-///
-/// `datum` is a the datum to be tested. It must be a proper or dotted list (as specified by
-/// `dotted`), with `elements` being its elements. The list must have at least `expected_length`
-/// elements or more. If any of the above is not true then diagnostic `kind` is reported to
-/// the provided `diagnostic` handler with the offending range.
-pub fn expect_list_length_at_least(datum: &ScannedDatum, dotted: bool, elements: &[ScannedDatum],
-    expected_length: usize, diagnostic: &Handler, kind: DiagnosticKind)
-{
-    if elements.is_empty() {
-        diagnostic.report(kind,
-            Span::new(datum.span.from + 1, datum.span.to - 1));
-
-        return;
-    }
-
-    let last = elements.len() - 1;
-
-    if elements.len() < expected_length {
-        diagnostic.report(kind, missing_last_span(datum));
-    }
-
-    if dotted && (elements.len() >= expected_length || expected_length > 2) {
-        assert!(elements.len() >= 2);
-        diagnostic.report(kind,
-            Span::new(elements[last - 1].span.to, elements[last].span.from));
-    }
-}
 
 /// Return a span between the last term and the closing parenthesis.
 ///
@@ -125,4 +25,31 @@ pub fn missing_last_span(datum: &ScannedDatum) -> Span {
         }
         _ => panic!("datum must be a list or a vector")
     }
+}
+
+/// Unwrap an expected form with expected keyword.
+///
+/// Expanders should be invoked only on valid forms. This function checks this and panics if the
+/// datum is not an expected form. It returns all the terms of the form and a flag whether the
+/// form is dotted.
+pub fn expect_form(keyword: Atom, datum: &ScannedDatum) -> (bool, &[ScannedDatum]) {
+    let (dotted, terms) = match datum.value {
+        DatumValue::ProperList(ref terms) => (false, terms),
+        DatumValue::DottedList(ref terms) => (true, terms),
+        _ => panic!("the expanded datum is not a list: {:?}", datum),
+    };
+
+    assert!(!terms.is_empty());
+
+    match terms[0].value {
+        DatumValue::Symbol(name) => {
+            if name != keyword {
+                panic!("the first term is not the expected keyword: {:?} (expected {:?})",
+                    name, keyword);
+            }
+        }
+        _ => panic!("the first term is not a symbol: {:?}", terms[0]),
+    }
+
+    return (dotted, terms);
 }

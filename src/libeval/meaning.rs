@@ -288,6 +288,12 @@ fn meaning_reference(
             ReferenceKind::Imported { index } => {
                 MeaningKind::ImportedReference(index)
             }
+            ReferenceKind::Syntactic { .. } => {
+                // TODO: provide suggestions based on the environment
+                // TODO: report an error
+
+                MeaningKind::Undefined
+            }
         }
     } else {
         // TODO: provide suggestions based on the environment
@@ -326,6 +332,11 @@ fn meaning_assignment(
             diagnostic.report(DiagnosticKind::err_meaning_assign_to_imported_binding,
                 variable.span);
         }
+        if let ReferenceKind::Syntactic { .. } = reference.kind {
+            // TODO: provide suggestions based on the environment
+            // TODO: show where the variable is imported from
+            // TODO: report an error
+        }
     } else {
         // TODO: provide suggestions based on the environment
         diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable,
@@ -349,7 +360,12 @@ fn meaning_assignment(
             // We really can't assign to the imported variable, so return the meaning of the new
             // value being computed in order to allow further passes to analyze it if necessary
             // (and see any side-effects and errors that the new value computation may contain).
-            ReferenceKind::Imported { .. } => {
+            //
+            // In the same vein, Scheme allows to reassign syntactic binding to a runtime binding
+            // via a (define ...) form, but in that case the variable should resolve into Global.
+            // So if we see Syntactic here then it's really (set! macro-expander ...) in source
+            // which is an error.
+            ReferenceKind::Imported { .. } | ReferenceKind::Syntactic { .. } => {
                 new_value.kind
             }
         }

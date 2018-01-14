@@ -20,26 +20,28 @@ use eval::meaning::{meaning, MeaningResult, Value};
 
 use std::rc::{Rc};
 
-use eval::expanders::{Expander, ExpanderStack, BasicExpander, ApplicationExpander,
-    QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
+use eval::expand::Expander;
+use eval::expanders::{QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
 use eval::expression::{Variable};
 use eval::environment::{Environment};
-use locus::diagnostics::{DiagnosticKind};
+use locus::diagnostics::{DiagnosticKind, Span};
 use reader::intern_pool::{InternPool};
 
-fn standard_scheme(pool: &InternPool) -> Box<Expander> {
-    Box::new(
-        ExpanderStack::new(Box::new(BasicExpander::new()))
-            .push(Box::new(ApplicationExpander::new()))
-            .push(Box::new( QuoteExpander::new(pool.intern("quote"))))
-            .push(Box::new( BeginExpander::new(pool.intern("begin"))))
-            .push(Box::new(    IfExpander::new(pool.intern("if"))))
-            .push(Box::new(   SetExpander::new(pool.intern("set!"))))
-            .push(Box::new(LambdaExpander::new(pool.intern("lambda"))))
-    )
+macro_rules! syntax {
+    ($pool:expr, $name:expr, $type:ty) => ({
+        let name = $pool.intern($name);
+        (Variable { name, span: Span::new(0, 0) }, Box::new(<$type>::new(name)))
+    })
 }
 
 fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
+    let keywords: Vec<(Variable, Box<Expander>)> = vec![
+        syntax!(pool, "quote",  QuoteExpander),
+        syntax!(pool, "begin",  BeginExpander),
+        syntax!(pool, "if",     IfExpander),
+        syntax!(pool, "set!",   SetExpander),
+        syntax!(pool, "lambda", LambdaExpander),
+    ];
     let imported_vars = [
         Variable { name: pool.intern("car"), span: Span::new(0, 0) },
         Variable { name: pool.intern("cdr"), span: Span::new(0, 0) },
@@ -49,7 +51,7 @@ fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
         Variable { name: pool.intern("*global*"), span: Span::new(0, 0) },
     ];
 
-    let imported_env = Environment::new_imported(&imported_vars);
+    let imported_env = Environment::new_imported(&imported_vars, keywords);
     let global_env = Environment::new_global(&global_vars, &imported_env);
 
     return global_env;
@@ -373,11 +375,10 @@ fn application_closed() {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use locus::diagnostics::{Diagnostic, Span};
+use locus::diagnostics::{Diagnostic};
 use reader::datum::{ScannedDatum};
 use reader::lexer::{StringScanner};
 use reader::parser::{Parser};
-use eval::expanders::{ExpansionResult};
 use eval::expression::{Expression};
 
 #[derive(Default)]
@@ -471,18 +472,14 @@ fn parse(pool: &InternPool, input: &str) -> Vec<ScannedDatum> {
 }
 
 fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
+    use eval::expand::expand;
     use locus::utils::collect_diagnostics;
 
     let (expansion_result, expansion_diagnostics) = collect_diagnostics(|handler| {
         let environment = basic_scheme_environment(pool);
-        let expander = standard_scheme(pool);
 
         return data.iter()
-            .map(|d| expander.expand(d, &environment, &handler, expander.as_ref()))
-            .map(|e| match e {
-                ExpansionResult::Some(e) => e,
-                _ => panic!("expander did not produce an expression"),
-            })
+            .map(|datum| expand(datum, &environment, &handler))
             .collect();
     });
 
