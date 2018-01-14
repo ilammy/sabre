@@ -180,7 +180,7 @@ fn quote_extra() {
     TestCase::new()
         .input("(quote 1 2 3)")
         .result("(Quotation 1)")
-        .diagnostic(9, 12, DiagnosticKind::err_expand_invalid_quote)
+        .diagnostic(8, 12, DiagnosticKind::err_expand_invalid_quote)
         .check();
 }
 
@@ -189,7 +189,7 @@ fn quote_extra_dotted() {
     TestCase::new()
         .input("(quote 1 2 . 3)")
         .result("(Quotation 1)")
-        .diagnostic(9, 14, DiagnosticKind::err_expand_invalid_quote)
+        .diagnostic(8, 14, DiagnosticKind::err_expand_invalid_quote)
         .check();
 }
 
@@ -349,7 +349,7 @@ fn if_forms_5() {
     TestCase::new()
         .input("(if #f 1 2 3 4)")
         .result("(Alternative (Literal #f) (Literal 1) (Literal 2))")
-        .diagnostic(11, 14, DiagnosticKind::err_expand_invalid_if)
+        .diagnostic(10, 14, DiagnosticKind::err_expand_invalid_if)
         .check();
 }
 
@@ -358,8 +358,7 @@ fn if_forms_5_dotted() {
     TestCase::new()
         .input("(if #f 1 2 3 . 4)")
         .result("(Alternative (Literal #f) (Literal 1) (Literal 2))")
-        .diagnostic(11, 16, DiagnosticKind::err_expand_invalid_if)
-        .diagnostic(12, 15, DiagnosticKind::err_expand_invalid_if)
+        .diagnostic(10, 16, DiagnosticKind::err_expand_invalid_if)
         .check();
 }
 
@@ -435,7 +434,7 @@ fn set_forms_3() {
     TestCase::new()
         .input("(set! i 1 2)")
         .result("(Assignment i (Literal 1))")
-        .diagnostic(10, 11, DiagnosticKind::err_expand_invalid_set)
+        .diagnostic(9, 11, DiagnosticKind::err_expand_invalid_set)
         .check();
 }
 
@@ -444,8 +443,7 @@ fn set_forms_3_dotted() {
     TestCase::new()
         .input("(set! i 5 . 4)")
         .result("(Assignment i (Literal 5))")
-        .diagnostic(12, 13, DiagnosticKind::err_expand_invalid_set)
-        .diagnostic( 9, 12, DiagnosticKind::err_expand_invalid_set)
+        .diagnostic(9, 13, DiagnosticKind::err_expand_invalid_set)
         .check();
 }
 

@@ -142,4 +142,10 @@ pub enum DiagnosticKind {
 
     /// Semantic analysis has found an assignment to an imported variable.
     err_meaning_assign_to_imported_binding,
+
+    /// Semantic analysis has found an assignment to a syntactic variable.
+    err_meaning_assign_to_syntactic_binding,
+
+    /// Semantic analysis has found a dereference of a syntactic variable.
+    err_meaning_reference_to_syntactic_binding,
 }

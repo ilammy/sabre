@@ -291,8 +291,10 @@ fn meaning_reference(
             }
             ReferenceKind::Syntactic { .. } => {
                 // TODO: provide suggestions based on the environment
-                // TODO: report an error
+                diagnostic.report(DiagnosticKind::err_meaning_reference_to_syntactic_binding,
+                    span);
 
+                // Syntactic variables do not have runtime values, so return a placeholder.
                 MeaningKind::Undefined
             }
         }
@@ -336,7 +338,8 @@ fn meaning_assignment(
         if let ReferenceKind::Syntactic { .. } = reference.kind {
             // TODO: provide suggestions based on the environment
             // TODO: show where the variable is imported from
-            // TODO: report an error
+            diagnostic.report(DiagnosticKind::err_meaning_assign_to_syntactic_binding,
+                variable.span);
         }
     } else {
         // TODO: provide suggestions based on the environment

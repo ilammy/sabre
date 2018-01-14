@@ -150,6 +150,15 @@ fn reference_undefined() {
         .check();
 }
 
+#[test]
+fn reference_syntactic() {
+    TestCase::new()
+        .input("begin")
+        .meaning("(Sequence (Undefined))")
+        .diagnostic(0, 5, DiagnosticKind::err_meaning_reference_to_syntactic_binding)
+        .check();
+}
+
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Alternative
 
@@ -221,6 +230,16 @@ fn assignment_imported() {
         .input("(set! car cdr)")
         .meaning("(Sequence (ImportedReference 1))")
         .diagnostic(6, 9, DiagnosticKind::err_meaning_assign_to_imported_binding)
+        .check();
+}
+
+#[test]
+fn assignment_syntactic() {
+    TestCase::new()
+        .input("(set! set! set!)")
+        .meaning("(Sequence (Undefined))")
+        .diagnostic( 6, 10, DiagnosticKind::err_meaning_assign_to_syntactic_binding)
+        .diagnostic(11, 15, DiagnosticKind::err_meaning_reference_to_syntactic_binding)
         .check();
 }
 
@@ -369,6 +388,29 @@ fn application_closed() {
                                         (ShallowArgumentReference 1)))) \
                       (Constant 0) \
                       (Constant 1)))")
+        .check();
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Shadowing
+
+#[test]
+fn local_variables_shadow_special_forms() {
+    TestCase::new()
+        .input("((lambda (if) (if if if if)) (lambda (a b) (cons a b)))")
+        .meaning("(Sequence \
+                    (ProcedureCall (ClosureFixed 1 \
+                                    (Sequence \
+                                      (ProcedureCall \
+                                        (ShallowArgumentReference 0) \
+                                        (ShallowArgumentReference 0) \
+                                        (ShallowArgumentReference 0) \
+                                        (ShallowArgumentReference 0)))) \
+                      (ClosureFixed 2 \
+                       (Sequence \
+                         (ProcedureCall (ImportedReference 2) \
+                           (ShallowArgumentReference 0) \
+                           (ShallowArgumentReference 1))))))")
         .check();
 }
 

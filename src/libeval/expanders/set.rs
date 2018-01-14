@@ -9,7 +9,7 @@
 
 use std::rc::{Rc};
 
-use locus::diagnostics::{Handler, DiagnosticKind, Span};
+use locus::diagnostics::{Handler, DiagnosticKind};
 use reader::datum::{ScannedDatum, DatumValue};
 use reader::intern_pool::{Atom};
 
@@ -39,9 +39,12 @@ impl Expander for SetExpander {
         environment: &Rc<Environment>,
         diagnostic: &Handler,
     ) -> Expression {
+        use expanders::utils::expect_macro_use;
+
         // The only valid form is (set! variable value). Variable must be mentioned verbatim.
         // The value expression needs to be expanded.
-        let terms = expect_set_form(self.name, datum, diagnostic);
+        let terms = expect_macro_use(datum, self.name, 3, diagnostic,
+            DiagnosticKind::err_expand_invalid_set);
 
         let variable = expand_variable(terms.get(0), diagnostic);
         let new_value = expand_new_value(terms.get(1), datum, environment, diagnostic);
@@ -58,33 +61,6 @@ impl Expander for SetExpander {
             environment: environment.clone(),
         };
     }
-}
-
-fn expect_set_form<'a>(
-    keyword: Atom,
-    datum: &'a ScannedDatum,
-    diagnostic: &Handler,
-) -> &'a [ScannedDatum] {
-    use expanders::utils::{expect_form, missing_last_span};
-
-    let (dotted, terms) = expect_form(keyword, datum);
-    let last = terms.len() - 1;
-
-    if terms.len() < 3 {
-        diagnostic.report(DiagnosticKind::err_expand_invalid_set, missing_last_span(datum));
-    }
-    if terms.len() > 3 {
-        let extra_forms = Span::new(terms[3].span.from, terms[last].span.to);
-        diagnostic.report(DiagnosticKind::err_expand_invalid_set, extra_forms);
-    }
-
-    if dotted {
-        assert!(terms.len() >= 2);
-        let around_dot = Span::new(terms[last - 1].span.to, terms[last].span.from);
-        diagnostic.report(DiagnosticKind::err_expand_invalid_set, around_dot);
-    }
-
-    return &terms[1..];
 }
 
 /// Expand (as a no-op) the variable name in a set! expression.

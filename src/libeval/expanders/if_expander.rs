@@ -9,7 +9,7 @@
 
 use std::rc::{Rc};
 
-use locus::diagnostics::{Handler, DiagnosticKind, Span};
+use locus::diagnostics::{Handler, DiagnosticKind};
 use reader::datum::{ScannedDatum};
 use reader::intern_pool::{Atom};
 
@@ -40,11 +40,12 @@ impl Expander for IfExpander {
         diagnostic: &Handler,
     ) -> Expression {
         use expand::expand;
-        use expanders::utils::missing_last_span;
+        use expanders::utils::{expect_macro_use, missing_last_span};
 
         // The only valid form is (if condition consequent alternative). Expand the terms before
         // gathering them up. Replace any missing terms with placeholder values.
-        let terms = expect_if_form(self.name, datum, diagnostic);
+        let terms = expect_macro_use(datum, self.name, 4, diagnostic,
+            DiagnosticKind::err_expand_invalid_if);
 
         let expand_or_recover = |term: Option<&ScannedDatum>| {
             term.map(|datum| expand(datum, environment, diagnostic))
@@ -65,31 +66,4 @@ impl Expander for IfExpander {
             environment: environment.clone(),
         };
     }
-}
-
-fn expect_if_form<'a>(
-    keyword: Atom,
-    datum: &'a ScannedDatum,
-    diagnostic: &Handler,
-) -> &'a [ScannedDatum] {
-    use expanders::utils::{expect_form, missing_last_span};
-
-    let (dotted, terms) = expect_form(keyword, datum);
-    let last = terms.len() - 1;
-
-    if terms.len() < 4 {
-        diagnostic.report(DiagnosticKind::err_expand_invalid_if, missing_last_span(datum));
-    }
-    if terms.len() > 4 {
-        let extra_forms = Span::new(terms[4].span.from, terms[last].span.to);
-        diagnostic.report(DiagnosticKind::err_expand_invalid_if, extra_forms);
-    }
-
-    if dotted {
-        assert!(terms.len() >= 2);
-        let around_dot = Span::new(terms[last - 1].span.to, terms[last].span.from);
-        diagnostic.report(DiagnosticKind::err_expand_invalid_if, around_dot);
-    }
-
-    return &terms[1..];
 }

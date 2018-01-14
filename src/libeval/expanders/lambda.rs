@@ -40,11 +40,13 @@ impl Expander for LambdaExpander {
         diagnostic: &Handler,
     ) -> Expression {
         use expand::expand;
+        use expanders::utils::expect_macro_use;
 
         // The only valid form is (lambda (variable...) body1 body2...). We need to expand only
         // the procedure body. Arguments have their own peculiar syntax and describe the new
         // environment for the procedure body.
-        let terms = expect_lambda_form(self.name, datum, diagnostic);
+        let terms = expect_macro_use(datum, self.name, 3.., diagnostic,
+            DiagnosticKind::err_expand_invalid_lambda);
 
         let arguments = expand_arguments(terms.get(0), diagnostic);
         let new_environment = new_local_environment(&arguments, environment);
@@ -60,29 +62,6 @@ impl Expander for LambdaExpander {
             environment: environment.clone(),
         };
     }
-}
-
-fn expect_lambda_form<'a>(
-    keyword: Atom,
-    datum: &'a ScannedDatum,
-    diagnostic: &Handler,
-) -> &'a [ScannedDatum] {
-    use expanders::utils::{expect_form, missing_last_span};
-
-    let (dotted, terms) = expect_form(keyword, datum);
-    let last = terms.len() - 1;
-
-    if terms.len() < 3 {
-        diagnostic.report(DiagnosticKind::err_expand_invalid_lambda, missing_last_span(datum));
-    }
-
-    if dotted {
-        assert!(terms.len() >= 2);
-        let around_dot = Span::new(terms[last - 1].span.to, terms[last].span.from);
-        diagnostic.report(DiagnosticKind::err_expand_invalid_lambda, around_dot);
-    }
-
-    return &terms[1..];
 }
 
 /// Expand the argument list.
