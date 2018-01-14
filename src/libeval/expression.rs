@@ -53,6 +53,9 @@ pub enum ExpressionKind {
 
     /// Procedure call.
     Application(Vec<Expression>),
+
+    /// An expression producing undefined value.
+    Undefined,
 }
 
 /// Literal value.
@@ -131,6 +134,8 @@ impl fmt::Debug for Expression {
                 try!(write!(f, ")"));
                 Ok(())
             }
+            ExpressionKind::Undefined =>
+                write!(f, "(Undefined)"),
         }
     }
 }

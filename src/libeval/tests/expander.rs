@@ -161,7 +161,7 @@ fn quote_nested() {
 fn quote_empty() {
     TestCase::new()
         .input("(quote)")
-        .result("(Quotation #f)")
+        .result("(Undefined)")
         .diagnostic(6, 6, DiagnosticKind::err_expand_invalid_quote)
         .check();
 }
@@ -238,7 +238,7 @@ fn begin_nested() {
 fn begin_empty() {
     TestCase::new()
         .input("(begin)")
-        .result("(Sequence)")
+        .result("(Undefined)")
         .diagnostic(6, 6, DiagnosticKind::err_expand_invalid_begin)
         .check();
 }
@@ -292,7 +292,7 @@ fn if_nested() {
 fn if_forms_0() {
     TestCase::new()
         .input("( if )")
-        .result("(Alternative (Literal #f) (Literal #f) (Literal #f))")
+        .result("(Alternative (Undefined) (Undefined) (Undefined))")
         .diagnostic(4, 5, DiagnosticKind::err_expand_invalid_if)
         .check();
 }
@@ -301,7 +301,7 @@ fn if_forms_0() {
 fn if_forms_1() {
     TestCase::new()
         .input("( if #false )")
-        .result("(Alternative (Literal #f) (Literal #f) (Literal #f))")
+        .result("(Alternative (Literal #f) (Undefined) (Undefined))")
         .diagnostic(11, 12, DiagnosticKind::err_expand_invalid_if)
         .check();
 }
@@ -310,7 +310,7 @@ fn if_forms_1() {
 fn if_forms_1_dotted() {
     TestCase::new()
         .input("(if . #f)")
-        .result("(Alternative (Literal #f) (Literal #f) (Literal #f))")
+        .result("(Alternative (Literal #f) (Undefined) (Undefined))")
         .diagnostic(8, 8, DiagnosticKind::err_expand_invalid_if)
         .diagnostic(3, 6, DiagnosticKind::err_expand_invalid_if)
         .check();
@@ -320,7 +320,7 @@ fn if_forms_1_dotted() {
 fn if_forms_2() {
     TestCase::new()
         .input("(if #f 1)")
-        .result("(Alternative (Literal #f) (Literal 1) (Literal #f))")
+        .result("(Alternative (Literal #f) (Literal 1) (Undefined))")
         .diagnostic(8, 8, DiagnosticKind::err_expand_invalid_if)
         .check();
 }
@@ -329,7 +329,7 @@ fn if_forms_2() {
 fn if_forms_2_dotted() {
     TestCase::new()
         .input("(if #f . 1)")
-        .result("(Alternative (Literal #f) (Literal 1) (Literal #f))")
+        .result("(Alternative (Literal #f) (Literal 1) (Undefined))")
         .diagnostic(10, 10, DiagnosticKind::err_expand_invalid_if)
         .diagnostic( 6,  9, DiagnosticKind::err_expand_invalid_if)
         .check();
@@ -397,7 +397,7 @@ fn set_nested() {
 fn set_forms_0() {
     TestCase::new()
         .input("(set!)")
-        .result("(Literal #f)")
+        .result("(Undefined)")
         .diagnostic(5, 5, DiagnosticKind::err_expand_invalid_set)
         .check();
 }
@@ -406,7 +406,7 @@ fn set_forms_0() {
 fn set_forms_1() {
     TestCase::new()
         .input("(set! i)")
-        .result("(Assignment i (Literal #f))")
+        .result("(Assignment i (Undefined))")
         .diagnostic(7, 7, DiagnosticKind::err_expand_invalid_set)
         .check();
 }
@@ -415,7 +415,7 @@ fn set_forms_1() {
 fn set_forms_1_dotted() {
     TestCase::new()
         .input("(set! . i)")
-        .result("(Assignment i (Literal #f))")
+        .result("(Assignment i (Undefined))")
         .diagnostic(9, 9, DiagnosticKind::err_expand_invalid_set)
         .diagnostic(5, 8, DiagnosticKind::err_expand_invalid_set)
         .check();
@@ -475,7 +475,7 @@ fn set_renaming() {
     TestCase::new()
         .input("(!!!SUMMER-ASSIGNMENT!!!)")
         .keywords(MagicKeywords { set: "!!!SUMMER-ASSIGNMENT!!!", ..Default::default() })
-        .result("(Literal #f)")
+        .result("(Undefined)")
         .diagnostic(24, 24, DiagnosticKind::err_expand_invalid_set)
         .check();
 }

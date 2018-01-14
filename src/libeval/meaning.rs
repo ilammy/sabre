@@ -235,6 +235,7 @@ fn meaning_expression(
                 meaning_abstraction(diagnostic, arguments, body, constants),
             ExpressionKind::Application(ref terms) =>
                 meaning_application(diagnostic, terms, constants),
+            ExpressionKind::Undefined => MeaningKind::Undefined,
         },
         span: expression.span,
     }

@@ -47,10 +47,14 @@ impl Expander for BeginExpander {
             expect_begin_form(self.name, datum, diagnostic)
             .iter()
             .map(|datum| expand(datum, environment, diagnostic))
-            .collect();
+            .collect::<Vec<_>>();
 
         return Expression {
-            kind: ExpressionKind::Sequence(expressions),
+            kind: if expressions.is_empty() {
+                ExpressionKind::Undefined
+            } else {
+                ExpressionKind::Sequence(expressions)
+            },
             span: datum.span,
             environment: environment.clone(),
         };

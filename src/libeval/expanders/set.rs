@@ -14,7 +14,7 @@ use reader::datum::{ScannedDatum, DatumValue};
 use reader::intern_pool::{Atom};
 
 use environment::{Environment};
-use expression::{Expression, ExpressionKind, Literal, Variable};
+use expression::{Expression, ExpressionKind, Variable};
 use expand::Expander;
 
 /// Expand `set!` special forms into assignments.
@@ -117,7 +117,7 @@ fn expand_new_value(
 
     term.map(|datum| expand(datum, environment, diagnostic))
         .unwrap_or(Expression {
-            kind: ExpressionKind::Literal(Literal::Boolean(false)),
+            kind: ExpressionKind::Undefined,
             span: missing_last_span(datum),
             environment: environment.clone(),
         })

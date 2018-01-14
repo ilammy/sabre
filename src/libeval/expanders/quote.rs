@@ -10,7 +10,7 @@
 use std::rc::{Rc};
 
 use locus::diagnostics::{Handler, DiagnosticKind, Span};
-use reader::datum::{ScannedDatum, DatumValue};
+use reader::datum::{ScannedDatum};
 use reader::intern_pool::{Atom};
 
 use environment::{Environment};
@@ -39,19 +39,16 @@ impl Expander for QuoteExpander {
         environment: &Rc<Environment>,
         diagnostic: &Handler,
     ) -> Expression {
-        use expanders::utils::missing_last_span;
-
         // The only valid form is (quote datum). Do not expand anything. Use the first datum
         // available or pull some placeholder out of thin air if this is a (quote) form.
         let data = expect_quote_form(self.name, datum, diagnostic);
 
-        let quoted_datum = data.first().cloned().unwrap_or_else(|| ScannedDatum {
-            value: DatumValue::Boolean(false),
-            span: missing_last_span(datum),
-        });
-
         return Expression {
-            kind: ExpressionKind::Quotation(quoted_datum),
+            kind: if let Some(quoted_datum) = data.first().cloned() {
+                ExpressionKind::Quotation(quoted_datum)
+            } else {
+                ExpressionKind::Undefined
+            },
             span: datum.span,
             environment: environment.clone(),
         };

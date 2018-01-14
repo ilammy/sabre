@@ -14,7 +14,7 @@ use reader::datum::{ScannedDatum};
 use reader::intern_pool::{Atom};
 
 use environment::{Environment};
-use expression::{Expression, ExpressionKind, Literal};
+use expression::{Expression, ExpressionKind};
 use expand::Expander;
 
 /// Expand `if` special forms into alternatives.
@@ -49,11 +49,12 @@ impl Expander for IfExpander {
         let expand_or_recover = |term: Option<&ScannedDatum>| {
             term.map(|datum| expand(datum, environment, diagnostic))
                 .unwrap_or(Expression {
-                    kind: ExpressionKind::Literal(Literal::Boolean(false)),
+                    kind: ExpressionKind::Undefined,
                     span: missing_last_span(datum),
                     environment: environment.clone(),
                 })
         };
+
         let condition   = Box::new(expand_or_recover(terms.get(0)));
         let consequent  = Box::new(expand_or_recover(terms.get(1)));
         let alternative = Box::new(expand_or_recover(terms.get(2)));
