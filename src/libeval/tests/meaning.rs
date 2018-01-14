@@ -41,12 +41,12 @@ fn standard_scheme(pool: &InternPool) -> Box<Expander> {
 
 fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
     let imported_vars = [
-        Variable { name: pool.intern("car"), span: None },
-        Variable { name: pool.intern("cdr"), span: None },
-        Variable { name: pool.intern("cons"), span: None },
+        Variable { name: pool.intern("car"), span: Span::new(0, 0) },
+        Variable { name: pool.intern("cdr"), span: Span::new(0, 0) },
+        Variable { name: pool.intern("cons"), span: Span::new(0, 0) },
     ];
     let global_vars = [
-        Variable { name: pool.intern("*global*"), span: None },
+        Variable { name: pool.intern("*global*"), span: Span::new(0, 0) },
     ];
 
     let imported_env = Environment::new_imported(&imported_vars);
