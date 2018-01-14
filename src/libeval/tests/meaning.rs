@@ -150,6 +150,15 @@ fn reference_undefined() {
         .check();
 }
 
+#[test]
+fn reference_syntactic() {
+    TestCase::new()
+        .input("begin")
+        .meaning("(Sequence (Undefined))")
+        .diagnostic(0, 5, DiagnosticKind::err_meaning_reference_to_syntactic_binding)
+        .check();
+}
+
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Alternative
 
@@ -221,6 +230,16 @@ fn assignment_imported() {
         .input("(set! car cdr)")
         .meaning("(Sequence (ImportedReference 1))")
         .diagnostic(6, 9, DiagnosticKind::err_meaning_assign_to_imported_binding)
+        .check();
+}
+
+#[test]
+fn assignment_syntactic() {
+    TestCase::new()
+        .input("(set! set! set!)")
+        .meaning("(Sequence (Undefined))")
+        .diagnostic( 6, 10, DiagnosticKind::err_meaning_assign_to_syntactic_binding)
+        .diagnostic(11, 15, DiagnosticKind::err_meaning_reference_to_syntactic_binding)
         .check();
 }
 
