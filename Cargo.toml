@@ -1,0 +1,7 @@
+[workspace]
+members = [
+    "src/libeval",
+    "src/liblocus",
+    "src/libreader",
+    "src/libunicode",
+]
