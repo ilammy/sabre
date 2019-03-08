@@ -15,7 +15,3 @@ The code is licensed under either of
 at your option.
 
 See [LICENSE](LICENSE) for more details.
-
-## Contributing
-
-Unless explicitly stated otherwise, any intentional contribution shall be dual licensed as above, without any additional terms or conditions.
