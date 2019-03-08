@@ -13,11 +13,12 @@
 //!
 //! This module contains normalization self-tests based on NormalizationTest.txt from UCD.
 
-extern crate unicode;
+extern crate libunicode;
 
 use std::char;
 use std::string::ToString;
-use unicode::normalization;
+
+use libunicode::normalization;
 
 #[test]
 fn conformance_explicit_nfc() {

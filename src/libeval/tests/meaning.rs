@@ -9,23 +9,23 @@
 //!
 //! This verifies that the basic semantics of Scheme is handled as expected.
 
-extern crate eval;
-extern crate locus;
-extern crate reader;
+extern crate libeval;
+extern crate liblocus;
+extern crate libreader;
 
-use eval::meaning::{meaning, MeaningResult, Value};
+use libeval::meaning::{meaning, MeaningResult, Value};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Tested expanders and environments
 
 use std::rc::{Rc};
 
-use eval::expanders::{Expander, ExpanderStack, BasicExpander, ApplicationExpander,
+use libeval::expanders::{Expander, ExpanderStack, BasicExpander, ApplicationExpander,
     QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
-use eval::expression::{Variable};
-use eval::environment::{Environment};
-use locus::diagnostics::{DiagnosticKind};
-use reader::intern_pool::{InternPool};
+use libeval::expression::{Variable};
+use libeval::environment::{Environment};
+use liblocus::diagnostics::{DiagnosticKind};
+use libreader::intern_pool::{InternPool};
 
 fn standard_scheme(pool: &InternPool) -> Box<Expander> {
     Box::new(
@@ -373,12 +373,12 @@ fn application_closed() {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use locus::diagnostics::{Diagnostic, Span};
-use reader::datum::{ScannedDatum};
-use reader::lexer::{StringScanner};
-use reader::parser::{Parser};
-use eval::expanders::{ExpansionResult};
-use eval::expression::{Expression};
+use liblocus::diagnostics::{Diagnostic, Span};
+use libreader::datum::{ScannedDatum};
+use libreader::lexer::{StringScanner};
+use libreader::parser::{Parser};
+use libeval::expanders::{ExpansionResult};
+use libeval::expression::{Expression};
 
 #[derive(Default)]
 struct TestCase {
@@ -452,7 +452,7 @@ fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic],
 }
 
 fn parse(pool: &InternPool, input: &str) -> Vec<ScannedDatum> {
-    use locus::utils::collect_diagnostics;
+    use liblocus::utils::collect_diagnostics;
 
     let (data, parsing_diagnostics) = collect_diagnostics(|handler| {
         let scanner = Box::new(StringScanner::new(input, handler, pool));
@@ -471,7 +471,7 @@ fn parse(pool: &InternPool, input: &str) -> Vec<ScannedDatum> {
 }
 
 fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
-    use locus::utils::collect_diagnostics;
+    use liblocus::utils::collect_diagnostics;
 
     let (expansion_result, expansion_diagnostics) = collect_diagnostics(|handler| {
         let environment = basic_scheme_environment(pool);
@@ -492,7 +492,7 @@ fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
 }
 
 fn treat(expressions: &[Expression]) -> (MeaningResult, Vec<Diagnostic>) {
-    use locus::utils::collect_diagnostics;
+    use liblocus::utils::collect_diagnostics;
 
     collect_diagnostics(|handler| {
         return meaning(handler, expressions);

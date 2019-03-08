@@ -13,7 +13,7 @@
 #![feature(test)]
 
 extern crate test;
-extern crate unicode;
+extern crate libunicode;
 
 macro_rules! define_benchmark_fn {
     ($name:ident, $normalize:expr, $string:expr) => {
@@ -28,7 +28,7 @@ macro_rules! define_benchmark {
     ($name:ident, $value:expr) => {
         mod $name {
             use test::Bencher;
-            use unicode::normalization;
+            use libunicode::normalization;
 
             const TEST_STRING: &'static str = $value;
 

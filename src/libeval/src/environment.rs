@@ -9,7 +9,7 @@
 
 use std::rc::{Rc};
 
-use reader::intern_pool::{Atom};
+use libreader::intern_pool::{Atom};
 
 use expression::{Variable};
 

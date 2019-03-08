@@ -9,17 +9,17 @@
 //!
 //! This verifies that the basic syntax of Scheme is handled as expected.
 
-extern crate eval;
-extern crate locus;
-extern crate reader;
+extern crate libeval;
+extern crate liblocus;
+extern crate libreader;
 
 use std::rc::{Rc};
 
-use eval::environment::{Environment};
-use eval::expanders::{Expander, ExpansionResult, ExpanderStack, BasicExpander,
+use libeval::environment::{Environment};
+use libeval::expanders::{Expander, ExpansionResult, ExpanderStack, BasicExpander,
     ApplicationExpander, QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
-use locus::diagnostics::{DiagnosticKind};
-use reader::intern_pool::{InternPool};
+use liblocus::diagnostics::{DiagnosticKind};
+use libreader::intern_pool::{InternPool};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Tested expanders
@@ -717,9 +717,9 @@ fn altogether() {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use locus::diagnostics::{Span, Diagnostic};
-use reader::lexer::{StringScanner};
-use reader::parser::{Parser};
+use liblocus::diagnostics::{Span, Diagnostic};
+use libreader::lexer::{StringScanner};
+use libreader::parser::{Parser};
 
 #[derive(Default)]
 struct TestCase {
@@ -773,8 +773,8 @@ impl TestCase {
 /// Check whether the given expander produces expected results and reports expected diagnostics.
 /// Panic if this is not true.
 fn check(expander_factory: &SchemeBase, input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
-    use locus::utils::collect_diagnostics;
-    use reader::intern_pool::with_formatting_pool;
+    use liblocus::utils::collect_diagnostics;
+    use libreader::intern_pool::with_formatting_pool;
 
     let pool = InternPool::new();
 

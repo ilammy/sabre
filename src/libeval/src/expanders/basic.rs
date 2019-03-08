@@ -9,8 +9,8 @@
 
 use std::rc::{Rc};
 
-use locus::diagnostics::{Handler, DiagnosticKind, Span};
-use reader::datum::{ScannedDatum, DatumValue};
+use liblocus::diagnostics::{Handler, DiagnosticKind, Span};
+use libreader::datum::{ScannedDatum, DatumValue};
 
 use environment::{Environment};
 use expression::{Expression, ExpressionKind, Literal};

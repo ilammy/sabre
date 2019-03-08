@@ -9,10 +9,10 @@
 //!
 //! This crate contains modules implementing basic syntax analysis of Scheme source code.
 
-extern crate locus;
+extern crate liblocus;
 
 #[cfg(feature = "unicode")]
-extern crate unicode;
+extern crate libunicode;
 
 pub mod datum;
 pub mod format;
@@ -20,10 +20,3 @@ pub mod intern_pool;
 pub mod lexer;
 pub mod parser;
 pub mod tokens;
-
-mod tests {
-    pub mod utils;
-}
-
-#[cfg_attr(not(test), doc(hidden))]
-pub use tests::utils as test_utils;

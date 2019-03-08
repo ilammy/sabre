@@ -10,7 +10,7 @@
 //! This module contains definition of the _syntactical analyzer_ which constructs parsing trees
 //! out of token streams.
 
-use locus::diagnostics::{Span, Handler, DiagnosticKind};
+use liblocus::diagnostics::{Span, Handler, DiagnosticKind};
 
 use datum::{ScannedDatum, DatumValue};
 use intern_pool::{Atom, InternPool};

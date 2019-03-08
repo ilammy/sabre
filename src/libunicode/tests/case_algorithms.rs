@@ -9,9 +9,9 @@
 //!
 //! This module contains tests for _Default Case Algorithms_.
 
-extern crate unicode;
+extern crate libunicode;
 
-use unicode::case_algorithms::{to_nfkc_casefold};
+use libunicode::case_algorithms::{to_nfkc_casefold};
 
 //
 // toNFKC_Casefold

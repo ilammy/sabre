@@ -12,7 +12,7 @@
 
 use std::char;
 
-use locus::diagnostics::{Span, Handler, DiagnosticKind};
+use liblocus::diagnostics::{Span, Handler, DiagnosticKind};
 
 use intern_pool::{InternPool};
 use tokens::{Token, ParenType};
@@ -1676,7 +1676,7 @@ fn is_identifier_subsequent(c: char) -> bool {
 /// Check if a character is an initial of an identifer.
 #[cfg(feature = "unicode")]
 fn is_identifier_initial(c: char) -> bool {
-    use unicode::scheme_identifiers;
+    use libunicode::scheme_identifiers;
 
     return scheme_identifiers::is_initial(c);
 }
@@ -1684,7 +1684,7 @@ fn is_identifier_initial(c: char) -> bool {
 /// Check if a character is a subsequent of an identifer.
 #[cfg(feature = "unicode")]
 fn is_identifier_subsequent(c: char) -> bool {
-    use unicode::scheme_identifiers;
+    use libunicode::scheme_identifiers;
 
     return scheme_identifiers::is_subsequent(c);
 }
@@ -1736,7 +1736,7 @@ fn normalize_case_insensitive_identifier(s: &str) -> String {
 /// Normalize a string as a case-sensitive identifier.
 #[cfg(feature = "unicode")]
 fn normalize_case_sensitive_identifier(s: &str) -> String {
-    use unicode::normalization;
+    use libunicode::normalization;
 
     const ZERO_WIDTH_NON_JOINER: char = '\u{200C}';
     const ZERO_WIDTH_JOINER: char = '\u{200D}';
@@ -1753,7 +1753,7 @@ fn normalize_case_sensitive_identifier(s: &str) -> String {
 /// Normalize a string as a case-insensitive identifier.
 #[cfg(feature = "unicode")]
 fn normalize_case_insensitive_identifier(s: &str) -> String {
-    use unicode::case_algorithms;
+    use libunicode::case_algorithms;
 
     case_algorithms::to_nfkc_casefold(s)
 }

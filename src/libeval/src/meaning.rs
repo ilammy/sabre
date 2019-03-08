@@ -14,9 +14,9 @@ use std::fmt;
 use std::rc::{Rc};
 use std::slice;
 
-use locus::diagnostics::{Span, Handler, DiagnosticKind};
-use reader::datum::{ScannedDatum, DatumValue};
-use reader::intern_pool::{Atom};
+use liblocus::diagnostics::{Span, Handler, DiagnosticKind};
+use libreader::datum::{ScannedDatum, DatumValue};
+use libreader::intern_pool::{Atom};
 
 use expression::{Expression, ExpressionKind, Literal, Variable, Arguments};
 use environment::{Environment, VariableKind};

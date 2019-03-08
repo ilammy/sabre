@@ -10,9 +10,9 @@
 use std::fmt;
 use std::rc::{Rc};
 
-use locus::diagnostics::{Span};
-use reader::datum::{ScannedDatum};
-use reader::intern_pool::{Atom};
+use liblocus::diagnostics::{Span};
+use libreader::datum::{ScannedDatum};
+use libreader::intern_pool::{Atom};
 
 use environment::{Environment};
 
@@ -137,7 +137,7 @@ impl fmt::Debug for Expression {
 
 impl fmt::Debug for Literal {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use reader::format::write_list;
+        use libreader::format::write_list;
 
         match *self {
             Literal::Boolean(value) =>
@@ -158,7 +158,7 @@ impl fmt::Debug for Literal {
 
 impl fmt::Debug for Arguments {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use reader::format::write_list;
+        use libreader::format::write_list;
 
         match *self {
             Arguments::Fixed(ref variables) =>
