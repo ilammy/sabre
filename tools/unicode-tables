@@ -71,7 +71,7 @@ def relative_to_script(path):
 
 def query_latest_unicode_version():
     """Retrieve numeric value of the latest Unicode Standard version"""
-    readme = urllib2.urlopen('http://unicode.org/Public/UCD/latest/ReadMe.txt').read()
+    readme = urllib2.urlopen('ftp://ftp.unicode.org/Public/UCD/latest/ReadMe.txt').read()
     s = readme.find('Version')
     e = readme.find('of', s)
     assert (s > 0) and (e > 0)
@@ -86,7 +86,7 @@ def retrieve_ucd(version, ucd):
         with open(filename, 'r') as f:
             data = f.read()
     else:
-        url = 'http://unicode.org/Public/' + version + '/ucd/' + ucd
+        url = 'ftp://ftp.unicode.org/Public/' + version + '/ucd/' + ucd
         data = urllib2.urlopen(url).read()
         with open(filename, 'w') as f:
             f.write(data)
