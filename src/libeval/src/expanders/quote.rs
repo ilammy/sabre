@@ -33,7 +33,7 @@ impl QuoteExpander {
 }
 
 impl Expander for QuoteExpander {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, _expand: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, _expand: &dyn Expander) -> ExpansionResult {
         use crate::expanders::utils::{is_named_form, expect_list_length_fixed};
 
         // Filter out anything that certainly does not look as a quote form.

@@ -32,7 +32,7 @@ impl BasicExpander {
 }
 
 impl Expander for BasicExpander {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &dyn Expander) -> ExpansionResult {
         match datum.value {
             // Simple literal data.
             DatumValue::Boolean(value) =>

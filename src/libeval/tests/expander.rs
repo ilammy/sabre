@@ -9,10 +9,6 @@
 //!
 //! This verifies that the basic syntax of Scheme is handled as expected.
 
-extern crate libeval;
-extern crate liblocus;
-extern crate libreader;
-
 use std::rc::{Rc};
 
 use libeval::environment::{Environment};

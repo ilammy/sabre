@@ -25,7 +25,7 @@ use crate::expanders::{Expander, ExpansionResult};
 /// subexpanders do not know what to do with the datum.
 pub struct ExpanderStack {
     /// The current expander.
-    head: Box<Expander>,
+    head: Box<dyn Expander>,
 
     /// The rest of the expanders.
     tail: Option<Box<ExpanderStack>>,
@@ -33,7 +33,7 @@ pub struct ExpanderStack {
 
 impl ExpanderStack {
     /// Create a new expander stack with a given expander.
-    pub fn new(base: Box<Expander>) -> ExpanderStack {
+    pub fn new(base: Box<dyn Expander>) -> ExpanderStack {
         ExpanderStack {
             head: base,
             tail: None,
@@ -41,7 +41,7 @@ impl ExpanderStack {
     }
 
     /// Push a new expander into the stack.
-    pub fn push(self, head: Box<Expander>) -> ExpanderStack {
+    pub fn push(self, head: Box<dyn Expander>) -> ExpanderStack {
         ExpanderStack {
             head: head,
             tail: Some(Box::new(self)),
@@ -58,7 +58,7 @@ impl ExpanderStack {
 }
 
 impl Expander for ExpanderStack {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &dyn Expander) -> ExpansionResult {
         let mut current = self.head.as_ref();
         loop {
             let result = current.expand(datum, environment, diagnostic, expander);

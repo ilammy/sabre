@@ -9,11 +9,6 @@
 //!
 //! This crate contains modules implementing basic syntax analysis of Scheme source code.
 
-extern crate liblocus;
-
-#[cfg(feature = "unicode")]
-extern crate libunicode;
-
 pub mod datum;
 pub mod format;
 pub mod intern_pool;

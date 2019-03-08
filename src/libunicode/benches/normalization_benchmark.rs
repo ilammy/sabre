@@ -13,7 +13,6 @@
 #![feature(test)]
 
 extern crate test;
-extern crate libunicode;
 
 macro_rules! define_benchmark_fn {
     ($name:ident, $normalize:expr, $string:expr) => {

@@ -24,7 +24,7 @@ use crate::tokens::{Token, ParenType};
 /// parser also does not perform any semantical analysis, does not expand macros, etc.
 pub struct Parser<'a> {
     /// Our source of tokens.
-    scanner: Box<Scanner + 'a>,
+    scanner: Box<dyn Scanner + 'a>,
 
     /// The pool used by the scanner.
     pool: &'a InternPool,
@@ -59,7 +59,7 @@ type ParseResult = Result<Option<ScannedDatum>, ()>;
 
 impl<'a> Parser<'a> {
     /// Construct a new parser that will use the given token stream.
-    pub fn new(scanner: Box<Scanner + 'a>, pool: &'a InternPool, handler: &'a Handler)
+    pub fn new(scanner: Box<dyn Scanner + 'a>, pool: &'a InternPool, handler: &'a Handler)
         -> Parser<'a>
     {
         let mut parser = Parser {

@@ -22,7 +22,7 @@ pub trait Expander {
     /// Normally the provided expander will be the same as `self`, but syntactic binding forms
     /// may replace it with an extended version.
     fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnosic: &Handler,
-        expand: &Expander) -> ExpansionResult;
+        expand: &dyn Expander) -> ExpansionResult;
 }
 
 /// Result of macro expansion.

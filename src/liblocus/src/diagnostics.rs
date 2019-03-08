@@ -62,12 +62,12 @@ pub trait Reporter {
 /// Convenience wrapper for reporting diagnostics.
 pub struct Handler {
     /// Internal reporter implementation.
-    reporter: RefCell<Box<Reporter>>,
+    reporter: RefCell<Box<dyn Reporter>>,
 }
 
 impl Handler {
     /// Construct a new Handler for a given reporter.
-    pub fn with_reporter(reporter: Box<Reporter>) -> Handler {
+    pub fn with_reporter(reporter: Box<dyn Reporter>) -> Handler {
         Handler {
             reporter: RefCell::new(reporter),
         }

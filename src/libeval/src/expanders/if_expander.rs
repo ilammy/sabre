@@ -33,7 +33,7 @@ impl IfExpander {
 }
 
 impl Expander for IfExpander {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &dyn Expander) -> ExpansionResult {
         use crate::expanders::utils::{is_named_form, expect_list_length_fixed, missing_last_span};
 
         // Filter out anything that certainly does not look as a if form.

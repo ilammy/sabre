@@ -9,9 +9,6 @@
 //!
 //! This verifies that the parser recognizes all expected expressions and errors.
 
-extern crate liblocus;
-extern crate libreader;
-
 use liblocus::diagnostics::{DiagnosticKind};
 use libreader::intern_pool::{InternPool};
 use libreader::lexer::{StringScanner};

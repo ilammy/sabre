@@ -9,9 +9,6 @@
 //!
 //! This crate contains definitions of core Scheme expressions and a crude evaluator of them.
 
-extern crate liblocus;
-extern crate libreader;
-
 pub mod expression;
 pub mod expanders;
 pub mod meaning;

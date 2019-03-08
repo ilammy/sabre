@@ -30,7 +30,7 @@ impl ApplicationExpander {
 }
 
 impl Expander for ApplicationExpander {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &dyn Expander) -> ExpansionResult {
         use crate::expanders::utils::{is_form, expect_list_length_at_least};
 
         // Filter out anything that certainly does not look as a form.

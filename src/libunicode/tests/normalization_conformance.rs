@@ -13,8 +13,6 @@
 //!
 //! This module contains normalization self-tests based on NormalizationTest.txt from UCD.
 
-extern crate libunicode;
-
 use std::char;
 use std::string::ToString;
 

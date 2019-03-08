@@ -9,9 +9,6 @@
 //!
 //! This verifies that the lexer recognizes all expected tokens and errors.
 
-extern crate liblocus;
-extern crate libreader;
-
 mod utils;
 
 use liblocus::diagnostics::{Span, Diagnostic, DiagnosticKind};

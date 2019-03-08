@@ -33,7 +33,7 @@ impl SetExpander {
 }
 
 impl Expander for SetExpander {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &dyn Expander) -> ExpansionResult {
         use crate::expanders::utils::{is_named_form, expect_list_length_fixed};
 
         // Filter out anything that certainly does not look as a set! form.
@@ -84,7 +84,7 @@ fn expand_variable(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Option
 /// Expand the subexpression denoting variable value in a set! expression.
 ///
 /// In case of errors return an #f literal as a placeholder.
-fn expand_value(datum: &ScannedDatum, term: Option<&ScannedDatum>, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> Expression {
+fn expand_value(datum: &ScannedDatum, term: Option<&ScannedDatum>, environment: &Rc<Environment>, diagnostic: &Handler, expander: &dyn Expander) -> Expression {
     use crate::expanders::utils::missing_last_span;
 
     if let Some(term) = term {

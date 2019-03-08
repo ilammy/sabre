@@ -202,7 +202,7 @@ impl<'a> StringScanner<'a> {
             '|' => {
                 self.scan_escaped_identifier()
             }
-            '0'...'9' => {
+            '0'..='9' => {
                 self.scan_number_literal()
             }
             '-' | '+' => {
@@ -1649,7 +1649,7 @@ fn is_exponent_marker(c: char) -> bool {
 fn is_identifier_initial(c: char) -> bool {
     match c {
         // <letter>
-        'A'...'Z' | 'a'...'z' => true,
+        'A'..='Z' | 'a'..='z' => true,
         // <special-initial>
         '!' | '$' | '%' | '&' | '*' | '/' | ':' |
         '<' | '=' | '>' | '?' | '^' | '_' | '~' => true,
@@ -1667,7 +1667,7 @@ fn is_identifier_subsequent(c: char) -> bool {
         // <initial>
         c if is_identifier_initial(c) => true,
         // <digit>
-        '0'...'9' => true,
+        '0'..='9' => true,
         // anything else is not allowed to be used in identifiers
         _ => false,
     }

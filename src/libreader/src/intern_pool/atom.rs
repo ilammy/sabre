@@ -88,7 +88,7 @@ fn set_dynamic_cell<'a, T>(cell: &'a DynamicCell<T>, new_value: &'a T) -> Dynami
     }
 }
 
-struct DynamicSetGuard<'a, T: 'a> {
+struct DynamicSetGuard<'a, T> {
     old_value: Option<*const T>,
     cell: &'a DynamicCell<T>,
 }

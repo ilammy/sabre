@@ -9,9 +9,6 @@
 //!
 //! This verifies that the basic semantics of Scheme is handled as expected.
 
-extern crate libeval;
-extern crate liblocus;
-extern crate libreader;
 
 use libeval::meaning::{meaning, MeaningResult, Value};
 
@@ -27,7 +24,7 @@ use libeval::environment::{Environment};
 use liblocus::diagnostics::{DiagnosticKind};
 use libreader::intern_pool::{InternPool};
 
-fn standard_scheme(pool: &InternPool) -> Box<Expander> {
+fn standard_scheme(pool: &InternPool) -> Box<dyn Expander> {
     Box::new(
         ExpanderStack::new(Box::new(BasicExpander::new()))
             .push(Box::new(ApplicationExpander::new()))
@@ -384,7 +381,7 @@ use libeval::expression::{Expression};
 struct TestCase {
     input: Option<String>,
     expected_meaning: Option<String>,
-    constant_generator: Option<Box<Fn(&InternPool) -> Vec<Value>>>,
+    constant_generator: Option<Box<dyn Fn(&InternPool) -> Vec<Value>>>,
     expected_diagnostics: Vec<Diagnostic>,
 }
 
@@ -433,7 +430,7 @@ impl TestCase {
 
 /// TODO
 fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic],
-    constant_generator: Option<&Fn(&InternPool) -> Vec<Value>>)
+    constant_generator: Option<&dyn Fn(&InternPool) -> Vec<Value>>)
 {
     let pool = InternPool::new();
 
