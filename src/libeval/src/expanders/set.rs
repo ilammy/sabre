@@ -13,9 +13,9 @@ use liblocus::diagnostics::{Handler, DiagnosticKind};
 use libreader::datum::{ScannedDatum, DatumValue};
 use libreader::intern_pool::{Atom};
 
-use environment::{Environment};
-use expression::{Expression, ExpressionKind, Literal, Variable};
-use expanders::{Expander, ExpansionResult};
+use crate::environment::{Environment};
+use crate::expression::{Expression, ExpressionKind, Literal, Variable};
+use crate::expanders::{Expander, ExpansionResult};
 
 /// Expand `set!` special forms into assignments.
 pub struct SetExpander {
@@ -34,7 +34,7 @@ impl SetExpander {
 
 impl Expander for SetExpander {
     fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
-        use expanders::utils::{is_named_form, expect_list_length_fixed};
+        use crate::expanders::utils::{is_named_form, expect_list_length_fixed};
 
         // Filter out anything that certainly does not look as a set! form.
         let (dotted, values) = match is_named_form(datum, self.name) {
@@ -85,7 +85,7 @@ fn expand_variable(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Option
 ///
 /// In case of errors return an #f literal as a placeholder.
 fn expand_value(datum: &ScannedDatum, term: Option<&ScannedDatum>, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> Expression {
-    use expanders::utils::missing_last_span;
+    use crate::expanders::utils::missing_last_span;
 
     if let Some(term) = term {
         if let ExpansionResult::Some(expression) = expander.expand(term, environment, diagnostic, expander) {

@@ -13,9 +13,9 @@ use liblocus::diagnostics::{Handler, DiagnosticKind};
 use libreader::datum::{ScannedDatum};
 use libreader::intern_pool::{Atom};
 
-use environment::{Environment};
-use expression::{Expression, ExpressionKind, Literal};
-use expanders::{Expander, ExpansionResult};
+use crate::environment::{Environment};
+use crate::expression::{Expression, ExpressionKind, Literal};
+use crate::expanders::{Expander, ExpansionResult};
 
 /// Expand `if` special forms into alternatives.
 pub struct IfExpander {
@@ -34,7 +34,7 @@ impl IfExpander {
 
 impl Expander for IfExpander {
     fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
-        use expanders::utils::{is_named_form, expect_list_length_fixed, missing_last_span};
+        use crate::expanders::utils::{is_named_form, expect_list_length_fixed, missing_last_span};
 
         // Filter out anything that certainly does not look as a if form.
         let (dotted, values) = match is_named_form(datum, self.name) {

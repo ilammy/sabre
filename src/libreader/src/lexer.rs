@@ -14,8 +14,8 @@ use std::char;
 
 use liblocus::diagnostics::{Span, Handler, DiagnosticKind};
 
-use intern_pool::{InternPool};
-use tokens::{Token, ParenType};
+use crate::intern_pool::{InternPool};
+use crate::tokens::{Token, ParenType};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Helper data structures

@@ -9,7 +9,7 @@
 //!
 //! This module contains definitions of tokens recognized and processed by Scheme reader.
 
-use intern_pool::Atom;
+use crate::intern_pool::Atom;
 
 /// Types of tokens recognized by the scanner.
 #[derive(Debug, PartialEq, Eq, Clone)]

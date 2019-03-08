@@ -38,7 +38,7 @@ impl Span {
 // Diagnostics
 //
 
-pub use diagnostic_kinds::DiagnosticKind;
+pub use crate::diagnostic_kinds::DiagnosticKind;
 
 /// A reported diagnostic.
 #[derive(Debug, Clone, PartialEq, Eq)]

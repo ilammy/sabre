@@ -13,9 +13,9 @@ use liblocus::diagnostics::{Handler, DiagnosticKind, Span};
 use libreader::datum::{ScannedDatum, DatumValue};
 use libreader::intern_pool::{Atom};
 
-use environment::{Environment};
-use expression::{Expression, ExpressionKind};
-use expanders::{Expander, ExpansionResult};
+use crate::environment::{Environment};
+use crate::expression::{Expression, ExpressionKind};
+use crate::expanders::{Expander, ExpansionResult};
 
 /// Expand `quote` special forms into quotations.
 pub struct QuoteExpander {
@@ -34,7 +34,7 @@ impl QuoteExpander {
 
 impl Expander for QuoteExpander {
     fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, _expand: &Expander) -> ExpansionResult {
-        use expanders::utils::{is_named_form, expect_list_length_fixed};
+        use crate::expanders::utils::{is_named_form, expect_list_length_fixed};
 
         // Filter out anything that certainly does not look as a quote form.
         let (dotted, values) = match is_named_form(datum, self.name) {

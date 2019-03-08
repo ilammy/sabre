@@ -13,7 +13,7 @@ use std::fmt;
 
 use liblocus::diagnostics::{Span};
 
-use intern_pool::Atom;
+use crate::intern_pool::Atom;
 
 /// A scanned datum with extents information. An AST node, if you with.
 #[derive(PartialEq, Eq, Clone)]
@@ -70,7 +70,7 @@ impl fmt::Debug for ScannedDatum {
 
 impl fmt::Debug for DatumValue {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use format::{write_list, write_dotted_list};
+        use crate::format::{write_list, write_dotted_list};
 
         match *self {
             DatumValue::Boolean(value) =>

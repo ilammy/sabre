@@ -14,8 +14,9 @@
 //! [UAX-15]: http://www.unicode.org/reports/tr15/
 
 use std::iter::{FromIterator, IntoIterator};
-use tables::{decomposition_mappings, composition_mappings};
-use util::charcc;
+
+use crate::tables::{decomposition_mappings, composition_mappings};
+use crate::util::charcc;
 
 //
 // Definitions of Normalization Forms
@@ -71,8 +72,8 @@ enum NormalizationForm { C, D, KC, KD }
 
 /// Check whether a string is already in the specified normalization form.
 fn already_normalized(s: &str, form: NormalizationForm) -> bool {
-    use tables::character_properties::canonical_combining_class as ccc;
-    use tables::{quick_check};
+    use crate::tables::character_properties::canonical_combining_class as ccc;
+    use crate::tables::{quick_check};
 
     let mut last_ccc = 0;
 

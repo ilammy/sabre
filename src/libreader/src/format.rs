@@ -21,16 +21,16 @@ pub fn write_list<I, T>(f: &mut fmt::Formatter, prefix: &str, items: I, sep: &st
 {
     let mut first = true;
 
-    try!(f.write_str(prefix));
+    f.write_str(prefix)?;
     for item in items {
         if first {
             first = false;
         } else {
-            try!(f.write_str(sep));
+            f.write_str(sep)?;
         }
-        try!(write!(f, "{:?}", item));
+        write!(f, "{:?}", item)?;
     }
-    try!(f.write_str(suffix));
+    f.write_str(suffix)?;
 
     return Ok(());
 }
@@ -47,7 +47,7 @@ pub fn write_dotted_list<I, T>(f: &mut fmt::Formatter, prefix: &str, items: I, s
     let mut curr = iter.next();
     let mut first = true;
 
-    try!(f.write_str(prefix));
+    f.write_str(prefix)?;
     while let Some(item) = curr {
         let next = iter.next();
 
@@ -55,18 +55,18 @@ pub fn write_dotted_list<I, T>(f: &mut fmt::Formatter, prefix: &str, items: I, s
             first = false;
         } else {
             if next.is_some() {
-                try!(f.write_str(sep));
+                f.write_str(sep)?;
             } else {
-                try!(f.write_str(sep));
-                try!(f.write_str("."));
-                try!(f.write_str(sep));
+                f.write_str(sep)?;
+                f.write_str(".")?;
+                f.write_str(sep)?;
             }
         }
-        try!(write!(f, "{:?}", item));
+        write!(f, "{:?}", item)?;
 
         curr = next;
     }
-    try!(f.write_str(suffix));
+    f.write_str(suffix)?;
 
     return Ok(());
 }

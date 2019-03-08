@@ -26,7 +26,7 @@ impl charcc {
     /// This is for cases where you know only the codepoint. The function will lookup correct
     /// canonical combining class for you.
     pub fn from_char(c: char) -> charcc {
-        use tables::character_properties::canonical_combining_class as ccc;
+        use crate::tables::character_properties::canonical_combining_class as ccc;
 
         Self::from_char_with_ccc(c, ccc(c))
     }
@@ -64,7 +64,7 @@ impl charcc {
 
     fn valid_charcc(value: u32) -> bool {
         use std::char;
-        use tables::character_properties::canonical_combining_class as compute_ccc;
+        use crate::tables::character_properties::canonical_combining_class as compute_ccc;
 
         let ccc = value >> 24;
         let codepoint = value & 0x00FFFFFF;

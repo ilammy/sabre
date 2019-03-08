@@ -12,10 +12,10 @@
 
 use liblocus::diagnostics::{Span, Handler, DiagnosticKind};
 
-use datum::{ScannedDatum, DatumValue};
-use intern_pool::{Atom, InternPool};
-use lexer::{Scanner, ScannedToken};
-use tokens::{Token, ParenType};
+use crate::datum::{ScannedDatum, DatumValue};
+use crate::intern_pool::{Atom, InternPool};
+use crate::lexer::{Scanner, ScannedToken};
+use crate::tokens::{Token, ParenType};
 
 /// Data parser.
 ///
@@ -282,7 +282,7 @@ impl<'a> Parser<'a> {
 
         // Then skip the same number of data.
         while let Some(start_span) = start_spans.pop() {
-            try!(self.next_datum_required(start_span));
+            self.next_datum_required(start_span)?;
         }
 
         return Ok(None);

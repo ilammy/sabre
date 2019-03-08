@@ -13,9 +13,9 @@ use liblocus::diagnostics::{Handler, DiagnosticKind, Span};
 use libreader::datum::{ScannedDatum, DatumValue};
 use libreader::intern_pool::{Atom};
 
-use environment::{Environment};
-use expression::{Expression, ExpressionKind, Variable, Arguments};
-use expanders::{Expander, ExpansionResult};
+use crate::environment::{Environment};
+use crate::expression::{Expression, ExpressionKind, Variable, Arguments};
+use crate::expanders::{Expander, ExpansionResult};
 
 /// Expand `lambda` special forms into abstractions.
 pub struct LambdaExpander {
@@ -34,7 +34,7 @@ impl LambdaExpander {
 
 impl Expander for LambdaExpander {
     fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
-        use expanders::utils::{is_named_form, expect_list_length_at_least};
+        use crate::expanders::utils::{is_named_form, expect_list_length_at_least};
 
         // Filter out anything that certainly does not look as a lambda form.
         let (dotted, values) = match is_named_form(datum, self.name) {

@@ -1743,7 +1743,7 @@ pub mod character_properties {
 /// This module contains definitions of derived properties used during the composition stage
 /// of Unicode normalization algorithms.
 pub mod composition_mappings {
-    use util::charcc;
+    use crate::util::charcc;
 
     /// Get a primary composite of `c1` of `c2` if it exists.
     ///
@@ -2436,7 +2436,7 @@ pub mod composition_mappings {
 /// This module contains definitions of derived properties used during the decomposition stage
 /// of Unicode normalization algorithms.
 pub mod decomposition_mappings {
-    use util::charcc;
+    use crate::util::charcc;
 
     /// Get full canonical decomposition of character `c`.
     ///

@@ -14,7 +14,7 @@ use liblocus::diagnostics::{Span};
 use libreader::datum::{ScannedDatum};
 use libreader::intern_pool::{Atom};
 
-use environment::{Environment};
+use crate::environment::{Environment};
 
 /// Scheme core expression.
 pub struct Expression {
@@ -108,27 +108,27 @@ impl fmt::Debug for Expression {
             ExpressionKind::Assignment(ref variable, ref value) =>
                 write!(f, "(Assignment {:?} {:?})", variable.name, value),
             ExpressionKind::Sequence(ref body) => {
-                try!(write!(f, "(Sequence"));
+                write!(f, "(Sequence")?;
                 for expression in body {
-                    try!(write!(f, " {:?}", expression));
+                    write!(f, " {:?}", expression)?;
                 }
-                try!(write!(f, ")"));
+                write!(f, ")")?;
                 Ok(())
             }
             ExpressionKind::Abstraction(ref arguments, ref body) => {
-                try!(write!(f, "(Abstraction {:?}", arguments));
+                write!(f, "(Abstraction {:?}", arguments)?;
                 for expression in body {
-                    try!(write!(f, " {:?}", expression));
+                    write!(f, " {:?}", expression)?;
                 }
-                try!(write!(f, ")"));
+                write!(f, ")")?;
                 Ok(())
             }
             ExpressionKind::Application(ref terms) => {
-                try!(write!(f, "(Application"));
+                write!(f, "(Application")?;
                 for expression in terms {
-                    try!(write!(f, " {:?}", expression));
+                    write!(f, " {:?}", expression)?;
                 }
-                try!(write!(f, ")"));
+                write!(f, ")")?;
                 Ok(())
             }
         }

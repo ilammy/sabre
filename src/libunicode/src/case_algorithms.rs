@@ -17,8 +17,8 @@
 //!
 //! [US-3]: http://www.unicode.org/versions/latest/ch03.pdf
 
-use normalization;
-use tables::case_mappings;
+use crate::normalization;
+use crate::tables::case_mappings;
 
 //
 // Default Case Folding

@@ -11,7 +11,7 @@ use std::rc::{Rc};
 
 use libreader::intern_pool::{Atom};
 
-use expression::{Variable};
+use crate::expression::{Variable};
 
 /// Lexical environment.
 ///

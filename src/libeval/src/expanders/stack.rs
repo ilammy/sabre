@@ -12,8 +12,8 @@ use std::rc::{Rc};
 use liblocus::diagnostics::{Handler};
 use libreader::datum::{ScannedDatum};
 
-use environment::{Environment};
-use expanders::{Expander, ExpansionResult};
+use crate::environment::{Environment};
+use crate::expanders::{Expander, ExpansionResult};
 
 /// Macro expander stack.
 ///

@@ -10,7 +10,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use diagnostics::{Diagnostic, Reporter, Handler};
+use crate::diagnostics::{Diagnostic, Reporter, Handler};
 
 /// A simple Reporter collecting diagnostics.
 struct SinkReporter {
@@ -53,7 +53,7 @@ pub fn collect_diagnostics<T, F>(body: F) -> (T, Vec<Diagnostic>)
 mod tests {
     use super::*;
 
-    use diagnostics::{Diagnostic, DiagnosticKind, Span};
+    use crate::diagnostics::{Diagnostic, DiagnosticKind, Span};
 
     #[test]
     fn collect_none() {

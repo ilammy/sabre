@@ -9,7 +9,7 @@ use std::cell::UnsafeCell;
 use std::fmt;
 use std::mem;
 
-use intern_pool::InternPool;
+use crate::intern_pool::InternPool;
 
 /// An interned string representation.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Ord, PartialOrd)]
@@ -105,7 +105,7 @@ impl<'a, T> Drop for DynamicSetGuard<'a, T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use intern_pool::InternPool;
+    use crate::intern_pool::InternPool;
 
     #[test]
     fn debug_format_default() {

@@ -12,9 +12,9 @@ use std::rc::{Rc};
 use liblocus::diagnostics::{Handler, DiagnosticKind, Span};
 use libreader::datum::{ScannedDatum, DatumValue};
 
-use environment::{Environment};
-use expression::{Expression, ExpressionKind, Literal};
-use expanders::{Expander, ExpansionResult};
+use crate::environment::{Environment};
+use crate::expression::{Expression, ExpressionKind, Literal};
+use crate::expanders::{Expander, ExpansionResult};
 
 /// Basic expander.
 ///

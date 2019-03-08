@@ -18,8 +18,8 @@ use liblocus::diagnostics::{Span, Handler, DiagnosticKind};
 use libreader::datum::{ScannedDatum, DatumValue};
 use libreader::intern_pool::{Atom};
 
-use expression::{Expression, ExpressionKind, Literal, Variable, Arguments};
-use environment::{Environment, VariableKind};
+use crate::expression::{Expression, ExpressionKind, Literal, Variable, Arguments};
+use crate::environment::{Environment, VariableKind};
 
 pub struct Meaning {
     pub kind: MeaningKind,
@@ -66,21 +66,21 @@ impl fmt::Debug for Meaning {
             MeaningKind::GlobalSet(index, ref value) =>
                 write!(f, "(GlobalSet {} {:?})", index, value),
             MeaningKind::Sequence(ref computations) => {
-                try!(write!(f, "(Sequence"));
+                write!(f, "(Sequence")?;
                 for c in computations {
-                    try!(write!(f, " {:?}", c));
+                    write!(f, " {:?}", c)?;
                 }
-                try!(write!(f, ")"));
+                write!(f, ")")?;
                 Ok(())
             }
             MeaningKind::ClosureFixed(arg_count, ref body) =>
                 write!(f, "(ClosureFixed {} {:?})", arg_count, body),
             MeaningKind::ProcedureCall(ref procedure, ref args) => {
-                try!(write!(f, "(ProcedureCall {:?}", procedure));
+                write!(f, "(ProcedureCall {:?}", procedure)?;
                 for a in args {
-                    try!(write!(f, " {:?}", a));
+                    write!(f, " {:?}", a)?;
                 }
-                try!(write!(f, ")"));
+                write!(f, ")")?;
                 Ok(())
             }
         }

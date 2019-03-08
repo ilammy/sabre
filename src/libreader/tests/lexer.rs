@@ -3926,7 +3926,7 @@ fn no_unicode_numbers_no_normalization() {
 
 use std::fmt::Write;
 
-use utils::diff::sequence::{self, Diff};
+use crate::utils::diff::sequence::{self, Diff};
 
 struct ScannerTestDiagnostic {
     pub from: usize,

@@ -12,9 +12,9 @@ use std::rc::{Rc};
 use liblocus::diagnostics::{Handler, DiagnosticKind};
 use libreader::datum::{ScannedDatum};
 
-use environment::{Environment};
-use expression::{Expression, ExpressionKind};
-use expanders::{Expander, ExpansionResult};
+use crate::environment::{Environment};
+use crate::expression::{Expression, ExpressionKind};
+use crate::expanders::{Expander, ExpansionResult};
 
 /// Expand all procedure calls into applications.
 ///
@@ -31,7 +31,7 @@ impl ApplicationExpander {
 
 impl Expander for ApplicationExpander {
     fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &Expander) -> ExpansionResult {
-        use expanders::utils::{is_form, expect_list_length_at_least};
+        use crate::expanders::utils::{is_form, expect_list_length_at_least};
 
         // Filter out anything that certainly does not look as a form.
         let (dotted, values) = match is_form(datum) {
