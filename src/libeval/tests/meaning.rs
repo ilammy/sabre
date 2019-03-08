@@ -9,25 +9,23 @@
 //!
 //! This verifies that the basic semantics of Scheme is handled as expected.
 
-extern crate eval;
-extern crate locus;
-extern crate reader;
-
-use eval::meaning::{meaning, MeaningResult, Value};
+use libeval::meaning::{meaning, MeaningResult, Value};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Tested expanders and environments
 
-use std::rc::{Rc};
+use std::rc::Rc;
 
-use eval::expanders::{Expander, ExpanderStack, BasicExpander, ApplicationExpander,
-    QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
-use eval::expression::{Variable};
-use eval::environment::{Environment};
-use locus::diagnostics::{DiagnosticKind};
-use reader::intern_pool::{InternPool};
+use libeval::environment::Environment;
+use libeval::expanders::{
+    ApplicationExpander, BasicExpander, BeginExpander, Expander, ExpanderStack, IfExpander,
+    LambdaExpander, QuoteExpander, SetExpander,
+};
+use libeval::expression::Variable;
+use liblocus::diagnostics::DiagnosticKind;
+use libreader::intern_pool::InternPool;
 
-fn standard_scheme(pool: &InternPool) -> Box<Expander> {
+fn standard_scheme(pool: &InternPool) -> Box<dyn Expander> {
     Box::new(
         ExpanderStack::new(Box::new(BasicExpander::new()))
             .push(Box::new(ApplicationExpander::new()))
@@ -359,32 +357,34 @@ fn application_nested() {
 fn application_closed() {
     TestCase::new()
         .input("((lambda (a b) (cons a b)) 111 222)")
-        .meaning("(Sequence \
-                    (ProcedureCall (ClosureFixed 2 \
-                                    (Sequence \
-                                      (ProcedureCall (ImportedReference 2) \
-                                        (ShallowArgumentReference 0) \
-                                        (ShallowArgumentReference 1)))) \
-                      (Constant 0) \
-                      (Constant 1)))")
+        .meaning(
+            "(Sequence \
+             (ProcedureCall (ClosureFixed 2 \
+             (Sequence \
+             (ProcedureCall (ImportedReference 2) \
+             (ShallowArgumentReference 0) \
+             (ShallowArgumentReference 1)))) \
+             (Constant 0) \
+             (Constant 1)))",
+        )
         .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use locus::diagnostics::{Diagnostic, Span};
-use reader::datum::{ScannedDatum};
-use reader::lexer::{StringScanner};
-use reader::parser::{Parser};
-use eval::expanders::{ExpansionResult};
-use eval::expression::{Expression};
+use libeval::expanders::ExpansionResult;
+use libeval::expression::Expression;
+use liblocus::diagnostics::{Diagnostic, Span};
+use libreader::datum::ScannedDatum;
+use libreader::lexer::StringScanner;
+use libreader::parser::Parser;
 
 #[derive(Default)]
 struct TestCase {
     input: Option<String>,
     expected_meaning: Option<String>,
-    constant_generator: Option<Box<Fn(&InternPool) -> Vec<Value>>>,
+    constant_generator: Option<Box<dyn Fn(&InternPool) -> Vec<Value>>>,
     expected_diagnostics: Vec<Diagnostic>,
 }
 
@@ -433,7 +433,7 @@ impl TestCase {
 
 /// TODO
 fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic],
-    constant_generator: Option<&Fn(&InternPool) -> Vec<Value>>)
+    constant_generator: Option<&dyn Fn(&InternPool) -> Vec<Value>>)
 {
     let pool = InternPool::new();
 
@@ -452,7 +452,7 @@ fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic],
 }
 
 fn parse(pool: &InternPool, input: &str) -> Vec<ScannedDatum> {
-    use locus::utils::collect_diagnostics;
+    use liblocus::utils::collect_diagnostics;
 
     let (data, parsing_diagnostics) = collect_diagnostics(|handler| {
         let scanner = Box::new(StringScanner::new(input, handler, pool));
@@ -471,7 +471,7 @@ fn parse(pool: &InternPool, input: &str) -> Vec<ScannedDatum> {
 }
 
 fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
-    use locus::utils::collect_diagnostics;
+    use liblocus::utils::collect_diagnostics;
 
     let (expansion_result, expansion_diagnostics) = collect_diagnostics(|handler| {
         let environment = basic_scheme_environment(pool);
@@ -492,7 +492,7 @@ fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
 }
 
 fn treat(expressions: &[Expression]) -> (MeaningResult, Vec<Diagnostic>) {
-    use locus::utils::collect_diagnostics;
+    use liblocus::utils::collect_diagnostics;
 
     collect_diagnostics(|handler| {
         return meaning(handler, expressions);

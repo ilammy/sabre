@@ -9,13 +9,12 @@
 //!
 //! This verifies that the lexer recognizes all expected tokens and errors.
 
-extern crate locus;
-extern crate reader;
+mod utils;
 
-use locus::diagnostics::{Span, Diagnostic, DiagnosticKind};
-use reader::intern_pool::{InternPool};
-use reader::lexer::{ScannedToken, StringScanner, Scanner};
-use reader::tokens::{Token, ParenType};
+use liblocus::diagnostics::{Diagnostic, DiagnosticKind, Span};
+use libreader::intern_pool::InternPool;
+use libreader::lexer::{ScannedToken, Scanner, StringScanner};
+use libreader::tokens::{ParenType, Token};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test macro helpers
@@ -3924,7 +3923,7 @@ fn no_unicode_numbers_no_normalization() {
 
 use std::fmt::Write;
 
-use reader::test_utils::diff::sequence::{self, Diff};
+use crate::utils::diff::sequence::{self, Diff};
 
 struct ScannerTestDiagnostic {
     pub from: usize,
@@ -4024,7 +4023,7 @@ fn compute_expected_results(test_slices: &[ScannerTestSlice]) -> ScannerTestResu
 
 /// Scan over the string and remember all produced tokens and diagnostics.
 fn compute_scanning_results(string: &str, pool: &InternPool) -> ScannerTestResults {
-    use locus::utils::collect_diagnostics;
+    use liblocus::utils::collect_diagnostics;
 
     let (tokens, diagnostics) = collect_diagnostics(|handler| {
         let mut tokens = Vec::new();

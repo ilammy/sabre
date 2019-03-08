@@ -9,17 +9,17 @@
 //!
 //! This verifies that the basic syntax of Scheme is handled as expected.
 
-extern crate eval;
-extern crate locus;
-extern crate reader;
+use std::rc::Rc;
 
-use std::rc::{Rc};
-
-use eval::environment::{Environment};
-use eval::expanders::{Expander, ExpansionResult, ExpanderStack, BasicExpander,
-    ApplicationExpander, QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
-use locus::diagnostics::{DiagnosticKind};
-use reader::intern_pool::{InternPool};
+use libeval::{
+    environment::Environment,
+    expanders::{
+        ApplicationExpander, BasicExpander, BeginExpander, Expander, ExpanderStack,
+        ExpansionResult, IfExpander, LambdaExpander, QuoteExpander, SetExpander,
+    },
+};
+use liblocus::diagnostics::DiagnosticKind;
+use libreader::intern_pool::InternPool;
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Tested expanders
@@ -705,21 +705,23 @@ fn application_non_reference() {
 fn altogether() {
     TestCase::new()
         .input("(lambda (a b) (if a (begin (set! a 9) (+ b c)) (print '(17 #(x)))))")
-        .result("(Abstraction (a b) \
-                   (Alternative (Reference a) \
-                     (Sequence \
-                      (Assignment a (Literal 9)) \
-                      (Application (Reference +) (Reference b) (Reference c))) \
-                     (Application (Reference print) (Quotation (17 #(x))))))")
+        .result(
+            "(Abstraction (a b) \
+             (Alternative (Reference a) \
+             (Sequence \
+             (Assignment a (Literal 9)) \
+             (Application (Reference +) (Reference b) (Reference c))) \
+             (Application (Reference print) (Quotation (17 #(x))))))",
+        )
         .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use locus::diagnostics::{Span, Diagnostic};
-use reader::lexer::{StringScanner};
-use reader::parser::{Parser};
+use liblocus::diagnostics::{Diagnostic, Span};
+use libreader::lexer::StringScanner;
+use libreader::parser::Parser;
 
 #[derive(Default)]
 struct TestCase {
@@ -773,8 +775,8 @@ impl TestCase {
 /// Check whether the given expander produces expected results and reports expected diagnostics.
 /// Panic if this is not true.
 fn check(expander_factory: &SchemeBase, input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
-    use locus::utils::collect_diagnostics;
-    use reader::intern_pool::with_formatting_pool;
+    use liblocus::utils::collect_diagnostics;
+    use libreader::intern_pool::with_formatting_pool;
 
     let pool = InternPool::new();
 

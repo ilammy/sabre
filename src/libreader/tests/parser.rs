@@ -9,13 +9,10 @@
 //!
 //! This verifies that the parser recognizes all expected expressions and errors.
 
-extern crate locus;
-extern crate reader;
-
-use locus::diagnostics::{DiagnosticKind};
-use reader::intern_pool::{InternPool};
-use reader::lexer::{StringScanner};
-use reader::parser::{Parser};
+use liblocus::diagnostics::DiagnosticKind;
+use libreader::intern_pool::InternPool;
+use libreader::lexer::StringScanner;
+use libreader::parser::Parser;
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Smoke test of test harness
@@ -1079,7 +1076,7 @@ fn unmatched_paren_after_misplaced_dot() {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use locus::diagnostics::{Diagnostic, Span};
+use liblocus::diagnostics::{Diagnostic, Span};
 
 #[derive(Default)]
 struct TestCase {
@@ -1125,8 +1122,8 @@ impl TestCase {
 /// when given a sequence of tokens produced from a given string by `StringScanner`.
 /// Panic if this is not true.
 fn check(input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
-    use locus::utils::collect_diagnostics;
-    use reader::intern_pool::with_formatting_pool;
+    use liblocus::utils::collect_diagnostics;
+    use libreader::intern_pool::with_formatting_pool;
 
     let pool = InternPool::new();
 
