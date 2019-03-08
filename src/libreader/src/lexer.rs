@@ -1728,8 +1728,6 @@ fn normalize_case_sensitive_identifier(s: &str) -> String {
 /// Normalize a string as a case-insensitive identifier.
 #[cfg(not(feature = "unicode"))]
 fn normalize_case_insensitive_identifier(s: &str) -> String {
-    use std::ascii::AsciiExt;
-
     s.to_ascii_lowercase()
 }
 
@@ -1845,8 +1843,6 @@ fn looks_like_number_prefix(s: &str, radix: u8) -> bool {
 
 /// Return true if `s` has a given ASCII prefix ignoring case.
 fn has_ascii_prefix_ci(s: &str, prefix: &str) -> bool {
-    use std::ascii::AsciiExt;
-
     assert!(prefix.chars().all(|c| c.is_ascii() && c == c.to_ascii_lowercase()));
 
     s.chars()
