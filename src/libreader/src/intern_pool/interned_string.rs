@@ -5,10 +5,10 @@
 // at your option. This file may be copied, distributed, and modified only
 // in accordance with the terms specified by the chosen license.
 
-use std::borrow;
-use std::cmp;
+use std::borrow::Borrow;
+use std::cmp::{Ord, Ordering};
 use std::fmt;
-use std::ops;
+use std::ops::Deref;
 use std::rc::Rc;
 
 /// Value of an interned string.
@@ -34,8 +34,8 @@ impl InternedString {
     }
 }
 
-impl cmp::Ord for InternedString {
-    fn cmp(&self, other: &InternedString) -> cmp::Ordering {
+impl Ord for InternedString {
+    fn cmp(&self, other: &InternedString) -> Ordering {
         self[..].cmp(&other[..])
     }
 }
@@ -52,13 +52,13 @@ impl fmt::Display for InternedString {
     }
 }
 
-impl borrow::Borrow<str> for InternedString {
+impl Borrow<str> for InternedString {
     fn borrow(&self) -> &str {
         &self.data[..]
     }
 }
 
-impl ops::Deref for InternedString {
+impl Deref for InternedString {
     type Target = str;
 
     fn deref(&self) -> &str { &self.data[..] }

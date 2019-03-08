@@ -7,11 +7,11 @@
 
 //! Lexical environments.
 
-use std::rc::{Rc};
+use std::rc::Rc;
 
-use libreader::intern_pool::{Atom};
+use libreader::intern_pool::Atom;
 
-use crate::expression::{Variable};
+use crate::expression::Variable;
 
 /// Lexical environment.
 ///

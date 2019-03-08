@@ -11,7 +11,7 @@
 
 use std::fmt;
 
-use liblocus::diagnostics::{Span};
+use liblocus::diagnostics::Span;
 
 use crate::intern_pool::Atom;
 

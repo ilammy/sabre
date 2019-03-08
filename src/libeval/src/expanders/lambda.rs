@@ -7,15 +7,15 @@
 
 //! `lambda` expander.
 
-use std::rc::{Rc};
+use std::rc::Rc;
 
-use liblocus::diagnostics::{Handler, DiagnosticKind, Span};
-use libreader::datum::{ScannedDatum, DatumValue};
-use libreader::intern_pool::{Atom};
+use liblocus::diagnostics::{DiagnosticKind, Handler, Span};
+use libreader::datum::{DatumValue, ScannedDatum};
+use libreader::intern_pool::Atom;
 
-use crate::environment::{Environment};
-use crate::expression::{Expression, ExpressionKind, Variable, Arguments};
+use crate::environment::Environment;
 use crate::expanders::{Expander, ExpansionResult};
+use crate::expression::{Arguments, Expression, ExpressionKind, Variable};
 
 /// Expand `lambda` special forms into abstractions.
 pub struct LambdaExpander {

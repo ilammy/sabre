@@ -9,20 +9,21 @@
 //!
 //! This verifies that the basic semantics of Scheme is handled as expected.
 
-
 use libeval::meaning::{meaning, MeaningResult, Value};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Tested expanders and environments
 
-use std::rc::{Rc};
+use std::rc::Rc;
 
-use libeval::expanders::{Expander, ExpanderStack, BasicExpander, ApplicationExpander,
-    QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
-use libeval::expression::{Variable};
-use libeval::environment::{Environment};
-use liblocus::diagnostics::{DiagnosticKind};
-use libreader::intern_pool::{InternPool};
+use libeval::environment::Environment;
+use libeval::expanders::{
+    ApplicationExpander, BasicExpander, BeginExpander, Expander, ExpanderStack, IfExpander,
+    LambdaExpander, QuoteExpander, SetExpander,
+};
+use libeval::expression::Variable;
+use liblocus::diagnostics::DiagnosticKind;
+use libreader::intern_pool::InternPool;
 
 fn standard_scheme(pool: &InternPool) -> Box<dyn Expander> {
     Box::new(
@@ -356,26 +357,28 @@ fn application_nested() {
 fn application_closed() {
     TestCase::new()
         .input("((lambda (a b) (cons a b)) 111 222)")
-        .meaning("(Sequence \
-                    (ProcedureCall (ClosureFixed 2 \
-                                    (Sequence \
-                                      (ProcedureCall (ImportedReference 2) \
-                                        (ShallowArgumentReference 0) \
-                                        (ShallowArgumentReference 1)))) \
-                      (Constant 0) \
-                      (Constant 1)))")
+        .meaning(
+            "(Sequence \
+             (ProcedureCall (ClosureFixed 2 \
+             (Sequence \
+             (ProcedureCall (ImportedReference 2) \
+             (ShallowArgumentReference 0) \
+             (ShallowArgumentReference 1)))) \
+             (Constant 0) \
+             (Constant 1)))",
+        )
         .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
+use libeval::expanders::ExpansionResult;
+use libeval::expression::Expression;
 use liblocus::diagnostics::{Diagnostic, Span};
-use libreader::datum::{ScannedDatum};
-use libreader::lexer::{StringScanner};
-use libreader::parser::{Parser};
-use libeval::expanders::{ExpansionResult};
-use libeval::expression::{Expression};
+use libreader::datum::ScannedDatum;
+use libreader::lexer::StringScanner;
+use libreader::parser::Parser;
 
 #[derive(Default)]
 struct TestCase {

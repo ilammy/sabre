@@ -15,8 +15,8 @@
 
 mod tables;
 
-pub use crate::tables::UNICODE_VERSION;
 pub use crate::tables::scheme_identifiers;
+pub use crate::tables::UNICODE_VERSION;
 
 pub mod case_algorithms;
 pub mod normalization;

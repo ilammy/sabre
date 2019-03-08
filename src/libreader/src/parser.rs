@@ -10,12 +10,12 @@
 //! This module contains definition of the _syntactical analyzer_ which constructs parsing trees
 //! out of token streams.
 
-use liblocus::diagnostics::{Span, Handler, DiagnosticKind};
+use liblocus::diagnostics::{DiagnosticKind, Handler, Span};
 
-use crate::datum::{ScannedDatum, DatumValue};
+use crate::datum::{DatumValue, ScannedDatum};
 use crate::intern_pool::{Atom, InternPool};
-use crate::lexer::{Scanner, ScannedToken};
-use crate::tokens::{Token, ParenType};
+use crate::lexer::{ScannedToken, Scanner};
+use crate::tokens::{ParenType, Token};
 
 /// Data parser.
 ///

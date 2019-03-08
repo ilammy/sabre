@@ -8,13 +8,13 @@
 //! Core Scheme expressions.
 
 use std::fmt;
-use std::rc::{Rc};
+use std::rc::Rc;
 
-use liblocus::diagnostics::{Span};
-use libreader::datum::{ScannedDatum};
-use libreader::intern_pool::{Atom};
+use liblocus::diagnostics::Span;
+use libreader::datum::ScannedDatum;
+use libreader::intern_pool::Atom;
 
-use crate::environment::{Environment};
+use crate::environment::Environment;
 
 /// Scheme core expression.
 pub struct Expression {

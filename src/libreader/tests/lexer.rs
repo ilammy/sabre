@@ -11,10 +11,10 @@
 
 mod utils;
 
-use liblocus::diagnostics::{Span, Diagnostic, DiagnosticKind};
-use libreader::intern_pool::{InternPool};
-use libreader::lexer::{ScannedToken, StringScanner, Scanner};
-use libreader::tokens::{Token, ParenType};
+use liblocus::diagnostics::{Diagnostic, DiagnosticKind, Span};
+use libreader::intern_pool::InternPool;
+use libreader::lexer::{ScannedToken, Scanner, StringScanner};
+use libreader::tokens::{ParenType, Token};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test macro helpers

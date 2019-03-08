@@ -7,7 +7,6 @@
 
 use std::cell::UnsafeCell;
 use std::fmt;
-use std::mem;
 
 use crate::intern_pool::InternPool;
 
@@ -61,7 +60,7 @@ pub fn with_formatting_pool<R, F: FnOnce() -> R>(new_pool: &InternPool, f: F) ->
     FORMATTING_POOL.with(|current_pool| {
         let assignment = set_dynamic_cell(current_pool, new_pool);
         let result = f();
-        mem::drop(assignment);
+        drop(assignment);
         return result;
     })
 }
@@ -83,7 +82,7 @@ fn set_dynamic_cell<'a, T>(cell: &'a DynamicCell<T>, new_value: &'a T) -> Dynami
         // cell. We can now safely swap the current value with the new one (to be used by the
         // closure and its descendants) and then replace the old value back so that the outer
         // active calls continue to see the previous value when we return.
-        old_value: mem::replace(unsafe { &mut *cell.get() }, Some(new_value)),
+        old_value: std::mem::replace(unsafe { &mut *cell.get() }, Some(new_value)),
         cell: cell,
     }
 }
@@ -98,7 +97,7 @@ impl<'a, T> Drop for DynamicSetGuard<'a, T> {
         // When this destructor is invoked the closure that can access the current cell value
         // is no longer active, so there are no users of that value. We can safely drop it and
         // replace the old value back now.
-        mem::replace(unsafe { &mut *self.cell.get() }, self.old_value.take());
+        std::mem::replace(unsafe { &mut *self.cell.get() }, self.old_value.take());
     }
 }
 

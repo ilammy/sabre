@@ -9,13 +9,17 @@
 //!
 //! This verifies that the basic syntax of Scheme is handled as expected.
 
-use std::rc::{Rc};
+use std::rc::Rc;
 
-use libeval::environment::{Environment};
-use libeval::expanders::{Expander, ExpansionResult, ExpanderStack, BasicExpander,
-    ApplicationExpander, QuoteExpander, BeginExpander, IfExpander, SetExpander, LambdaExpander};
-use liblocus::diagnostics::{DiagnosticKind};
-use libreader::intern_pool::{InternPool};
+use libeval::{
+    environment::Environment,
+    expanders::{
+        ApplicationExpander, BasicExpander, BeginExpander, Expander, ExpanderStack,
+        ExpansionResult, IfExpander, LambdaExpander, QuoteExpander, SetExpander,
+    },
+};
+use liblocus::diagnostics::DiagnosticKind;
+use libreader::intern_pool::InternPool;
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Tested expanders
@@ -701,21 +705,23 @@ fn application_non_reference() {
 fn altogether() {
     TestCase::new()
         .input("(lambda (a b) (if a (begin (set! a 9) (+ b c)) (print '(17 #(x)))))")
-        .result("(Abstraction (a b) \
-                   (Alternative (Reference a) \
-                     (Sequence \
-                      (Assignment a (Literal 9)) \
-                      (Application (Reference +) (Reference b) (Reference c))) \
-                     (Application (Reference print) (Quotation (17 #(x))))))")
+        .result(
+            "(Abstraction (a b) \
+             (Alternative (Reference a) \
+             (Sequence \
+             (Assignment a (Literal 9)) \
+             (Application (Reference +) (Reference b) (Reference c))) \
+             (Application (Reference print) (Quotation (17 #(x))))))",
+        )
         .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use liblocus::diagnostics::{Span, Diagnostic};
-use libreader::lexer::{StringScanner};
-use libreader::parser::{Parser};
+use liblocus::diagnostics::{Diagnostic, Span};
+use libreader::lexer::StringScanner;
+use libreader::parser::Parser;
 
 #[derive(Default)]
 struct TestCase {

@@ -7,15 +7,15 @@
 
 //! `set!` expander.
 
-use std::rc::{Rc};
+use std::rc::Rc;
 
-use liblocus::diagnostics::{Handler, DiagnosticKind};
-use libreader::datum::{ScannedDatum, DatumValue};
-use libreader::intern_pool::{Atom};
+use liblocus::diagnostics::{DiagnosticKind, Handler};
+use libreader::datum::{DatumValue, ScannedDatum};
+use libreader::intern_pool::Atom;
 
-use crate::environment::{Environment};
-use crate::expression::{Expression, ExpressionKind, Literal, Variable};
+use crate::environment::Environment;
 use crate::expanders::{Expander, ExpansionResult};
+use crate::expression::{Expression, ExpressionKind, Literal, Variable};
 
 /// Expand `set!` special forms into assignments.
 pub struct SetExpander {

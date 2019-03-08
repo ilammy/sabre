@@ -27,6 +27,7 @@ macro_rules! define_benchmark {
     ($name:ident, $value:expr) => {
         mod $name {
             use test::Bencher;
+
             use libunicode::normalization;
 
             const TEST_STRING: &'static str = $value;

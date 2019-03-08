@@ -54,35 +54,30 @@ impl charcc {
     ///
     /// This is also for data tables, like applying `from_u32` to a whole slice.
     pub fn from_u32_slice<'a>(slice: &'a [u32]) -> &'a [charcc] {
-        use std::mem;
-
         debug_assert!(slice.iter().all(|&v| charcc::valid_charcc(v)));
 
         // This is safe as 1) charcc and u32 have the same layout, 2) we have validated the slice.
-        unsafe { mem::transmute(slice) }
+        unsafe { std::mem::transmute(slice) }
     }
 
     fn valid_charcc(value: u32) -> bool {
-        use std::char;
         use crate::tables::character_properties::canonical_combining_class as compute_ccc;
 
         let ccc = value >> 24;
         let codepoint = value & 0x00FFFFFF;
 
         let valid_ccc = ccc < 256;
-        let valid_codepoint = char::from_u32(codepoint).is_some();
+        let valid_codepoint = std::char::from_u32(codepoint).is_some();
 
-        let actual_ccc = compute_ccc(char::from_u32(codepoint).unwrap());
+        let actual_ccc = compute_ccc(std::char::from_u32(codepoint).unwrap());
 
         valid_ccc && valid_codepoint && (ccc as u8) == actual_ccc
     }
 
     /// Extract char value of charcc.
     pub fn to_char(self) -> char {
-        use std::char;
-
         // This is safe as we validate character values when constructing charccs.
-        unsafe { char::from_u32_unchecked(self.0 & 0x00FFFFFF) }
+        unsafe { std::char::from_u32_unchecked(self.0 & 0x00FFFFFF) }
     }
 
     /// Extract canonical combining class of charcc.

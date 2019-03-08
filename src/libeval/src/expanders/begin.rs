@@ -7,15 +7,15 @@
 
 //! `begin` expander.
 
-use std::rc::{Rc};
+use std::rc::Rc;
 
-use liblocus::diagnostics::{Handler, DiagnosticKind};
-use libreader::datum::{ScannedDatum};
-use libreader::intern_pool::{Atom};
+use liblocus::diagnostics::{DiagnosticKind, Handler};
+use libreader::datum::ScannedDatum;
+use libreader::intern_pool::Atom;
 
-use crate::environment::{Environment};
-use crate::expression::{Expression, ExpressionKind};
+use crate::environment::Environment;
 use crate::expanders::{Expander, ExpansionResult};
+use crate::expression::{Expression, ExpressionKind};
 
 /// Expand `begin` special forms into sequences.
 pub struct BeginExpander {

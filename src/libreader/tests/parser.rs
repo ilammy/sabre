@@ -9,10 +9,10 @@
 //!
 //! This verifies that the parser recognizes all expected expressions and errors.
 
-use liblocus::diagnostics::{DiagnosticKind};
-use libreader::intern_pool::{InternPool};
-use libreader::lexer::{StringScanner};
-use libreader::parser::{Parser};
+use liblocus::diagnostics::DiagnosticKind;
+use libreader::intern_pool::InternPool;
+use libreader::lexer::StringScanner;
+use libreader::parser::Parser;
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Smoke test of test harness

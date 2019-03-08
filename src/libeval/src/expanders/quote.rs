@@ -7,15 +7,15 @@
 
 //! `quote` expander.
 
-use std::rc::{Rc};
+use std::rc::Rc;
 
-use liblocus::diagnostics::{Handler, DiagnosticKind, Span};
-use libreader::datum::{ScannedDatum, DatumValue};
-use libreader::intern_pool::{Atom};
+use liblocus::diagnostics::{DiagnosticKind, Handler, Span};
+use libreader::datum::{DatumValue, ScannedDatum};
+use libreader::intern_pool::Atom;
 
-use crate::environment::{Environment};
-use crate::expression::{Expression, ExpressionKind};
+use crate::environment::Environment;
 use crate::expanders::{Expander, ExpansionResult};
+use crate::expression::{Expression, ExpressionKind};
 
 /// Expand `quote` special forms into quotations.
 pub struct QuoteExpander {

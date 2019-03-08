@@ -7,15 +7,15 @@
 
 //! `if` expander.
 
-use std::rc::{Rc};
+use std::rc::Rc;
 
-use liblocus::diagnostics::{Handler, DiagnosticKind};
-use libreader::datum::{ScannedDatum};
-use libreader::intern_pool::{Atom};
+use liblocus::diagnostics::{DiagnosticKind, Handler};
+use libreader::datum::ScannedDatum;
+use libreader::intern_pool::Atom;
 
-use crate::environment::{Environment};
-use crate::expression::{Expression, ExpressionKind, Literal};
+use crate::environment::Environment;
 use crate::expanders::{Expander, ExpansionResult};
+use crate::expression::{Expression, ExpressionKind, Literal};
 
 /// Expand `if` special forms into alternatives.
 pub struct IfExpander {

@@ -11,15 +11,14 @@
 //! This is the finish line of the front-end.
 
 use std::fmt;
-use std::rc::{Rc};
-use std::slice;
+use std::rc::Rc;
 
-use liblocus::diagnostics::{Span, Handler, DiagnosticKind};
-use libreader::datum::{ScannedDatum, DatumValue};
-use libreader::intern_pool::{Atom};
+use liblocus::diagnostics::{DiagnosticKind, Handler, Span};
+use libreader::datum::{DatumValue, ScannedDatum};
+use libreader::intern_pool::Atom;
 
-use crate::expression::{Expression, ExpressionKind, Literal, Variable, Arguments};
 use crate::environment::{Environment, VariableKind};
+use crate::expression::{Arguments, Expression, ExpressionKind, Literal, Variable};
 
 pub struct Meaning {
     pub kind: MeaningKind,
@@ -101,8 +100,8 @@ pub struct MeaningResult {
 }
 
 struct SequenceSplicingIterator<'a> {
-    current: Option<slice::Iter<'a, Expression>>,
-    postponed: Vec<slice::Iter<'a, Expression>>,
+    current: Option<std::slice::Iter<'a, Expression>>,
+    postponed: Vec<std::slice::Iter<'a, Expression>>,
 }
 
 // I personally consider the splicing role of the (begin term ...) form to be a wart on Scheme

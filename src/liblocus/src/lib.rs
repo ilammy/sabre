@@ -10,6 +10,7 @@
 //! This crate deals with source code location information like code spans,
 //! diagnostics.
 
-pub mod diagnostics;
 mod diagnostic_kinds;
+
+pub mod diagnostics;
 pub mod utils;

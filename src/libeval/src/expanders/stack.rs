@@ -7,12 +7,12 @@
 
 //! Macro expander stack.
 
-use std::rc::{Rc};
+use std::rc::Rc;
 
-use liblocus::diagnostics::{Handler};
-use libreader::datum::{ScannedDatum};
+use liblocus::diagnostics::Handler;
+use libreader::datum::ScannedDatum;
 
-use crate::environment::{Environment};
+use crate::environment::Environment;
 use crate::expanders::{Expander, ExpansionResult};
 
 /// Macro expander stack.

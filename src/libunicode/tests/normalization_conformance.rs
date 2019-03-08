@@ -13,7 +13,6 @@
 //!
 //! This module contains normalization self-tests based on NormalizationTest.txt from UCD.
 
-use std::char;
 use std::string::ToString;
 
 use libunicode::normalization;
@@ -66,7 +65,7 @@ fn conformance_explicit_nfkd() {
 fn conformance_trivial() {
     for &(from, to) in TRIVIAL_RANGES {
         for n in (from as u32)..(to as u32 + 1) {
-            let c = char::from_u32(n).unwrap();
+            let c = std::char::from_u32(n).unwrap();
             let s = &c.to_string()[..];
 
             assert_eq!(s, normalization::nfc(s));

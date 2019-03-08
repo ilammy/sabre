@@ -74,6 +74,7 @@ pub fn write_dotted_list<I, T>(f: &mut fmt::Formatter, prefix: &str, items: I, s
 #[cfg(test)]
 mod tests {
     use super::*;
+
     use std::fmt;
 
     struct ProperList<I>(I);

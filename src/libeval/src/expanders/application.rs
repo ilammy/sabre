@@ -7,14 +7,14 @@
 
 //! Application expander.
 
-use std::rc::{Rc};
+use std::rc::Rc;
 
-use liblocus::diagnostics::{Handler, DiagnosticKind};
-use libreader::datum::{ScannedDatum};
+use liblocus::diagnostics::{DiagnosticKind, Handler};
+use libreader::datum::ScannedDatum;
 
-use crate::environment::{Environment};
-use crate::expression::{Expression, ExpressionKind};
+use crate::environment::Environment;
 use crate::expanders::{Expander, ExpansionResult};
+use crate::expression::{Expression, ExpressionKind};
 
 /// Expand all procedure calls into applications.
 ///

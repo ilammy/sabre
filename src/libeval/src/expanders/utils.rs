@@ -7,9 +7,9 @@
 
 //! Miscellaneous expander utilities.
 
-use liblocus::diagnostics::{Handler, DiagnosticKind, Span};
-use libreader::datum::{ScannedDatum, DatumValue};
-use libreader::intern_pool::{Atom};
+use liblocus::diagnostics::{DiagnosticKind, Handler, Span};
+use libreader::datum::{DatumValue, ScannedDatum};
+use libreader::intern_pool::Atom;
 
 /// Check if `datum` is a form (possibly empty).
 /// Return `Some((dotted, values))` if it is, `None` otherwise.

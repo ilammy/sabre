@@ -10,7 +10,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use crate::diagnostics::{Diagnostic, Reporter, Handler};
+use crate::diagnostics::{Diagnostic, Handler, Reporter};
 
 /// A simple Reporter collecting diagnostics.
 struct SinkReporter {

@@ -7,14 +7,14 @@
 
 //! Basic expander.
 
-use std::rc::{Rc};
+use std::rc::Rc;
 
-use liblocus::diagnostics::{Handler, DiagnosticKind, Span};
-use libreader::datum::{ScannedDatum, DatumValue};
+use liblocus::diagnostics::{DiagnosticKind, Handler, Span};
+use libreader::datum::{DatumValue, ScannedDatum};
 
-use crate::environment::{Environment};
-use crate::expression::{Expression, ExpressionKind, Literal};
+use crate::environment::Environment;
 use crate::expanders::{Expander, ExpansionResult};
+use crate::expression::{Expression, ExpressionKind, Literal};
 
 /// Basic expander.
 ///

@@ -10,12 +10,10 @@
 //! This module contains definition of the _lexical analyzer_ which breaks a stream of characters
 //! into tokens.
 
-use std::char;
+use liblocus::diagnostics::{DiagnosticKind, Handler, Span};
 
-use liblocus::diagnostics::{Span, Handler, DiagnosticKind};
-
-use crate::intern_pool::{InternPool};
-use crate::tokens::{Token, ParenType};
+use crate::intern_pool::InternPool;
+use crate::tokens::{ParenType, Token};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Helper data structures
@@ -439,7 +437,7 @@ impl<'a> StringScanner<'a> {
                 // If we run into a delimiter or out of characters then we are done. Check the
                 // resulting code point value for correctness and return it.
                 if self.cur.map_or(true, is_delimiter) {
-                    if let Some(c) = char::from_u32(value) {
+                    if let Some(c) = std::char::from_u32(value) {
                         return Token::Character(c);
                     } else {
                         self.diagnostic.report(DiagnosticKind::err_lexer_invalid_unicode_range,
@@ -760,7 +758,7 @@ impl<'a> StringScanner<'a> {
             }
 
             // Check the resulting code point for correctness and return the value.
-            if let Some(c) = char::from_u32(value) {
+            if let Some(c) = std::char::from_u32(value) {
                 return c;
             } else {
                 self.diagnostic.report(DiagnosticKind::err_lexer_invalid_unicode_range,
@@ -1676,17 +1674,13 @@ fn is_identifier_subsequent(c: char) -> bool {
 /// Check if a character is an initial of an identifer.
 #[cfg(feature = "unicode")]
 fn is_identifier_initial(c: char) -> bool {
-    use libunicode::scheme_identifiers;
-
-    return scheme_identifiers::is_initial(c);
+    return libunicode::scheme_identifiers::is_initial(c);
 }
 
 /// Check if a character is a subsequent of an identifer.
 #[cfg(feature = "unicode")]
 fn is_identifier_subsequent(c: char) -> bool {
-    use libunicode::scheme_identifiers;
-
-    return scheme_identifiers::is_subsequent(c);
+    return libunicode::scheme_identifiers::is_subsequent(c);
 }
 
 /// A replacement character used when we need to return a character, but don't have one.
@@ -1734,12 +1728,10 @@ fn normalize_case_insensitive_identifier(s: &str) -> String {
 /// Normalize a string as a case-sensitive identifier.
 #[cfg(feature = "unicode")]
 fn normalize_case_sensitive_identifier(s: &str) -> String {
-    use libunicode::normalization;
-
     const ZERO_WIDTH_NON_JOINER: char = '\u{200C}';
     const ZERO_WIDTH_JOINER: char = '\u{200D}';
 
-    let normalized = normalization::nfkc(s);
+    let normalized = libunicode::normalization::nfkc(s);
 
     // Scheme identifier syntax permits only ZWNJ and ZWJ to occur in valid identifiers,
     // so we remove only these (and do not need a table of Default_Ignorable_Code_Points).
@@ -1751,9 +1743,7 @@ fn normalize_case_sensitive_identifier(s: &str) -> String {
 /// Normalize a string as a case-insensitive identifier.
 #[cfg(feature = "unicode")]
 fn normalize_case_insensitive_identifier(s: &str) -> String {
-    use libunicode::case_algorithms;
-
-    case_algorithms::to_nfkc_casefold(s)
+    libunicode::case_algorithms::to_nfkc_casefold(s)
 }
 
 /// Check whether a string should be parsed as a number or it can be glanced off as an identifier
