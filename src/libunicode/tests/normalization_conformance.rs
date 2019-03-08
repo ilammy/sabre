@@ -76,7 +76,7 @@ fn conformance_trivial() {
     }
 }
 
-const EXPLICIT_STRINGS: &'static [(&'static str, &'static str, &'static str, &'static str, &'static str)] = &[
+const EXPLICIT_STRINGS: &[(&str, &str, &str, &str, &str)] = &[
     ("\u{1E0A}", "\u{1E0A}", "\u{0044}\u{0307}", "\u{1E0A}", "\u{0044}\u{0307}"),
     ("\u{1E0C}", "\u{1E0C}", "\u{0044}\u{0323}", "\u{1E0C}", "\u{0044}\u{0323}"),
     ("\u{1E0A}\u{0323}", "\u{1E0C}\u{0307}", "\u{0044}\u{0323}\u{0307}", "\u{1E0C}\u{0307}", "\u{0044}\u{0323}\u{0307}"),
@@ -18802,7 +18802,7 @@ const EXPLICIT_STRINGS: &'static [(&'static str, &'static str, &'static str, &'s
 
 ];
 
-const TRIVIAL_RANGES: &'static [(char, char)] = &[
+const TRIVIAL_RANGES: &[(char, char)] = &[
     ('\u{0000}', '\u{009F}'), ('\u{00A1}', '\u{00A7}'), ('\u{00A9}', '\u{00A9}'),
     ('\u{00AB}', '\u{00AE}'), ('\u{00B0}', '\u{00B1}'), ('\u{00B6}', '\u{00B7}'),
     ('\u{00BB}', '\u{00BB}'), ('\u{00BF}', '\u{00BF}'), ('\u{00C6}', '\u{00C6}'),

@@ -134,7 +134,7 @@ struct SequenceSplicingIterator<'a> {
 // compatible and to eat histerical raisins, I guess.
 //
 // Either way, Abathur would certainly like this function name, so that alone justifies it.
-fn splice_in_sequences<'a>(expressions: &'a [Expression]) -> SequenceSplicingIterator<'a> {
+fn splice_in_sequences(expressions: &[Expression]) -> SequenceSplicingIterator {
     SequenceSplicingIterator {
         current: Some(expressions.iter()),
         postponed: Vec::new(),
@@ -178,7 +178,7 @@ pub fn meaning(diagnostic: &Handler, expressions: &[Expression]) -> MeaningResul
 
     MeaningResult {
         sequence: body_sequence,
-        constants: constants,
+        constants,
     }
 }
 
@@ -208,7 +208,7 @@ fn expressions_span(expressions: &[Expression]) -> Span {
     let first = expressions.first().unwrap().span;
     let last = expressions.last().unwrap().span;
 
-    return Span::new(first.from, last.to);
+    Span::new(first.from, last.to)
 }
 
 fn meaning_expression(
@@ -250,7 +250,7 @@ fn meaning_literal(value: &Literal, constants: &mut Vec<Value>) -> MeaningKind {
         _ => unimplemented!(),
     });
 
-    return MeaningKind::Constant(index);
+    MeaningKind::Constant(index)
 }
 
 fn meaning_quote(datum: &ScannedDatum, constants: &mut Vec<Value>) -> MeaningKind {
@@ -264,7 +264,7 @@ fn meaning_quote(datum: &ScannedDatum, constants: &mut Vec<Value>) -> MeaningKin
         _ => unimplemented!(),
     });
 
-    return MeaningKind::Constant(index);
+    MeaningKind::Constant(index)
 }
 
 fn meaning_reference(
@@ -321,11 +321,11 @@ fn meaning_assignment(
     if let VariableKind::Unresolved = variable_kind {
         // TODO: provide suggestions based on the environment
         diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable,
-            variable.span.expect("BUG: unresolved variable").clone());
+            variable.span.expect("BUG: unresolved variable"));
     }
     if let VariableKind::Imported { .. } = variable_kind {
         diagnostic.report(DiagnosticKind::err_meaning_assign_to_imported_binding,
-            variable.span.expect("BUG: unresolved variable").clone());
+            variable.span.expect("BUG: unresolved variable"));
     }
 
     let new_value = Box::new(meaning_expression(diagnostic, value, constants));
@@ -355,7 +355,7 @@ fn meaning_sequence(
     expressions: &[Expression],
     constants: &mut Vec<Value>) -> MeaningKind
 {
-    assert!(expressions.len() >= 1, "BUG: (begin) not handled");
+    assert!(!expressions.is_empty(), "BUG: (begin) not handled");
 
     MeaningKind::Sequence(
         expressions.iter()
@@ -382,12 +382,12 @@ fn meaning_application(
     terms: &[Expression],
     constants: &mut Vec<Value>) -> MeaningKind
 {
-    assert!(terms.len() >= 1, "BUG: empty application");
+    assert!(!terms.is_empty(), "BUG: empty application");
 
     let procedure = Box::new(meaning_expression(diagnostic, &terms[0], constants));
     let arguments = terms[1..].iter()
         .map(|e| meaning_expression(diagnostic, e, constants))
         .collect();
 
-    return MeaningKind::ProcedureCall(procedure, arguments);
+    MeaningKind::ProcedureCall(procedure, arguments)
 }

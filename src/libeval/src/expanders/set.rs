@@ -27,7 +27,7 @@ impl SetExpander {
     /// Make a new `set!` expander for a given name.
     pub fn new(name: Atom) -> SetExpander {
         SetExpander {
-            name: name,
+            name,
         }
     }
 }
@@ -51,7 +51,7 @@ impl Expander for SetExpander {
         let value = expand_value(datum, values.get(2), environment, diagnostic, expander);
 
         // If we have a variable to assign then use that variable. Otherwise leave only the value.
-        return ExpansionResult::Some(
+        ExpansionResult::Some(
             if let Some(variable) = variable {
                 Expression {
                     kind: ExpressionKind::Assignment(variable, Box::new(value)),
@@ -61,7 +61,7 @@ impl Expander for SetExpander {
             } else {
                 value
             }
-        );
+        )
     }
 }
 
@@ -72,13 +72,13 @@ fn expand_variable(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Option
     if let Some(datum) = datum {
         if let DatumValue::Symbol(name) = datum.value {
             return Some(Variable {
-                name: name,
+                name,
                 span: Some(datum.span),
             });
         }
         diagnostic.report(DiagnosticKind::err_expand_invalid_set, datum.span);
     }
-    return None;
+    None
 }
 
 /// Expand the subexpression denoting variable value in a set! expression.
@@ -89,19 +89,19 @@ fn expand_value(datum: &ScannedDatum, term: Option<&ScannedDatum>, environment: 
 
     if let Some(term) = term {
         if let ExpansionResult::Some(expression) = expander.expand(term, environment, diagnostic, expander) {
-            return expression;
+            expression
         } else {
-            return Expression {
+            Expression {
                 kind: ExpressionKind::Literal(Literal::Boolean(false)),
                 span: term.span,
                 environment: environment.clone(),
-            };
+            }
         }
     } else {
-        return Expression {
+        Expression {
             kind: ExpressionKind::Literal(Literal::Boolean(false)),
             span: missing_last_span(datum),
             environment: environment.clone(),
-        };
+        }
     }
 }

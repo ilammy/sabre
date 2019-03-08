@@ -63,13 +63,13 @@ impl<'a> Parser<'a> {
         -> Parser<'a>
     {
         let mut parser = Parser {
-            scanner: scanner,
-            pool: pool,
+            scanner,
+            pool,
             cur: ScannedToken { tok: Token::Eof, span: Span::new(0, 0) },
             diagnostic: handler,
         };
         parser.bump();
-        return parser;
+        parser
     }
 
     /// Read in the next meaningful token.
@@ -106,7 +106,7 @@ impl<'a> Parser<'a> {
             }
         }
 
-        return data;
+        data
     }
 
     /// Parse next datum out of the token stream.
@@ -118,42 +118,42 @@ impl<'a> Parser<'a> {
             Token::Boolean(value) => {
                 self.bump();
 
-                return Ok(Some(ScannedDatum {
+                Ok(Some(ScannedDatum {
                     value: DatumValue::Boolean(value),
                     span: cur_span,
-                }));
+                }))
             }
             Token::Character(value) => {
                 self.bump();
 
-                return Ok(Some(ScannedDatum {
+                Ok(Some(ScannedDatum {
                     value: DatumValue::Character(value),
                     span: cur_span,
-                }));
+                }))
             }
             Token::String(value) => {
                 self.bump();
 
-                return Ok(Some(ScannedDatum {
+                Ok(Some(ScannedDatum {
                     value: DatumValue::String(value),
                     span: cur_span,
-                }));
+                }))
             }
             Token::Number(value) => {
                 self.bump();
 
-                return Ok(Some(ScannedDatum {
+                Ok(Some(ScannedDatum {
                     value: DatumValue::Number(value),
                     span: cur_span,
-                }));
+                }))
             }
             Token::Identifier(value) => {
                 self.bump();
 
-                return Ok(Some(ScannedDatum {
+                Ok(Some(ScannedDatum {
                     value: DatumValue::Symbol(value),
                     span: cur_span,
-                }));
+                }))
             }
 
             // Dots are expected only in lists.
@@ -163,7 +163,7 @@ impl<'a> Parser<'a> {
 
                 self.bump();
 
-                return Ok(None);
+                Ok(None)
             }
 
             // Closing parentheses should be paired with opening ones.
@@ -173,7 +173,7 @@ impl<'a> Parser<'a> {
 
                 self.bump();
 
-                return Ok(None);
+                Ok(None)
             }
 
             // Handle bytevectors.
@@ -209,10 +209,10 @@ impl<'a> Parser<'a> {
             Token::LabelRef(label) => {
                 self.bump();
 
-                return Ok(Some(ScannedDatum {
+                Ok(Some(ScannedDatum {
                     value: DatumValue::LabelReference(label),
                     span: cur_span,
-                }));
+                }))
             }
 
             // Handle labeled data.
@@ -285,7 +285,7 @@ impl<'a> Parser<'a> {
             self.next_datum_required(start_span)?;
         }
 
-        return Ok(None);
+        Ok(None)
     }
 
     /// Parse a bytevector literal.
@@ -348,10 +348,10 @@ impl<'a> Parser<'a> {
 
         self.bump();
 
-        return Ok(Some(ScannedDatum {
+        Ok(Some(ScannedDatum {
             value: DatumValue::Bytevector(values),
             span: Span::new(start_span.from, end_span.to),
-        }));
+        }))
     }
 
     /// Parse a vector datum.
@@ -405,10 +405,10 @@ impl<'a> Parser<'a> {
 
         self.bump();
 
-        return Ok(Some(ScannedDatum {
+        Ok(Some(ScannedDatum {
             value: DatumValue::Vector(elements),
             span: Span::new(start_span.from, end_span.to),
-        }));
+        }))
     }
 
     /// Parse a list datum.
@@ -481,14 +481,14 @@ impl<'a> Parser<'a> {
             }
         }
 
-        return Ok(Some(ScannedDatum {
+        Ok(Some(ScannedDatum {
             value: if dotted_list {
                 DatumValue::DottedList(elements)
             } else {
                 DatumValue::ProperList(elements)
             },
             span: Span::new(start_span.from, end_span.to),
-        }));
+        }))
     }
 
     /// Parse an abbreviation.
@@ -502,7 +502,7 @@ impl<'a> Parser<'a> {
 
         self.bump();
 
-        return self.next_datum_required(start_span).map(|result| result.map(|datum| {
+        self.next_datum_required(start_span).map(|result| result.map(|datum| {
             ScannedDatum {
                 span: Span::new(start_span.from, datum.span.to),
                 value: DatumValue::ProperList(vec![
@@ -513,7 +513,7 @@ impl<'a> Parser<'a> {
                     datum,
                 ]),
             }
-        }));
+        }))
     }
 
     /// Parse a labeled datum.
@@ -527,12 +527,12 @@ impl<'a> Parser<'a> {
 
         self.bump();
 
-        return self.next_datum_required(start_span).map(|result| result.map(|datum| {
+        self.next_datum_required(start_span).map(|result| result.map(|datum| {
             ScannedDatum {
                 span: Span::new(start_span.from, datum.span.to),
                 value: DatumValue::LabeledDatum(label, Box::new(datum)),
             }
-        }));
+        }))
     }
 }
 
@@ -550,5 +550,5 @@ fn is_dotted_list(elements: &[ScannedDatum], dot_locations: &[Span]) -> bool {
 
     assert!(prev.to < last.from);
 
-    return (prev.to <= dot.from) && (dot.to <= last.from);
+    (prev.to <= dot.from) && (dot.to <= last.from)
 }

@@ -28,7 +28,7 @@ pub fn nfd(s: &str) -> String {
         return s.to_owned();
     }
     let v = canonical_decomposition(s.chars());
-    return cleaned_up_string(v);
+    cleaned_up_string(v)
 }
 
 /// Normalize a string according to **Normalization Form KD** (_D119_).
@@ -37,7 +37,7 @@ pub fn nfkd(s: &str) -> String {
         return s.to_owned();
     }
     let v = compatibility_decomposition(s.chars());
-    return cleaned_up_string(v);
+    cleaned_up_string(v)
 }
 
 /// Normalize a string according to **Normalization Form C** (_D120_).
@@ -47,7 +47,7 @@ pub fn nfc(s: &str) -> String {
     }
     let mut v = canonical_decomposition(s.chars());
     compose_canonically(&mut v);
-    return cleaned_up_string(v);
+    cleaned_up_string(v)
 }
 
 /// Normalize a string according to **Normalization Form KC** (_D121_).
@@ -57,7 +57,7 @@ pub fn nfkc(s: &str) -> String {
     }
     let mut v = compatibility_decomposition(s.chars());
     compose_canonically(&mut v);
-    return cleaned_up_string(v);
+    cleaned_up_string(v)
 }
 
 fn cleaned_up_string(normalized: Vec<charcc>) -> String {
@@ -106,7 +106,7 @@ fn already_normalized(s: &str, form: NormalizationForm) -> bool {
         last_ccc = this_ccc;
     }
 
-    return true;
+    true
 }
 
 //
@@ -125,7 +125,7 @@ fn compatibility_decomposition<I>(chars: I) -> Vec<charcc>
 
     reorder_canonically(&mut buffer[..]);
 
-    return buffer;
+    buffer
 }
 
 /// Produce a Canonical decomposition (D68) of a character sequence.
@@ -140,7 +140,7 @@ fn canonical_decomposition<I>(chars: I) -> Vec<charcc>
 
     reorder_canonically(&mut buffer[..]);
 
-    return buffer;
+    buffer
 }
 
 /// Push a Compatibility decomposition (D65) of a single character into the given buffer.
@@ -226,7 +226,7 @@ fn push_hangul_decomposition(c: char, vec: &mut Vec<charcc>) -> bool {
         vec.push(charcc::from_char_with_ccc(v, 0));
     }
 
-    return true;
+    true
 }
 
 /// If a character pair forms a Precomposed Hangul syllable (D132) when it is canonically composed
@@ -266,7 +266,7 @@ fn compose_hangul(c1: char, c2: char) -> Option<charcc> {
     }
 
     // Anything else
-    return None;
+    None
 }
 
 //
@@ -345,11 +345,12 @@ fn find_starter(slice: &[charcc], ci: usize) -> Option<usize> {
             return Some(li);
         }
     }
-    return None;
+    None
 }
 
 /// Verify that A is not blocked (D115) from C in a character slice.
 /// This is the first part of step R2 of the Canonical Composition Algorithm (D117).
+#[allow(clippy::needless_range_loop)]
 fn blocked(slice: &[charcc], ai: usize, ci: usize) -> bool {
     assert!(ai < ci);
 
@@ -366,7 +367,7 @@ fn blocked(slice: &[charcc], ai: usize, ci: usize) -> bool {
         }
     }
 
-    return false;
+    false
 }
 
 /// Check for a Primary Composite (D114) equivalent to the given pair of characters.

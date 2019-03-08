@@ -33,17 +33,17 @@ pub struct ExpanderStack {
 
 impl ExpanderStack {
     /// Create a new expander stack with a given expander.
-    pub fn new(base: Box<dyn Expander>) -> ExpanderStack {
+    pub fn new(base_expander: Box<dyn Expander>) -> ExpanderStack {
         ExpanderStack {
-            head: base,
+            head: base_expander,
             tail: None,
         }
     }
 
     /// Push a new expander into the stack.
-    pub fn push(self, head: Box<dyn Expander>) -> ExpanderStack {
+    pub fn push(self, expander: Box<dyn Expander>) -> ExpanderStack {
         ExpanderStack {
-            head: head,
+            head: expander,
             tail: Some(Box::new(self)),
         }
     }

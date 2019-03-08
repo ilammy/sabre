@@ -27,7 +27,7 @@ impl LambdaExpander {
     /// Make a new `lambda` expander for a given name.
     pub fn new(name: Atom) -> LambdaExpander {
         LambdaExpander {
-            name: name,
+            name,
         }
     }
 }
@@ -62,11 +62,11 @@ impl Expander for LambdaExpander {
             })
             .collect();
 
-        return ExpansionResult::Some(Expression {
+        ExpansionResult::Some(Expression {
             kind: ExpressionKind::Abstraction(arguments, expressions),
             span: datum.span,
             environment: environment.clone(), // note that this is *not* the new environment
-        });
+        })
     }
 }
 
@@ -75,24 +75,26 @@ impl Expander for LambdaExpander {
 /// Simply ignore non-variables in the list, or fall back to empty argument list in case the
 /// problem is really severe.
 fn expand_arguments(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Arguments {
-    if let Some(arguments) = expect_argument_list(datum, diagnostic) {
-        let raw_variables: Vec<Variable> = arguments.iter()
-            .filter_map(|argument| {
-                if let DatumValue::Symbol(name) = argument.value {
-                    Some(Variable { name: name, span: Some(argument.span) })
-                } else {
-                    diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
-                        argument.span);
-                    None
-                }
-            })
-            .collect();
+    match expect_argument_list(datum, diagnostic) {
+        Some(arguments) => {
+            let raw_variables: Vec<Variable> = arguments.iter()
+                .filter_map(|argument| {
+                    if let DatumValue::Symbol(name) = argument.value {
+                        Some(Variable { name, span: Some(argument.span) })
+                    } else {
+                        diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
+                                          argument.span);
+                        None
+                    }
+                })
+                .collect();
 
-        let variables = deduplicate_variables(raw_variables, diagnostic);
-
-        return Arguments::Fixed(variables);
+            Arguments::Fixed(deduplicate_variables(raw_variables, diagnostic))
+        }
+        None => {
+            Arguments::Fixed(vec![])
+        }
     }
-    return Arguments::Fixed(vec![]);
 }
 
 /// Extract argument list from the datum (if it really looks like an argument list).
@@ -102,7 +104,7 @@ fn expect_argument_list<'b>(datum: Option<&'b ScannedDatum>, diagnostic: &Handle
     if let Some(datum) = datum {
         match datum.value {
             DatumValue::ProperList(ref data) => {
-                return Some(&data);
+                Some(&data)
             }
             DatumValue::DottedList(ref data) => {
                 // Currently we do not support &rest arguments, so we unify them into
@@ -112,15 +114,17 @@ fn expect_argument_list<'b>(datum: Option<&'b ScannedDatum>, diagnostic: &Handle
                 diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
                     Span::new(data[last - 1].span.to, data[last].span.from));
 
-                return Some(&data);
+                Some(&data)
             }
             _ => {
                 diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
                     datum.span);
+                None
             }
         }
+    } else {
+        None
     }
-    return None;
 }
 
 /// Check that arguments are not duplicated, report and remove duplicates.
@@ -141,7 +145,7 @@ fn deduplicate_variables(raw_variables: Vec<Variable>, diagnostic: &Handler) -> 
         variables.push(variable);
     }
 
-    return variables;
+    variables
 }
 
 /// Extend the parent environment with new variables based on the argument list of a lambda form.

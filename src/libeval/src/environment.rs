@@ -118,6 +118,6 @@ impl Environment {
         }
 
         // The variable cannot be resolved if it is absent in all environments.
-        return VariableKind::Unresolved;
+        VariableKind::Unresolved
     }
 }

@@ -24,6 +24,7 @@ pub struct ApplicationExpander;
 
 impl ApplicationExpander {
     /// Make a new application expander.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> ApplicationExpander {
         ApplicationExpander
     }
@@ -51,10 +52,10 @@ impl Expander for ApplicationExpander {
             })
             .collect();
 
-        return ExpansionResult::Some(Expression {
+        ExpansionResult::Some(Expression {
             kind: ExpressionKind::Application(expressions),
             span: datum.span,
             environment: environment.clone(),
-        });
+        })
     }
 }

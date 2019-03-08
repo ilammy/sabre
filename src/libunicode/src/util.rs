@@ -20,6 +20,8 @@
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct charcc(u32);
 
+const CODEPOINT_MASK: u32 = 0x00_FF_FF_FF;
+
 impl charcc {
     /// Make a new charcc from a char.
     ///
@@ -36,7 +38,7 @@ impl charcc {
     /// This is for cases when you know canonical combining class somehow (e.g., it is guaranteed
     /// to be zero). The function will validate canonical combining class value for you.
     pub fn from_char_with_ccc(c: char, ccc: u8) -> charcc {
-        Self::from_u32((c as u32) | ((ccc as u32) << 24))
+        Self::from_u32(u32::from(c) | (u32::from(ccc) << 24))
     }
 
     /// Make a new charcc from its raw u32 form.
@@ -53,7 +55,8 @@ impl charcc {
     /// Cast a u32 slice into a charcc slice.
     ///
     /// This is also for data tables, like applying `from_u32` to a whole slice.
-    pub fn from_u32_slice<'a>(slice: &'a [u32]) -> &'a [charcc] {
+    #[allow(clippy::transmute_ptr_to_ptr)]
+    pub fn from_u32_slice(slice: &[u32]) -> &[charcc] {
         debug_assert!(slice.iter().all(|&v| charcc::valid_charcc(v)));
 
         // This is safe as 1) charcc and u32 have the same layout, 2) we have validated the slice.
@@ -64,7 +67,7 @@ impl charcc {
         use crate::tables::character_properties::canonical_combining_class as compute_ccc;
 
         let ccc = value >> 24;
-        let codepoint = value & 0x00FFFFFF;
+        let codepoint = value & CODEPOINT_MASK;
 
         let valid_ccc = ccc < 256;
         let valid_codepoint = std::char::from_u32(codepoint).is_some();
@@ -77,7 +80,7 @@ impl charcc {
     /// Extract char value of charcc.
     pub fn to_char(self) -> char {
         // This is safe as we validate character values when constructing charccs.
-        unsafe { std::char::from_u32_unchecked(self.0 & 0x00FFFFFF) }
+        unsafe { std::char::from_u32_unchecked(self.0 & CODEPOINT_MASK) }
     }
 
     /// Extract canonical combining class of charcc.

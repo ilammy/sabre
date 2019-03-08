@@ -26,6 +26,7 @@ pub struct BasicExpander;
 
 impl BasicExpander {
     /// Make a new fixed expander.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> BasicExpander {
         BasicExpander
     }

@@ -32,7 +32,7 @@ pub fn write_list<I, T>(f: &mut fmt::Formatter, prefix: &str, items: I, sep: &st
     }
     f.write_str(suffix)?;
 
-    return Ok(());
+    Ok(())
 }
 
 /// Format a dotted s-expression list.
@@ -53,14 +53,12 @@ pub fn write_dotted_list<I, T>(f: &mut fmt::Formatter, prefix: &str, items: I, s
 
         if first {
             first = false;
+        } else if next.is_some() {
+            f.write_str(sep)?;
         } else {
-            if next.is_some() {
-                f.write_str(sep)?;
-            } else {
-                f.write_str(sep)?;
-                f.write_str(".")?;
-                f.write_str(sep)?;
-            }
+            f.write_str(sep)?;
+            f.write_str(".")?;
+            f.write_str(sep)?;
         }
         write!(f, "{:?}", item)?;
 
@@ -68,7 +66,7 @@ pub fn write_dotted_list<I, T>(f: &mut fmt::Formatter, prefix: &str, items: I, s
     }
     f.write_str(suffix)?;
 
-    return Ok(());
+    Ok(())
 }
 
 #[cfg(test)]

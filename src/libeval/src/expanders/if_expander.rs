@@ -27,7 +27,7 @@ impl IfExpander {
     /// Make a new `if` expander for a given name.
     pub fn new(name: Atom) -> IfExpander {
         IfExpander {
-            name: name,
+            name,
         }
     }
 }
@@ -42,7 +42,7 @@ impl Expander for IfExpander {
             None => { return ExpansionResult::Unknown; }
         };
 
-        assert!(values.len() >= 1);
+        assert!(!values.is_empty());
 
         // The only valid form is (if condition consequence alternative).
         expect_list_length_fixed(datum, dotted, values, 4,
@@ -56,20 +56,20 @@ impl Expander for IfExpander {
                     return expression;
                 }
             }
-            return Expression {
+            Expression {
                 kind: ExpressionKind::Literal(Literal::Boolean(false)),
                 span: missing_last_span(datum),
                 environment: environment.clone(),
-            };
+            }
         };
         let condition   = Box::new(expand_or_recover(1));
         let consequence = Box::new(expand_or_recover(2));
         let alternative = Box::new(expand_or_recover(3));
 
-        return ExpansionResult::Some(Expression {
+        ExpansionResult::Some(Expression {
             kind: ExpressionKind::Alternative(condition, consequence, alternative),
             span: datum.span,
             environment: environment.clone(),
-        });
+        })
     }
 }

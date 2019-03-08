@@ -45,6 +45,7 @@ pub struct InternPool {
 
 impl InternPool {
     /// Create a new empty string intern pool.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> InternPool {
         InternPool {
             pool: RefCell::new(HashMap::new()),
@@ -85,7 +86,7 @@ impl InternPool {
         backrefs.push(interned.clone());
         pool.insert(interned, new_atom);
 
-        return new_atom;
+        new_atom
     }
 
     /// Retrieve the string value associated with a given atom.
@@ -95,7 +96,7 @@ impl InternPool {
     /// Panics if the atom is not present in this pool.
     pub fn get(&self, atom: Atom) -> InternedString {
         let backrefs = self.backrefs.borrow();
-        return backrefs[atom.0 as usize].clone();
+        backrefs[atom.0 as usize].clone()
     }
 }
 

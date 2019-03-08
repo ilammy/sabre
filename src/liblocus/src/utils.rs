@@ -28,7 +28,7 @@ impl SinkReporter {
     /// Make a new sink reporter.
     pub fn new(diagnostics: Rc<RefCell<Vec<Diagnostic>>>) -> SinkReporter {
         SinkReporter {
-            diagnostics: diagnostics,
+            diagnostics,
         }
     }
 }
@@ -46,7 +46,7 @@ pub fn collect_diagnostics<T, F>(body: F) -> (T, Vec<Diagnostic>)
         let handler = Handler::with_reporter(Box::new(reporter));
         body(&handler)
     };
-    return (value, Rc::try_unwrap(diagnostics).unwrap().into_inner());
+    (value, Rc::try_unwrap(diagnostics).unwrap().into_inner())
 }
 
 #[cfg(test)]

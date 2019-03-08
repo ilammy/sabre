@@ -27,7 +27,7 @@ impl BeginExpander {
     /// Make a new `begin` expander for a given name.
     pub fn new(name: Atom) -> BeginExpander {
         BeginExpander {
-            name: name,
+            name,
         }
     }
 }
@@ -55,10 +55,10 @@ impl Expander for BeginExpander {
             })
             .collect();
 
-        return ExpansionResult::Some(Expression {
+        ExpansionResult::Some(Expression {
             kind: ExpressionKind::Sequence(expressions),
             span: datum.span,
             environment: environment.clone(),
-        });
+        })
     }
 }

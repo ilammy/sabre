@@ -35,5 +35,5 @@ pub fn to_nfkc_casefold(s: &str) -> String {
         }
     }
 
-    return normalization::nfc(&folded);
+    normalization::nfc(&folded)
 }

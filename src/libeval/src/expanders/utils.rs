@@ -45,7 +45,7 @@ pub fn is_named_form(datum: &ScannedDatum, expected_name: Atom)
         }
     }
 
-    return Some((dotted, values));
+    Some((dotted, values))
 }
 
 /// Check that a proper list has given number of elements.
@@ -119,7 +119,7 @@ pub fn missing_last_span(datum: &ScannedDatum) -> Span {
         DatumValue::ProperList(ref terms) |
         DatumValue::DottedList(ref terms) |
         DatumValue::Vector(ref terms) => {
-            assert!(terms.len() >= 1, "the list must be non-empty");
+            assert!(!terms.is_empty());
             let last_span = terms.last().unwrap().span;
             Span::new(last_span.to, datum.span.to - 1)
         }

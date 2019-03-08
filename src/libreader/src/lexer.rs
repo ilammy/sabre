@@ -108,22 +108,21 @@ impl<'a> StringScanner<'a> {
     pub fn new(s: &'a str, handler: &'a Handler, pool: &'a InternPool) -> StringScanner<'a> {
         let mut scanner = StringScanner {
             buf: s,
-            pool: pool,
+            pool,
             cur: None, pos: 0, prev_pos: 0,
             folding_case: false,
             diagnostic: handler,
         };
         scanner.read();
-        return scanner;
+        scanner
     }
 
     /// Read in the next character and update `cur`, `pos`, `prev_pos`.
     fn read(&mut self) {
         self.prev_pos = self.pos;
         self.cur = self.peek();
-        match self.cur {
-            Some(c) => { self.pos += c.len_utf8(); }
-            None    => { }
+        if let Some(c) = self.cur {
+            self.pos += c.len_utf8();
         }
     }
 
@@ -157,10 +156,10 @@ impl<'a> StringScanner<'a> {
 
         assert!(tok != Token::Eof);
 
-        return ScannedToken {
-            tok: tok,
+        ScannedToken {
+            tok,
             span: Span::new(start, end)
-        };
+        }
     }
 
     /// Scan over the next token.
@@ -231,8 +230,7 @@ impl<'a> StringScanner<'a> {
             }
             self.read();
         }
-
-        return Token::Whitespace;
+        Token::Whitespace
     }
 
     /// Scan a line comment starting with `;`.
@@ -261,7 +259,7 @@ impl<'a> StringScanner<'a> {
             }
         }
 
-        return Token::Comment;
+        Token::Comment
     }
 
     /// Scan a possibly nested block comment `#| ... |#`.
@@ -302,7 +300,7 @@ impl<'a> StringScanner<'a> {
             }
         }
 
-        return Token::Comment;
+        Token::Comment
     }
 
     /// Scan over a token starting with a hash `#`.
@@ -370,7 +368,7 @@ impl<'a> StringScanner<'a> {
         }
 
         // Recover as `scan_hash_token()` would do.
-        return self.scan_number_literal();
+        self.scan_number_literal()
     }
 
     /// Scan over a bytevector opener `#u8(`.
@@ -390,7 +388,7 @@ impl<'a> StringScanner<'a> {
         }
 
         // Recover as `scan_hash_token()` would do.
-        return self.scan_number_literal();
+        self.scan_number_literal()
     }
 
     /// Scan a character literal (`#\\!`, `#\\x000F`, `#\\return`).
@@ -431,7 +429,7 @@ impl<'a> StringScanner<'a> {
             // with `x` (there are no valid ones). We have no idea which one it is until we try.
             // Scan this as a hexcoded literal until we are done or encounter a non-hex digit.
 
-            let mut value: u32 = 0;
+            let mut value = 0;
 
             loop {
                 // If we run into a delimiter or out of characters then we are done. Check the
@@ -457,9 +455,7 @@ impl<'a> StringScanner<'a> {
                 // Otherwise it is a hex digit that should be added it to the accumulated value.
                 // The user may write literals of any length so handle cases like `#\x000000000001`
                 // and `#\xFFFFDEADCAFEBABE` without overflows.
-                if value <= 0x00FFFFFF {
-                    value = (value << 4) | hex_value(c) as u32;
-                }
+                value = saturating_add_unicode_nibble(value, c);
 
                 self.read();
             }
@@ -501,19 +497,19 @@ impl<'a> StringScanner<'a> {
 
         // Finally, handle named character literals.
         match &name[..] {
-            "alarm"     => { return Token::Character('\u{0007}'); }
-            "escape"    => { return Token::Character('\u{0008}'); }
-            "delete"    => { return Token::Character('\u{007F}'); }
-            "newline"   => { return Token::Character('\u{000A}'); }
-            "null"      => { return Token::Character('\u{0000}'); }
-            "return"    => { return Token::Character('\u{000D}'); }
-            "space"     => { return Token::Character('\u{0020}'); }
-            "tab"       => { return Token::Character('\u{0009}'); }
+            "alarm"     => { Token::Character('\u{0007}') }
+            "escape"    => { Token::Character('\u{0008}') }
+            "delete"    => { Token::Character('\u{007F}') }
+            "newline"   => { Token::Character('\u{000A}') }
+            "null"      => { Token::Character('\u{0000}') }
+            "return"    => { Token::Character('\u{000D}') }
+            "space"     => { Token::Character('\u{0020}') }
+            "tab"       => { Token::Character('\u{0009}') }
             _ => {
                 self.diagnostic.report(DiagnosticKind::err_lexer_unknown_character_name,
                     Span::new(start, name_end));
 
-                return Token::Character(REPLACEMENT_CHARACTER);
+                Token::Character(REPLACEMENT_CHARACTER)
             }
         }
     }
@@ -562,7 +558,7 @@ impl<'a> StringScanner<'a> {
         let value = &self.buf[start..end];
         let atom = self.pool.intern(value);
 
-        return if is_reference { Token::LabelRef(atom) } else { Token::LabelMark(atom) };
+        if is_reference { Token::LabelRef(atom) } else { Token::LabelMark(atom) }
     }
 
     /// Scan a string literal. This method also expands any escape sequences and normalizes line
@@ -614,7 +610,7 @@ impl<'a> StringScanner<'a> {
             }
         }
 
-        return Token::String(self.pool.intern_string(value));
+        Token::String(self.pool.intern_string(value))
     }
 
     /// Scan a single escape sequence inside a string. Returns None if the sequence produces no
@@ -628,26 +624,26 @@ impl<'a> StringScanner<'a> {
 
         match self.cur {
             // Handle traditional escape sequences.
-            Some('a')  => { self.read(); return Some('\u{0007}'); }
-            Some('b')  => { self.read(); return Some('\u{0008}'); }
-            Some('t')  => { self.read(); return Some('\u{0009}'); }
-            Some('n')  => { self.read(); return Some('\u{000A}'); }
-            Some('r')  => { self.read(); return Some('\u{000D}'); }
-            Some('"')  => { self.read(); return Some('\u{0022}'); }
-            Some('\\') => { self.read(); return Some('\u{005C}'); }
-            Some('|')  => { self.read(); return Some('\u{007C}'); }
+            Some('a')  => { self.read(); Some('\u{0007}') }
+            Some('b')  => { self.read(); Some('\u{0008}') }
+            Some('t')  => { self.read(); Some('\u{0009}') }
+            Some('n')  => { self.read(); Some('\u{000A}') }
+            Some('r')  => { self.read(); Some('\u{000D}') }
+            Some('"')  => { self.read(); Some('\u{0022}') }
+            Some('\\') => { self.read(); Some('\u{005C}') }
+            Some('|')  => { self.read(); Some('\u{007C}') }
 
             // A backslash followed by whitespace starts a line escape which is ignored.
             Some(c) if is_whitespace(c) => {
                 self.scan_string_line_escape_sequence(escape_start);
-                return None;
+                None
             }
 
             // A backslash followed by `x` starts a hexcoded Unicode character escape
             // (or is an invalid escape sequence, we handle both below).
             Some('x') | Some('X') => {
                 let c = self.scan_string_unicode_escape_sequence(escape_start);
-                return Some(c);
+                Some(c)
             }
 
             // Any other character is not expected after a backslash, it is an error. Report
@@ -656,13 +652,11 @@ impl<'a> StringScanner<'a> {
                 self.diagnostic.report(DiagnosticKind::err_lexer_invalid_escape_sequence,
                     Span::new(escape_start, self.pos));
                 self.read();
-                return Some(c);
+                Some(c)
             }
 
             // If we encounter an EOF then just return None. The caller will report this condition.
-            None => {
-                return None;
-            }
+            None => { None }
         }
     }
 
@@ -740,9 +734,7 @@ impl<'a> StringScanner<'a> {
                     // literals like "\x00000000000000000001;" or "\xFFFFFFFFFFFFFFFF", so we
                     // should be careful about overflows.
                     Some(c) if is_digit(16, c) => {
-                        if value <= 0x00FFFFFF {
-                            value = (value << 4) | hex_value(c) as u32;
-                        }
+                        value = saturating_add_unicode_nibble(value, c);
                         self.read();
                     }
 
@@ -777,12 +769,12 @@ impl<'a> StringScanner<'a> {
                 Span::new(self.prev_pos, self.prev_pos));
             self.read();
 
-            return REPLACEMENT_CHARACTER;
+            REPLACEMENT_CHARACTER
         } else {
             self.diagnostic.report(DiagnosticKind::err_lexer_invalid_escape_sequence,
                 Span::new(escape_start, self.prev_pos));
 
-            return first_char;
+            first_char
         }
     }
 
@@ -815,7 +807,7 @@ impl<'a> StringScanner<'a> {
             }
         }
 
-        return Token::Directive(self.pool.intern_string(value));
+        Token::Directive(self.pool.intern_string(value))
     }
 
     /// Scan over an identifier (non-escaped).
@@ -862,7 +854,7 @@ impl<'a> StringScanner<'a> {
                 Span::new(start, end));
         }
 
-        return Token::Identifier(self.pool.intern_string(value));
+        Token::Identifier(self.pool.intern_string(value))
     }
 
     /// Scan an escaped identifier. This method also expands any escape sequences in the scanned
@@ -908,7 +900,7 @@ impl<'a> StringScanner<'a> {
 
         // Note that escaped identifiers are always verbatim. They are case-sensitive and they are
         // not normalized in any way.
-        return Token::Identifier(self.pool.intern_string(value));
+        Token::Identifier(self.pool.intern_string(value))
     }
 
     /// Scan a single escape sequence inside an identifier. Returns None if an unexpected
@@ -922,20 +914,20 @@ impl<'a> StringScanner<'a> {
 
         match self.cur {
             // Handle traditional escape sequences.
-            Some('a')  => { self.read(); return Some('\u{0007}'); }
-            Some('b')  => { self.read(); return Some('\u{0008}'); }
-            Some('t')  => { self.read(); return Some('\u{0009}'); }
-            Some('n')  => { self.read(); return Some('\u{000A}'); }
-            Some('r')  => { self.read(); return Some('\u{000D}'); }
-            Some('"')  => { self.read(); return Some('\u{0022}'); }
-            Some('\\') => { self.read(); return Some('\u{005C}'); }
-            Some('|')  => { self.read(); return Some('\u{007C}'); }
+            Some('a')  => { self.read(); Some('\u{0007}') }
+            Some('b')  => { self.read(); Some('\u{0008}') }
+            Some('t')  => { self.read(); Some('\u{0009}') }
+            Some('n')  => { self.read(); Some('\u{000A}') }
+            Some('r')  => { self.read(); Some('\u{000D}') }
+            Some('"')  => { self.read(); Some('\u{0022}') }
+            Some('\\') => { self.read(); Some('\u{005C}') }
+            Some('|')  => { self.read(); Some('\u{007C}') }
 
             // A backslash followed by `x` starts a hexcoded Unicode character escape
             // (or is an invalid escape sequence, we handle both below).
             Some('x') | Some('X') => {
                 let c = self.scan_string_unicode_escape_sequence(escape_start);
-                return Some(c);
+                Some(c)
             }
 
             // Any other character is not expected after a backslash, it is an error. Report
@@ -944,13 +936,11 @@ impl<'a> StringScanner<'a> {
                 self.diagnostic.report(DiagnosticKind::err_lexer_invalid_escape_sequence,
                     Span::new(escape_start, self.pos));
                 self.read();
-                return Some(c);
+                Some(c)
             }
 
             // If we encounter an EOF then just return None. The caller will report this condition.
-            None => {
-                return None;
-            }
+            None => { None }
         }
     }
 
@@ -1043,7 +1033,7 @@ impl<'a> StringScanner<'a> {
 
         let value = &self.buf[start..end];
 
-        return Token::Number(self.pool.intern(value));
+        Token::Number(self.pool.intern(value))
     }
 
     /// Scan all number literal prefixes. Fills in values and locations of radix and exactness
@@ -1472,28 +1462,28 @@ impl<'a> StringScanner<'a> {
             return true;
         }
 
-        return false;
+        false
     }
 
     /// If the current string remainder starts with a given prefix (case-insensitive, ASCII-only),
     /// then scan over it and return true. Otherwise do not modify scanning state and return false.
     fn try_scan(&mut self, prefix: &str) -> bool {
-        if has_ascii_prefix_ci(&self.buf[self.prev_pos..], prefix) {
+        let has_prefix = has_ascii_prefix_ci(&self.buf[self.prev_pos..], prefix);
+        if has_prefix {
             for _ in 0..prefix.len() { self.read(); }
-            return true;
         }
-        return false;
+        has_prefix
     }
 
     /// If the current string remainder starts with a given prefix (case-insensitive, ASCII-only),
     /// and a delimiter is present after the prefix, then scan over it and return true. Otherwise
     /// do not modify scanning state and return false.
     fn try_scan_exactly(&mut self, prefix: &str) -> bool {
-        if has_ascii_prefix_ci_exact(&self.buf[self.prev_pos..], prefix) {
+        let has_prefix = has_ascii_prefix_ci_exact(&self.buf[self.prev_pos..], prefix);
+        if has_prefix {
             for _ in 0..prefix.len() { self.read(); }
-            return true;
         }
-        return false;
+        has_prefix
     }
 
     /// Scan over an (invalid) suffix of an `+inf.0` or `-nan.0` value.
@@ -1674,13 +1664,13 @@ fn is_identifier_subsequent(c: char) -> bool {
 /// Check if a character is an initial of an identifer.
 #[cfg(feature = "unicode")]
 fn is_identifier_initial(c: char) -> bool {
-    return libunicode::scheme_identifiers::is_initial(c);
+    libunicode::scheme_identifiers::is_initial(c)
 }
 
 /// Check if a character is a subsequent of an identifer.
 #[cfg(feature = "unicode")]
 fn is_identifier_subsequent(c: char) -> bool {
-    return libunicode::scheme_identifiers::is_subsequent(c);
+    libunicode::scheme_identifiers::is_subsequent(c)
 }
 
 /// A replacement character used when we need to return a character, but don't have one.
@@ -1703,14 +1693,23 @@ fn is_digit(base: u8, c: char) -> bool {
 fn hex_value(c: char) -> u8 {
     assert!(is_digit(16, c));
 
-    const H: &'static [u8; 128] = &[
+    const H: &[u8; 128] = &[
         0, 0, 0, 0, 0, 0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
         0, 0, 0, 0, 0, 0, 0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,5,6,7,8,9,0,0,0,0,0,0,
         0,10,11,12,13,14,15,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
         0,10,11,12,13,14,15,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
     ];
 
-    return H[c as usize];
+    H[c as usize]
+}
+
+/// Appends hexadecimal nibble to a Unicode code point without integer overflow.
+fn saturating_add_unicode_nibble(value: u32, c: char) -> u32 {
+    if value <= 0x00_FF_FF_FF {
+        (value << 4) | u32::from(hex_value(c))
+    } else {
+        value
+    }
 }
 
 /// Normalize a string as a case-sensitive identifier.
@@ -1828,7 +1827,7 @@ fn looks_like_number_prefix(s: &str, radix: u8) -> bool {
     }
 
     // Anything starting with a digit must be a number.
-    return first.map_or(false, |c| is_digit(radix, c));
+    first.map_or(false, |c| is_digit(radix, c))
 }
 
 /// Return true if `s` has a given ASCII prefix ignoring case.
@@ -1846,7 +1845,7 @@ fn has_ascii_prefix_ci_exact(s: &str, prefix: &str) -> bool {
     if !has_ascii_prefix_ci(s, prefix) {
         return false;
     }
-    return s.chars()
-            .nth(prefix.len())
-            .map_or(true, is_delimiter);
+    s.chars()
+     .nth(prefix.len())
+     .map_or(true, is_delimiter)
 }

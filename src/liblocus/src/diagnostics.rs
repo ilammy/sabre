@@ -30,7 +30,7 @@ impl Span {
     /// Make a new span with given bounds.
     pub fn new(from: usize, to: usize) -> Span {
         assert!(from <= to);
-        Span { from: from, to: to }
+        Span { from, to }
     }
 }
 

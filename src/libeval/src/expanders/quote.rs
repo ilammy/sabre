@@ -27,7 +27,7 @@ impl QuoteExpander {
     /// Make a new `quote` expander for a given name.
     pub fn new(name: Atom) -> QuoteExpander {
         QuoteExpander {
-            name: name,
+            name,
         }
     }
 }
@@ -57,10 +57,10 @@ impl Expander for QuoteExpander {
             }
         };
 
-        return ExpansionResult::Some(Expression {
+        ExpansionResult::Some(Expression {
             kind: ExpressionKind::Quotation(result),
             span: datum.span,
             environment: environment.clone(),
-        });
+        })
     }
 }

@@ -61,7 +61,7 @@ pub fn with_formatting_pool<R, F: FnOnce() -> R>(new_pool: &InternPool, f: F) ->
         let assignment = set_dynamic_cell(current_pool, new_pool);
         let result = f();
         drop(assignment);
-        return result;
+        result
     })
 }
 
@@ -72,7 +72,7 @@ fn get_dynamic_cell<'a, T>(cell: &'a DynamicCell<T>) -> Option<&'a T> {
     let pointer = unsafe { &*cell.get() };
     // The pointers we store as Some are guaranteed to be valid for the borrow duration of
     // the dynamic cell which is established by the LocalKey::with() call.
-    return pointer.map(|p| unsafe { &*p });
+    pointer.map(|p| unsafe { &*p })
 }
 
 fn set_dynamic_cell<'a, T>(cell: &'a DynamicCell<T>, new_value: &'a T) -> DynamicSetGuard<'a, T> {
@@ -83,7 +83,7 @@ fn set_dynamic_cell<'a, T>(cell: &'a DynamicCell<T>, new_value: &'a T) -> Dynami
         // closure and its descendants) and then replace the old value back so that the outer
         // active calls continue to see the previous value when we return.
         old_value: std::mem::replace(unsafe { &mut *cell.get() }, Some(new_value)),
-        cell: cell,
+        cell,
     }
 }
 
