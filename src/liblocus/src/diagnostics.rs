@@ -11,6 +11,7 @@
 //! error and warning messages, notifications, etc.
 
 use std::cell::RefCell;
+use std::ops::Range;
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Spans
@@ -76,5 +77,47 @@ impl Handler {
     /// Immediately report a single diagnostic.
     pub fn report(&self, kind: DiagnosticKind, span: Span) {
         self.reporter.borrow_mut().report(Diagnostic { kind, span });
+    }
+
+    pub fn report_(&self, kind: DiagnosticKind) -> DiagnosticBuilder {
+        DiagnosticBuilder {
+            handler: self,
+            kind,
+            span: None,
+        }
+    }
+}
+
+pub struct DiagnosticBuilder<'a> {
+    handler: &'a Handler,
+    kind: DiagnosticKind,
+    span: Option<Span>,
+}
+
+pub struct SpanSpec(Span);
+
+impl From<Span> for SpanSpec {
+    fn from(span: Span) -> Self {
+        SpanSpec(span)
+    }
+}
+
+impl From<Range<usize>> for SpanSpec {
+    fn from(range: Range<usize>) -> Self {
+        SpanSpec(Span::new(range.start, range.end))
+    }
+}
+
+impl<'a> DiagnosticBuilder<'a> {
+    pub fn at(mut self, span: impl Into<SpanSpec>) -> Self {
+        self.span = Some(span.into().0);
+        self
+    }
+}
+
+impl<'a> Drop for DiagnosticBuilder<'a> {
+    fn drop(&mut self) {
+        assert!(self.span.is_some(), "diagnostic span not specified");
+        self.handler.report(self.kind, self.span.unwrap());
     }
 }
