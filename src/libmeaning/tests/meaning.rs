@@ -9,43 +9,59 @@
 //!
 //! This verifies that the basic semantics of Scheme is handled as expected.
 
-use libeval::meaning::{meaning, MeaningResult, Value};
+use libmeaning::{meaning, MeaningResult, Value};
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Tested expanders and environments
 
 use std::rc::Rc;
 
-use libeval::environment::Environment;
-use libeval::expand::Expander;
-use libeval::expanders::{BeginExpander, IfExpander, LambdaExpander, QuoteExpander, SetExpander};
-use libeval::expression::Variable;
+use libexpand::environment::Environment;
+use libexpand::Expander;
+use libexpand::expanders::{BeginExpander, IfExpander, LambdaExpander, QuoteExpander, SetExpander};
+use libexpand::expression::Variable;
 use liblocus::diagnostics::{DiagnosticKind, Span};
 use libreader::intern_pool::InternPool;
 
 macro_rules! syntax {
-    ($pool:expr, $name:expr, $type:ty) => ({
+    ($pool:expr, $name:expr, $type:ty) => {{
         let name = $pool.intern($name);
-        (Variable { name, span: Span::new(0, 0) }, Box::new(<$type>::new(name)))
-    })
+        (
+            Variable {
+                name,
+                span: Span::new(0, 0),
+            },
+            Box::new(<$type>::new(name)),
+        )
+    }};
 }
 
 fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
     let keywords: Vec<(Variable, Box<Expander>)> = vec![
-        syntax!(pool, "quote",  QuoteExpander),
-        syntax!(pool, "begin",  BeginExpander),
-        syntax!(pool, "if",     IfExpander),
-        syntax!(pool, "set!",   SetExpander),
+        syntax!(pool, "quote", QuoteExpander),
+        syntax!(pool, "begin", BeginExpander),
+        syntax!(pool, "if", IfExpander),
+        syntax!(pool, "set!", SetExpander),
         syntax!(pool, "lambda", LambdaExpander),
     ];
     let imported_vars = [
-        Variable { name: pool.intern("car"), span: Span::new(0, 0) },
-        Variable { name: pool.intern("cdr"), span: Span::new(0, 0) },
-        Variable { name: pool.intern("cons"), span: Span::new(0, 0) },
+        Variable {
+            name: pool.intern("car"),
+            span: Span::new(0, 0),
+        },
+        Variable {
+            name: pool.intern("cdr"),
+            span: Span::new(0, 0),
+        },
+        Variable {
+            name: pool.intern("cons"),
+            span: Span::new(0, 0),
+        },
     ];
-    let global_vars = [
-        Variable { name: pool.intern("*global*"), span: Span::new(0, 0) },
-    ];
+    let global_vars = [Variable {
+        name: pool.intern("*global*"),
+        span: Span::new(0, 0),
+    }];
 
     let imported_env = Environment::new_imported(&imported_vars, keywords);
     let global_env = Environment::new_global(&global_vars, &imported_env);
@@ -312,7 +328,7 @@ fn lambda_fixed_arguments() {
         .meaning("(Sequence \
                     (ClosureFixed 1 \
                      (Sequence \
-                       (Alternative (ShallowArgumentReference 0) \
+                       (Alternative (ArgumentReference 0 0) \
                          (Sequence (Constant 0) (Constant 1)) \
                          (Constant 2)))))")
         .check();
@@ -328,15 +344,15 @@ fn lambda_fixed_arguments_nested() {
         .meaning("(Sequence \
                     (ClosureFixed 3 \
                      (Sequence \
-                       (Alternative (ShallowArgumentReference 2) \
+                       (Alternative (ArgumentReference 0 2) \
                          (ClosureFixed 1 \
                           (Sequence \
-                            (ShallowArgumentReference 0) \
-                            (DeepArgumentReference 1 0))) \
+                            (ArgumentReference 0 0) \
+                            (ArgumentReference 1 0))) \
                          (ClosureFixed 1 \
                           (Sequence \
-                            (ShallowArgumentReference 0) \
-                            (DeepArgumentReference 1 1)))))))")
+                            (ArgumentReference 0 0) \
+                            (ArgumentReference 1 1)))))))")
         .check();
 }
 
@@ -381,8 +397,8 @@ fn application_closed() {
              (ProcedureCall (ClosureFixed 2 \
              (Sequence \
              (ProcedureCall (ImportedReference 2) \
-             (ShallowArgumentReference 0) \
-             (ShallowArgumentReference 1)))) \
+             (ArgumentReference 0 0) \
+             (ArgumentReference 0 1)))) \
              (Constant 0) \
              (Constant 1)))",
         )
@@ -400,22 +416,22 @@ fn local_variables_shadow_special_forms() {
                     (ProcedureCall (ClosureFixed 1 \
                                     (Sequence \
                                       (ProcedureCall \
-                                        (ShallowArgumentReference 0) \
-                                        (ShallowArgumentReference 0) \
-                                        (ShallowArgumentReference 0) \
-                                        (ShallowArgumentReference 0)))) \
+                                        (ArgumentReference 0 0) \
+                                        (ArgumentReference 0 0) \
+                                        (ArgumentReference 0 0) \
+                                        (ArgumentReference 0 0)))) \
                       (ClosureFixed 2 \
                        (Sequence \
                          (ProcedureCall (ImportedReference 2) \
-                           (ShallowArgumentReference 0) \
-                           (ShallowArgumentReference 1))))))")
+                           (ArgumentReference 0 0) \
+                           (ArgumentReference 0 1))))))")
         .check();
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use libeval::expression::Expression;
+use libexpand::expression::Expression;
 use liblocus::diagnostics::Diagnostic;
 use libreader::datum::ScannedDatum;
 use libreader::lexer::StringScanner;
@@ -447,7 +463,8 @@ impl TestCase {
     }
 
     fn constants<F>(mut self, generator: F) -> Self
-        where F: Fn(&InternPool) -> Vec<Value> + 'static
+    where
+        F: Fn(&InternPool) -> Vec<Value> + 'static,
     {
         assert!(self.constant_generator.is_none(), "don't set constants twice");
         self.constant_generator = Some(Box::new(generator));
@@ -473,9 +490,12 @@ impl TestCase {
 }
 
 /// TODO
-fn check(input: &str, output: &str, expected_diagnostics: &[Diagnostic],
-    constant_generator: Option<&dyn Fn(&InternPool) -> Vec<Value>>)
-{
+fn check(
+    input: &str,
+    output: &str,
+    expected_diagnostics: &[Diagnostic],
+    constant_generator: Option<&dyn Fn(&InternPool) -> Vec<Value>>,
+) {
     let pool = InternPool::new();
 
     let data = parse(&pool, input);
@@ -512,13 +532,14 @@ fn parse(pool: &InternPool, input: &str) -> Vec<ScannedDatum> {
 }
 
 fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
-    use libeval::expand::expand;
+    use libexpand::expand;
     use liblocus::utils::collect_diagnostics;
 
     let (expansion_result, expansion_diagnostics) = collect_diagnostics(|handler| {
         let environment = basic_scheme_environment(pool);
 
-        return data.iter()
+        return data
+            .iter()
             .map(|datum| expand(datum, &environment, &handler))
             .collect();
     });
@@ -532,6 +553,6 @@ fn treat(expressions: &[Expression]) -> (MeaningResult, Vec<Diagnostic>) {
     use liblocus::utils::collect_diagnostics;
 
     collect_diagnostics(|handler| {
-        return meaning(handler, expressions);
+        return meaning(expressions, handler);
     })
 }

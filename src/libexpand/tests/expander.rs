@@ -11,9 +11,9 @@
 
 use std::rc::Rc;
 
-use libeval::environment::Environment;
-use libeval::expanders::{BeginExpander, IfExpander, LambdaExpander, QuoteExpander, SetExpander};
-use libeval::expression::Variable;
+use libexpand::environment::Environment;
+use libexpand::expanders::{BeginExpander, IfExpander, LambdaExpander, QuoteExpander, SetExpander};
+use libexpand::expression::Variable;
 use liblocus::diagnostics::{DiagnosticKind, Span};
 use libreader::intern_pool::InternPool;
 
@@ -771,7 +771,7 @@ impl TestCase {
 /// Panic if this is not true.
 
 fn check(keywords: &MagicKeywords, input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
-    use libeval::expand::expand;
+    use libexpand::expand;
     use liblocus::utils::collect_diagnostics;
     use libreader::intern_pool::with_formatting_pool;
 

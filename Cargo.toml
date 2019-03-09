@@ -1,7 +1,8 @@
 [workspace]
 members = [
-    "src/libeval",
+    "src/libexpand",
     "src/liblocus",
+    "src/libmeaning",
     "src/libreader",
     "src/libunicode",
 ]
