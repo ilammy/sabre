@@ -55,18 +55,21 @@ pub mod scheme_identifiers {
     fn lookup(c: char, mapping: &[(char, char)]) -> bool {
         use std::cmp::Ordering;
 
-        mapping.binary_search_by(|&(low, high)| {
-            if (low <= c) && (c <= high) {
-                Ordering::Equal
-            } else if high < c {
-                Ordering::Less
-            } else {
-                Ordering::Greater
-            }
-        }).is_ok()
+        mapping
+            .binary_search_by(|&(low, high)| {
+                if (low <= c) && (c <= high) {
+                    Ordering::Equal
+                } else if high < c {
+                    Ordering::Less
+                } else {
+                    Ordering::Greater
+                }
+            })
+            .is_ok()
     }
 
     /// Lookup table of initial mapping for ASCII.
+    #[rustfmt::skip]
     const ASCII_INITIAL: &[bool; 128] = &[
         false, false, false, false, false, false, false, false, false, false, false, false, false,
         false, false, false, false, false, false, false, false, false, false, false, false, false,
@@ -81,6 +84,7 @@ pub mod scheme_identifiers {
     ];
 
     /// Lookup table of subsequent mapping for ASCII.
+    #[rustfmt::skip]
     const ASCII_SUBSEQUENT: &[bool; 128] = &[
         false, false, false, false, false, false, false, false, false, false, false, false, false,
         false, false, false, false, false, false, false, false, false, false, false, false, false,
@@ -95,6 +99,7 @@ pub mod scheme_identifiers {
     ];
 
     /// Lookup table of initial mapping for full Unicode range.
+    #[rustfmt::skip]
     const FULL_UNICODE_INITIAL: &[(char, char)] = &[
         ('\u{0021}', '\u{0021}'), ('\u{0024}', '\u{0026}'), ('\u{002A}', '\u{002B}'),
         ('\u{002D}', '\u{002F}'), ('\u{003A}', '\u{003A}'), ('\u{003C}', '\u{005A}'),
@@ -345,6 +350,7 @@ pub mod scheme_identifiers {
     ];
 
     /// Lookup table of subsequent mapping for full Unicode range.
+    #[rustfmt::skip]
     const FULL_UNICODE_SUBSEQUENT: &[(char, char)] = &[
         ('\u{0021}', '\u{0021}'), ('\u{0024}', '\u{0026}'), ('\u{002A}', '\u{002B}'),
         ('\u{002D}', '\u{003A}'), ('\u{003C}', '\u{005A}'), ('\u{005E}', '\u{005F}'),
@@ -605,7 +611,7 @@ pub mod character_properties {
 
         let prefix = (c >> CCC_SUFFIX) as usize;
         let offset = (c & ((1 << CCC_SUFFIX) - 1)) as usize;
-        let base   = CCC_OFFSETS[prefix] as usize;
+        let base = CCC_OFFSETS[prefix] as usize;
 
         CCC_VALUES[base + offset]
     }
@@ -614,6 +620,7 @@ pub mod character_properties {
     const CCC_SUFFIX: u8 = 8;
 
     /// Lookup table of offsets.
+    #[rustfmt::skip]
     const CCC_OFFSETS: &[u16] = &[
             0,     0,     0,   256,   512,   768,  1024,  1280,  1536,  1792,  2048,  2304,  2560,
          2816,  3072,  3328,  3584,     0,     0,  3840,     0,     0,     0,  4096,  4352,  4608,
@@ -953,6 +960,7 @@ pub mod character_properties {
     ];
 
     /// Lookup table of values.
+    #[rustfmt::skip]
     const CCC_VALUES: &[u8] = &[
           0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
           0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,   0,
@@ -1778,6 +1786,7 @@ pub mod composition_mappings {
     }
 
     /// Compute hash function of a code point pair.
+    #[rustfmt::skip]
     fn hash(c1: u32, c2: u32) -> u32 {
         let (n1, n2, n3) = (61463, 17929, 60887);
 
@@ -1799,6 +1808,7 @@ pub mod composition_mappings {
 
     /// Hash table buckets for `primary()`. They contain all Primary Composite mappings
     /// except for precomposed Hangul syllables.
+    #[rustfmt::skip]
     const PRIMARY_COMPOSITION_HASH_TABLE: &[(u32, u32, u32)] = &[
         MISSING, MISSING, MISSING, MISSING, MISSING, MISSING, MISSING, MISSING, MISSING, MISSING,
         MISSING, MISSING, (0x0075,  0x0328, 0x0173), (0x0436,  0x0306, 0x04C2),
@@ -2452,7 +2462,7 @@ pub mod decomposition_mappings {
 
         let prefix = (c >> DECOMPOSITION_SUFFIX) as usize;
         let offset = (c & ((1 << DECOMPOSITION_SUFFIX) - 1)) as usize;
-        let base   = DECOMPOSITION_OFFSETS[prefix] as usize;
+        let base = DECOMPOSITION_OFFSETS[prefix] as usize;
 
         let (address, length, _, _) = DECOMPOSITION_SLICES[base + offset];
 
@@ -2462,7 +2472,8 @@ pub mod decomposition_mappings {
 
         let (address, length) = (address as usize, length as usize);
 
-        Some(charcc::from_u32_slice(&DECOMPOSITION_CHARS[address..(address + length)]))
+        let slice = &DECOMPOSITION_CHARS[address..(address + length)];
+        Some(charcc::from_u32_slice(slice))
     }
 
     /// Get full compatibility decomposition of character `c`.
@@ -2477,7 +2488,7 @@ pub mod decomposition_mappings {
 
         let prefix = (c >> DECOMPOSITION_SUFFIX) as usize;
         let offset = (c & ((1 << DECOMPOSITION_SUFFIX) - 1)) as usize;
-        let base   = DECOMPOSITION_OFFSETS[prefix] as usize;
+        let base = DECOMPOSITION_OFFSETS[prefix] as usize;
 
         let (_, _, address, length) = DECOMPOSITION_SLICES[base + offset];
 
@@ -2487,13 +2498,15 @@ pub mod decomposition_mappings {
 
         let (address, length) = (address as usize, length as usize);
 
-        Some(charcc::from_u32_slice(&DECOMPOSITION_CHARS[address..(address + length)]))
+        let slice = &DECOMPOSITION_CHARS[address..(address + length)];
+        Some(charcc::from_u32_slice(slice))
     }
 
     /// Length of trie suffix.
     const DECOMPOSITION_SUFFIX: u8 = 6;
 
     /// Lookup table of offsets.
+    #[rustfmt::skip]
     const DECOMPOSITION_OFFSETS: &[u16] = &[
           0,     0,    64,   128,   192,   256,   320,   384,   448,     0,   512,   576,     0,
         640,   704,   768,   832,   896,     0,   960,     0,     0,  1024,     0,  1088,  1152,
@@ -3838,6 +3851,7 @@ pub mod decomposition_mappings {
     ];
 
     /// Lookup table of slices.
+    #[rustfmt::skip]
     const DECOMPOSITION_SLICES: &[(u16, u8, u16, u8)] = &[
         (    0,  0,     0,  0), (    0,  0,     0,  0), (    0,  0,     0,  0),
         (    0,  0,     0,  0), (    0,  0,     0,  0), (    0,  0,     0,  0),
@@ -7405,6 +7419,7 @@ pub mod decomposition_mappings {
     ];
 
     /// Actual decomposition character data blob.
+    #[rustfmt::skip]
     const DECOMPOSITION_CHARS: &[u32] = &[
         0x0020, 0x0020, 0xE6000308, 0x0061, 0x0020, 0xE6000304, 0x0032, 0x0033, 0x0020,
         0xE6000301, 0x03BC, 0x0020, 0xCA000327, 0x0031, 0x006F, 0x0031, 0x2044, 0x0034, 0x0031,
@@ -8136,7 +8151,7 @@ pub mod quick_check {
 
         let prefix = (c >> QUICK_CHECK_SUFFIX) as usize;
         let offset = (c & ((1 << QUICK_CHECK_SUFFIX) - 1)) as usize;
-        let base   = QUICK_CHECK_OFFSETS[prefix] as usize;
+        let base = QUICK_CHECK_OFFSETS[prefix] as usize;
 
         QUICK_CHECK_VALUES[base + offset]
     }
@@ -8150,6 +8165,7 @@ pub mod quick_check {
     const QUICK_CHECK_SUFFIX: u8 = 8;
 
     /// Lookup table of offsets.
+    #[rustfmt::skip]
     const QUICK_CHECK_OFFSETS: &[u16] = &[
            0,  256,  512,  768, 1024, 1280, 1536, 1792, 1792, 2048, 2304, 2560, 2816, 3072, 3328,
         3584, 3840, 4096, 1792, 1792, 1792, 1792, 1792, 1792, 1792, 1792, 1792, 4352, 1792, 4608,
@@ -8445,6 +8461,7 @@ pub mod quick_check {
     ];
 
     /// Lookup table of data.
+    #[rustfmt::skip]
     const QUICK_CHECK_VALUES: &[u8] = &[
          0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
          0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,  0,
@@ -9167,7 +9184,7 @@ pub mod case_mappings {
 
         let prefix = (c >> NFKC_CASEFOLD_SUFFIX) as usize;
         let offset = (c & ((1 << NFKC_CASEFOLD_SUFFIX) - 1)) as usize;
-        let base   = NFKC_CASEFOLD_OFFSETS[prefix] as usize;
+        let base = NFKC_CASEFOLD_OFFSETS[prefix] as usize;
 
         let (start, end) = NFKC_CASEFOLD_SLICES[base + offset];
 
@@ -9182,6 +9199,7 @@ pub mod case_mappings {
     const NFKC_CASEFOLD_SUFFIX: u8 = 7;
 
     /// Lookup table of offsets.
+    #[rustfmt::skip]
     const NFKC_CASEFOLD_OFFSETS: &[u16] = &[
           0,   128,   256,   384,   512,   640,   768,   896,  1024,  1152,  1280,  1408,  1536,
        1664,  1664,  1664,  1664,  1664,  1792,  1920,  2048,  1664,  2176,  1664,  1664,  1664,
@@ -9856,6 +9874,7 @@ pub mod case_mappings {
     ];
 
     /// Lookup table of slices.
+    #[rustfmt::skip]
     const NFKC_CASEFOLD_SLICES: &[(u16, u16)] = &[
         (    1,     0), (    1,     0), (    1,     0), (    1,     0), (    1,     0),
         (    1,     0), (    1,     0), (    1,     0), (    1,     0), (    1,     0),
@@ -12548,6 +12567,7 @@ pub mod case_mappings {
     ];
 
     /// Actual case-folded character data blob.
+    #[rustfmt::skip]
     const NFKC_CASEFOLD_CHARS: &str = "\
         \u{0061}\u{0062}\u{0063}\u{0064}\u{0065}\u{0066}\u{0067}\u{0068}\u{0069}\u{006A}\u{006B}\
         \u{006C}\u{006D}\u{006E}\u{006F}\u{0070}\u{0071}\u{0072}\u{0073}\u{0074}\u{0075}\u{0076}\

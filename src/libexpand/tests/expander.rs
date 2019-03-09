@@ -41,20 +41,29 @@ impl Default for MagicKeywords {
 }
 
 macro_rules! syntax {
-    ($pool:expr, $name:expr, $type:ty) => ({
+    ($pool:expr, $name:expr, $type:ty) => {{
         let name = $pool.intern($name);
-        (Variable { name, span: Span::new(0, 0) }, Box::new(<$type>::new(name)))
-    })
+        (
+            Variable {
+                name,
+                span: Span::new(0, 0),
+            },
+            Box::new(<$type>::new(name)),
+        )
+    }};
 }
 
 fn basic_scheme_environment(pool: &InternPool, names: &MagicKeywords) -> Rc<Environment> {
-    Environment::new_imported(&[], vec![
-        syntax!(pool, names.quote,  QuoteExpander),
-        syntax!(pool, names.begin,  BeginExpander),
-        syntax!(pool, names.if_,    IfExpander),
-        syntax!(pool, names.set,    SetExpander),
-        syntax!(pool, names.lambda, LambdaExpander),
-    ])
+    Environment::new_imported(
+        &[],
+        vec![
+            syntax!(pool, names.quote, QuoteExpander),
+            syntax!(pool, names.begin, BeginExpander),
+            syntax!(pool, names.if_, IfExpander),
+            syntax!(pool, names.set, SetExpander),
+            syntax!(pool, names.lambda, LambdaExpander),
+        ],
+    )
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -770,7 +779,12 @@ impl TestCase {
 /// Check whether the given expander produces expected results and reports expected diagnostics.
 /// Panic if this is not true.
 
-fn check(keywords: &MagicKeywords, input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
+fn check(
+    keywords: &MagicKeywords,
+    input: &str,
+    expected_result: &str,
+    expected_diagnostics: &[Diagnostic],
+) {
     use libexpand::expand;
     use liblocus::utils::collect_diagnostics;
     use libreader::intern_pool::with_formatting_pool;
@@ -782,12 +796,18 @@ fn check(keywords: &MagicKeywords, input: &str, expected_result: &str, expected_
         let mut parser = Parser::new(scanner, &pool, handler);
 
         let mut all_data = parser.parse_all_data();
-        assert!(parser.parse_all_data().is_empty(), "parser did not consume the whole stream");
+        assert!(
+            parser.parse_all_data().is_empty(),
+            "parser did not consume the whole stream"
+        );
         assert!(all_data.len() == 1, "input must describe exactly one datum");
         all_data.pop().unwrap()
     });
 
-    assert!(parsing_diagnostics.is_empty(), "parsing produced diagnostics");
+    assert!(
+        parsing_diagnostics.is_empty(),
+        "parsing produced diagnostics"
+    );
 
     let (expand_result, expand_diagnostics) = collect_diagnostics(|handler| {
         let environment = basic_scheme_environment(&pool, keywords);

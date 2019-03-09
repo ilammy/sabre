@@ -28,9 +28,7 @@ impl InternedString {
 
     /// Wrap an existing String into InternedString.
     pub fn from_string(s: String) -> InternedString {
-        InternedString {
-            data: Rc::new(s),
-        }
+        InternedString { data: Rc::new(s) }
     }
 }
 
@@ -61,5 +59,7 @@ impl Borrow<str> for InternedString {
 impl Deref for InternedString {
     type Target = str;
 
-    fn deref(&self) -> &str { &self.data[..] }
+    fn deref(&self) -> &str {
+        &self.data[..]
+    }
 }

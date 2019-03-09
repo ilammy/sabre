@@ -52,7 +52,7 @@ enum VariableKind {
     Syntactic {
         /// The macro expander.
         expander: Box<Expander>,
-    }
+    },
 }
 
 /// Reference to a variable from environment.
@@ -69,28 +69,19 @@ pub enum ReferenceKind<'a> {
     ///
     /// Local variables are identified by their (zero-based) index in the activation record of
     /// their defining procedure and by the nesting depth of the procedure (zero is current one).
-    Local {
-        depth: usize,
-        index: usize,
-    },
+    Local { depth: usize, index: usize },
     /// Globally-defined mutable variable.
     ///
     /// Global variables are identified by their index in the global variable table.
-    Global {
-        index: usize,
-    },
+    Global { index: usize },
     /// Imported immutable variable.
     ///
     /// Imported variables are identified by their index in the import table.
-    Imported {
-        index: usize,
-    },
+    Imported { index: usize },
     /// Syntactic variable.
     ///
     /// Syntactic variables are bound to macro expanders.
-    Syntactic {
-        expander: &'a Expander,
-    }
+    Syntactic { expander: &'a Expander },
 }
 
 impl Environment {
@@ -110,7 +101,10 @@ impl Environment {
     /// The environment stack should contain exactly one global environment, so the parent must be
     /// an imported environment, or else this function panics.
     pub fn new_global(variables: &[Variable], parent: &Rc<Environment>) -> Rc<Environment> {
-        assert!(match parent.kind { EnvironmentKind::Imported => true, _ => false });
+        assert!(match parent.kind {
+            EnvironmentKind::Imported => true,
+            _ => false,
+        });
         Rc::new(Environment {
             kind: EnvironmentKind::Global,
             variables: enumerate_runtime_variables(variables),
@@ -140,18 +134,19 @@ impl Environment {
         // First, try to resolve the name locally.
         if let Some(variable) = self.variables.get(&name) {
             let kind = match variable.kind {
-                VariableKind::Runtime { index } => {
-                    match self.kind {
-                        EnvironmentKind::Local => ReferenceKind::Local { index, depth: 0 },
-                        EnvironmentKind::Global => ReferenceKind::Global { index },
-                        EnvironmentKind::Imported => ReferenceKind::Imported { index },
-                    }
-                }
-                VariableKind::Syntactic { ref expander } => {
-                    ReferenceKind::Syntactic { expander: expander.as_ref() }
-                }
+                VariableKind::Runtime { index } => match self.kind {
+                    EnvironmentKind::Local => ReferenceKind::Local { index, depth: 0 },
+                    EnvironmentKind::Global => ReferenceKind::Global { index },
+                    EnvironmentKind::Imported => ReferenceKind::Imported { index },
+                },
+                VariableKind::Syntactic { ref expander } => ReferenceKind::Syntactic {
+                    expander: expander.as_ref(),
+                },
             };
-            return Some(VariableReference { kind, span: variable.span });
+            return Some(VariableReference {
+                kind,
+                span: variable.span,
+            });
         }
 
         // If that fails then look into parent environment (if it's available).
@@ -171,20 +166,24 @@ impl Environment {
 }
 
 fn enumerate_runtime_variables(variables: &[Variable]) -> HashMap<Atom, EnvironmentVariable> {
-    variables.iter()
+    variables
+        .iter()
         .enumerate()
         .map(|(index, variable)| {
-            (variable.name, EnvironmentVariable {
-                kind: VariableKind::Runtime { index },
-                span: variable.span,
-            })
+            (
+                variable.name,
+                EnvironmentVariable {
+                    kind: VariableKind::Runtime { index },
+                    span: variable.span,
+                },
+            )
         })
         .collect()
 }
 
 fn combine_variables(
     runtime_variables: &[Variable],
-    syntactic_variables: Vec<(Variable, Box<Expander>)>
+    syntactic_variables: Vec<(Variable, Box<Expander>)>,
 ) -> HashMap<Atom, EnvironmentVariable> {
     let mut variables = HashMap::new();
 

@@ -14,10 +14,16 @@ use std::fmt;
 /// Format an s-expression list.
 ///
 /// Format items for debugging as an s-expression list in `fmt::Debug` implementation.
-pub fn write_list<I, T>(f: &mut fmt::Formatter, prefix: &str, items: I, sep: &str, suffix: &str)
-    -> fmt::Result
-    where I: IntoIterator<Item=T>,
-          T: fmt::Debug,
+pub fn write_list<I, T>(
+    f: &mut fmt::Formatter,
+    prefix: &str,
+    items: I,
+    sep: &str,
+    suffix: &str,
+) -> fmt::Result
+where
+    I: IntoIterator<Item = T>,
+    T: fmt::Debug,
 {
     let mut first = true;
 
@@ -38,10 +44,16 @@ pub fn write_list<I, T>(f: &mut fmt::Formatter, prefix: &str, items: I, sep: &st
 /// Format a dotted s-expression list.
 ///
 /// Format items for debugging as a dotted s-expression list in `fmt::Debug` implementation.
-pub fn write_dotted_list<I, T>(f: &mut fmt::Formatter, prefix: &str, items: I, sep: &str, suffix: &str)
-    -> fmt::Result
-    where I: IntoIterator<Item=T>,
-          T: fmt::Debug,
+pub fn write_dotted_list<I, T>(
+    f: &mut fmt::Formatter,
+    prefix: &str,
+    items: I,
+    sep: &str,
+    suffix: &str,
+) -> fmt::Result
+where
+    I: IntoIterator<Item = T>,
+    T: fmt::Debug,
 {
     let mut iter = items.into_iter();
     let mut curr = iter.next();
@@ -79,7 +91,9 @@ mod tests {
     struct DottedList<I>(I);
 
     impl<I, T> fmt::Debug for ProperList<I>
-        where I: IntoIterator<Item=T> + Clone, T: fmt::Debug
+    where
+        I: IntoIterator<Item = T> + Clone,
+        T: fmt::Debug,
     {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write_list(f, "<", self.0.clone(), ", ", ">")
@@ -87,7 +101,9 @@ mod tests {
     }
 
     impl<I, T> fmt::Debug for DottedList<I>
-        where I: IntoIterator<Item=T> + Clone, T: fmt::Debug
+    where
+        I: IntoIterator<Item = T> + Clone,
+        T: fmt::Debug,
     {
         fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
             write_dotted_list(f, "#u8(", self.0.clone(), " ", ")")

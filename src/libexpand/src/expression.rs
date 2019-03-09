@@ -100,16 +100,17 @@ pub enum Arguments {
 impl fmt::Debug for Expression {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.kind {
-            ExpressionKind::Reference(ref variable) =>
-                write!(f, "(Reference {:?})", variable),
-            ExpressionKind::Literal(ref value) =>
-                write!(f, "(Literal {:?})", value),
-            ExpressionKind::Quotation(ref value) =>
-                write!(f, "(Quotation {:?})", value),
-            ExpressionKind::Alternative(ref condition, ref consequent, ref alternate) =>
-                write!(f, "(Alternative {:?} {:?} {:?})", condition, consequent, alternate),
-            ExpressionKind::Assignment(ref variable, ref value) =>
-                write!(f, "(Assignment {:?} {:?})", variable.name, value),
+            ExpressionKind::Reference(ref variable) => write!(f, "(Reference {:?})", variable),
+            ExpressionKind::Literal(ref value) => write!(f, "(Literal {:?})", value),
+            ExpressionKind::Quotation(ref value) => write!(f, "(Quotation {:?})", value),
+            ExpressionKind::Alternative(ref condition, ref consequent, ref alternate) => write!(
+                f,
+                "(Alternative {:?} {:?} {:?})",
+                condition, consequent, alternate
+            ),
+            ExpressionKind::Assignment(ref variable, ref value) => {
+                write!(f, "(Assignment {:?} {:?})", variable.name, value)
+            }
             ExpressionKind::Sequence(ref body) => {
                 write!(f, "(Sequence")?;
                 for expression in body {
@@ -134,8 +135,7 @@ impl fmt::Debug for Expression {
                 write!(f, ")")?;
                 Ok(())
             }
-            ExpressionKind::Undefined =>
-                write!(f, "(Undefined)"),
+            ExpressionKind::Undefined => write!(f, "(Undefined)"),
         }
     }
 }
@@ -145,18 +145,18 @@ impl fmt::Debug for Literal {
         use libreader::format::write_list;
 
         match *self {
-            Literal::Boolean(value) =>
-                if value { write!(f, "#t") } else { write!(f, "#f") },
-            Literal::Number(value) =>
-                write!(f, "{:?}", value),
-            Literal::Character(char) =>
-                write!(f, "#\\x{:04X}", char as u32),
-            Literal::String(value) =>
-                write!(f, "\"{:?}\"", value),
-            Literal::Vector(ref values) =>
-                write_list(f, "#(", values, " ", ")"),
-            Literal::Bytevector(ref values) =>
-                write_list(f, "#u8(", values, " ", ")"),
+            Literal::Boolean(value) => {
+                if value {
+                    write!(f, "#t")
+                } else {
+                    write!(f, "#f")
+                }
+            }
+            Literal::Number(value) => write!(f, "{:?}", value),
+            Literal::Character(char) => write!(f, "#\\x{:04X}", char as u32),
+            Literal::String(value) => write!(f, "\"{:?}\"", value),
+            Literal::Vector(ref values) => write_list(f, "#(", values, " ", ")"),
+            Literal::Bytevector(ref values) => write_list(f, "#u8(", values, " ", ")"),
         }
     }
 }
@@ -166,8 +166,9 @@ impl fmt::Debug for Arguments {
         use libreader::format::write_list;
 
         match *self {
-            Arguments::Fixed(ref variables) =>
+            Arguments::Fixed(ref variables) => {
                 write_list(f, "(", variables.iter().map(|v| v.name), " ", ")")
+            }
         }
     }
 }

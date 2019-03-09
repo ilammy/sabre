@@ -54,26 +54,24 @@ pub fn expand(
 ) -> Expression {
     match datum.value {
         // Literal data does not contain any macros, it is retured as is.
-        DatumValue::Boolean(value) =>
-            literal(datum, environment, Literal::Boolean(value)),
-        DatumValue::Number(value) =>
-            literal(datum, environment, Literal::Number(value)),
-        DatumValue::Character(value) =>
-            literal(datum, environment, Literal::Character(value)),
-        DatumValue::String(value) =>
-            literal(datum, environment, Literal::String(value)),
-        DatumValue::Vector(ref elements) =>
-            literal(datum, environment, Literal::Vector(elements.clone())),
-        DatumValue::Bytevector(ref elements) =>
-            literal(datum, environment, Literal::Bytevector(elements.clone())),
+        DatumValue::Boolean(value) => literal(datum, environment, Literal::Boolean(value)),
+        DatumValue::Number(value) => literal(datum, environment, Literal::Number(value)),
+        DatumValue::Character(value) => literal(datum, environment, Literal::Character(value)),
+        DatumValue::String(value) => literal(datum, environment, Literal::String(value)),
+        DatumValue::Vector(ref elements) => {
+            literal(datum, environment, Literal::Vector(elements.clone()))
+        }
+        DatumValue::Bytevector(ref elements) => {
+            literal(datum, environment, Literal::Bytevector(elements.clone()))
+        }
 
         // R7RS Scheme does not support identifier macros, so symbols always mean references.
-        DatumValue::Symbol(name) =>
-            reference(datum, environment, name),
+        DatumValue::Symbol(name) => reference(datum, environment, name),
 
         // Lists denote forms, so proceed with macro expansion in them.
-        DatumValue::ProperList(ref terms) | DatumValue::DottedList(ref terms) =>
-            form(datum, terms, environment, diagnostic),
+        DatumValue::ProperList(ref terms) | DatumValue::DottedList(ref terms) => {
+            form(datum, terms, environment, diagnostic)
+        }
 
         // Labeled data cannot be used in programs, only in literal quoted data.
         // Report the error and assume the label never existed, reinvoking the expander.
@@ -150,7 +148,8 @@ fn form(
             Span::new(terms[last - 1].span.to, terms[last].span.from));
     }
 
-    let expressions = terms.iter()
+    let expressions = terms
+        .iter()
         .map(|datum| expand(datum, environment, diagnosic))
         .collect();
 

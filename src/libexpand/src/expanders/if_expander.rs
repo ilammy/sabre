@@ -26,9 +26,7 @@ pub struct IfExpander {
 impl IfExpander {
     /// Make a new `if` expander for a given name.
     pub fn new(name: Atom) -> IfExpander {
-        IfExpander {
-            name,
-        }
+        IfExpander { name }
     }
 }
 
@@ -44,8 +42,13 @@ impl Expander for IfExpander {
 
         // The only valid form is (if condition consequent alternative). Expand the terms before
         // gathering them up. Replace any missing terms with placeholder values.
-        let terms = expect_macro_use(datum, self.name, 4, diagnostic,
-            DiagnosticKind::err_expand_invalid_if);
+        let terms = expect_macro_use(
+            datum,
+            self.name,
+            4,
+            diagnostic,
+            DiagnosticKind::err_expand_invalid_if,
+        );
 
         let expand_or_recover = |term: Option<&ScannedDatum>| {
             term.map(|datum| expand(datum, environment, diagnostic))
@@ -56,8 +59,8 @@ impl Expander for IfExpander {
                 })
         };
 
-        let condition   = Box::new(expand_or_recover(terms.get(0)));
-        let consequent  = Box::new(expand_or_recover(terms.get(1)));
+        let condition = Box::new(expand_or_recover(terms.get(0)));
+        let consequent = Box::new(expand_or_recover(terms.get(1)));
         let alternative = Box::new(expand_or_recover(terms.get(2)));
 
         Expression {

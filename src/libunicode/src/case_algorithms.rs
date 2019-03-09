@@ -30,8 +30,12 @@ pub fn to_nfkc_casefold(s: &str) -> String {
 
     for c in s.chars() {
         match case_mappings::nfkc_casefold(c) {
-            Some(slice) => { folded.push_str(slice); }
-            None        => { folded.push(c); }
+            Some(slice) => {
+                folded.push_str(slice);
+            }
+            None => {
+                folded.push(c);
+            }
         }
     }
 

@@ -17,9 +17,9 @@ use libmeaning::{meaning, MeaningResult, Value};
 use std::rc::Rc;
 
 use libexpand::environment::Environment;
-use libexpand::Expander;
 use libexpand::expanders::{BeginExpander, IfExpander, LambdaExpander, QuoteExpander, SetExpander};
 use libexpand::expression::Variable;
+use libexpand::Expander;
 use liblocus::diagnostics::{DiagnosticKind, Span};
 use libreader::intern_pool::InternPool;
 
@@ -96,12 +96,14 @@ fn literals() {
     TestCase::new()
         .input("42 #\\x #false \"string\"")
         .meaning("(Sequence (Constant 0) (Constant 1) (Constant 2) (Constant 3))")
-        .constants(|pool| vec![
-            Value::Number(pool.intern("42")),
-            Value::Character('x'),
-            Value::Boolean(false),
-            Value::String(pool.intern("string")),
-        ])
+        .constants(|pool| {
+            vec![
+                Value::Number(pool.intern("42")),
+                Value::Character('x'),
+                Value::Boolean(false),
+                Value::String(pool.intern("string")),
+            ]
+        })
         .check();
 }
 
@@ -110,12 +112,14 @@ fn quote_literals() {
     TestCase::new()
         .input("'123 (quote #\\!) '#t (quote \"\")")
         .meaning("(Sequence (Constant 0) (Constant 1) (Constant 2) (Constant 3))")
-        .constants(|pool| vec![
-            Value::Number(pool.intern("123")),
-            Value::Character('!'),
-            Value::Boolean(true),
-            Value::String(pool.intern("")),
-        ])
+        .constants(|pool| {
+            vec![
+                Value::Number(pool.intern("123")),
+                Value::Character('!'),
+                Value::Boolean(true),
+                Value::String(pool.intern("")),
+            ]
+        })
         .check();
 }
 
@@ -126,15 +130,17 @@ fn constants_are_duplicated() {
         .meaning("(Sequence \
                     (Constant 0) (Constant 1) (Constant 2) (Constant 3) \
                     (Constant 4) (Constant 5) (Constant 6))")
-        .constants(|pool| vec![
-            Value::Number(pool.intern("1")),
-            Value::Number(pool.intern("2")),
-            Value::Number(pool.intern("3")),
-            Value::Number(pool.intern("1")),
-            Value::Number(pool.intern("2")),
-            Value::Number(pool.intern("3")),
-            Value::Number(pool.intern("1")),
-        ])
+        .constants(|pool| {
+            vec![
+                Value::Number(pool.intern("1")),
+                Value::Number(pool.intern("2")),
+                Value::Number(pool.intern("3")),
+                Value::Number(pool.intern("1")),
+                Value::Number(pool.intern("2")),
+                Value::Number(pool.intern("3")),
+                Value::Number(pool.intern("1")),
+            ]
+        })
         .check();
 }
 
@@ -143,14 +149,26 @@ fn constants_are_duplicated() {
 
 #[test]
 fn reference_imported() {
-    TestCase::new().input("car") .meaning("(Sequence (ImportedReference 0))").check();
-    TestCase::new().input("cdr") .meaning("(Sequence (ImportedReference 1))").check();
-    TestCase::new().input("cons").meaning("(Sequence (ImportedReference 2))").check();
+    TestCase::new()
+        .input("car")
+        .meaning("(Sequence (ImportedReference 0))")
+        .check();
+    TestCase::new()
+        .input("cdr")
+        .meaning("(Sequence (ImportedReference 1))")
+        .check();
+    TestCase::new()
+        .input("cons")
+        .meaning("(Sequence (ImportedReference 2))")
+        .check();
 }
 
 #[test]
 fn reference_global() {
-    TestCase::new().input("*global*").meaning("(Sequence (GlobalReference 0))").check();
+    TestCase::new()
+        .input("*global*")
+        .meaning("(Sequence (GlobalReference 0))")
+        .check();
 }
 
 #[test]
@@ -466,7 +484,10 @@ impl TestCase {
     where
         F: Fn(&InternPool) -> Vec<Value> + 'static,
     {
-        assert!(self.constant_generator.is_none(), "don't set constants twice");
+        assert!(
+            self.constant_generator.is_none(),
+            "don't set constants twice"
+        );
         self.constant_generator = Some(Box::new(generator));
         self
     }
@@ -521,12 +542,18 @@ fn parse(pool: &InternPool, input: &str) -> Vec<ScannedDatum> {
 
         let all_data = parser.parse_all_data();
 
-        assert!(parser.parse_all_data().is_empty(), "parser did not consume the whole stream");
+        assert!(
+            parser.parse_all_data().is_empty(),
+            "parser did not consume the whole stream"
+        );
 
         return all_data;
     });
 
-    assert!(parsing_diagnostics.is_empty(), "parsing produced diagnostics");
+    assert!(
+        parsing_diagnostics.is_empty(),
+        "parsing produced diagnostics"
+    );
 
     return data;
 }
@@ -544,7 +571,10 @@ fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
             .collect();
     });
 
-    assert!(expansion_diagnostics.is_empty(), "expander produced diagnostics");
+    assert!(
+        expansion_diagnostics.is_empty(),
+        "expander produced diagnostics"
+    );
 
     return expansion_result;
 }

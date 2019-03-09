@@ -76,6 +76,7 @@ fn conformance_trivial() {
     }
 }
 
+#[rustfmt::skip]
 const EXPLICIT_STRINGS: &[(&str, &str, &str, &str, &str)] = &[
     ("\u{1E0A}", "\u{1E0A}", "\u{0044}\u{0307}", "\u{1E0A}", "\u{0044}\u{0307}"),
     ("\u{1E0C}", "\u{1E0C}", "\u{0044}\u{0323}", "\u{1E0C}", "\u{0044}\u{0323}"),
@@ -18802,6 +18803,7 @@ const EXPLICIT_STRINGS: &[(&str, &str, &str, &str, &str)] = &[
 
 ];
 
+#[rustfmt::skip]
 const TRIVIAL_RANGES: &[(char, char)] = &[
     ('\u{0000}', '\u{009F}'), ('\u{00A1}', '\u{00A7}'), ('\u{00A9}', '\u{00A9}'),
     ('\u{00AB}', '\u{00AE}'), ('\u{00B0}', '\u{00B1}'), ('\u{00B6}', '\u{00B7}'),

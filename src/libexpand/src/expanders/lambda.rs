@@ -26,9 +26,7 @@ pub struct LambdaExpander {
 impl LambdaExpander {
     /// Make a new `lambda` expander for a given name.
     pub fn new(name: Atom) -> LambdaExpander {
-        LambdaExpander {
-            name,
-        }
+        LambdaExpander { name }
     }
 }
 
@@ -45,13 +43,19 @@ impl Expander for LambdaExpander {
         // The only valid form is (lambda (variable...) body1 body2...). We need to expand only
         // the procedure body. Arguments have their own peculiar syntax and describe the new
         // environment for the procedure body.
-        let terms = expect_macro_use(datum, self.name, 3.., diagnostic,
-            DiagnosticKind::err_expand_invalid_lambda);
+        let terms = expect_macro_use(
+            datum,
+            self.name,
+            3..,
+            diagnostic,
+            DiagnosticKind::err_expand_invalid_lambda,
+        );
 
         let arguments = expand_arguments(terms.get(0), diagnostic);
         let new_environment = new_local_environment(&arguments, environment);
 
-        let expressions = terms.iter()
+        let expressions = terms
+            .iter()
             .skip(1)
             .map(|datum| expand(datum, &new_environment, diagnostic))
             .collect();
@@ -71,10 +75,14 @@ impl Expander for LambdaExpander {
 fn expand_arguments(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Arguments {
     match expect_argument_list(datum, diagnostic) {
         Some(arguments) => {
-            let raw_variables: Vec<Variable> = arguments.iter()
+            let raw_variables: Vec<Variable> = arguments
+                .iter()
                 .filter_map(|argument| {
                     if let DatumValue::Symbol(name) = argument.value {
-                        Some(Variable { name, span: argument.span })
+                        Some(Variable {
+                            name,
+                            span: argument.span,
+                        })
                     } else {
                         diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
                             argument.span);
@@ -85,21 +93,18 @@ fn expand_arguments(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Argum
 
             Arguments::Fixed(deduplicate_variables(raw_variables, diagnostic))
         }
-        None => {
-            Arguments::Fixed(vec![])
-        }
+        None => Arguments::Fixed(vec![]),
     }
 }
 
 /// Extract argument list from the datum (if it really looks like an argument list).
-fn expect_argument_list<'b>(datum: Option<&'b ScannedDatum>, diagnostic: &Handler)
-    -> Option<&'b [ScannedDatum]>
-{
+fn expect_argument_list<'b>(
+    datum: Option<&'b ScannedDatum>,
+    diagnostic: &Handler,
+) -> Option<&'b [ScannedDatum]> {
     if let Some(datum) = datum {
         match datum.value {
-            DatumValue::ProperList(ref data) => {
-                Some(&data)
-            }
+            DatumValue::ProperList(ref data) => Some(&data),
             DatumValue::DottedList(ref data) => {
                 // Currently we do not support &rest arguments, so we unify them into
                 // fixed argument list and produce a diagnostic.
@@ -126,8 +131,7 @@ fn deduplicate_variables(raw_variables: Vec<Variable>, diagnostic: &Handler) -> 
     let mut variables: Vec<Variable> = Vec::with_capacity(raw_variables.len());
 
     // Argument lists should be short, so this O(n^2) algorithm is okay.
-    'next_variable:
-    for variable in raw_variables {
+    'next_variable: for variable in raw_variables {
         for previous in &variables {
             if variable.name == previous.name {
                 diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
@@ -145,8 +149,6 @@ fn deduplicate_variables(raw_variables: Vec<Variable>, diagnostic: &Handler) -> 
 /// Extend the parent environment with new variables based on the argument list of a lambda form.
 fn new_local_environment(arguments: &Arguments, parent: &Rc<Environment>) -> Rc<Environment> {
     match *arguments {
-        Arguments::Fixed(ref variables) => {
-            Environment::new_local(variables, parent)
-        }
+        Arguments::Fixed(ref variables) => Environment::new_local(variables, parent),
     }
 }

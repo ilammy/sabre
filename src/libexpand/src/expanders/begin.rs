@@ -26,9 +26,7 @@ pub struct BeginExpander {
 impl BeginExpander {
     /// Make a new `begin` expander for a given name.
     pub fn new(name: Atom) -> BeginExpander {
-        BeginExpander {
-            name,
-        }
+        BeginExpander { name }
     }
 }
 
@@ -44,10 +42,16 @@ impl Expander for BeginExpander {
 
         // The only valid form is (begin expr1 expr2 ...). Expand nested terms in sequence.
         // Expand anything erroneous into an empty sequence after reporting it to the handler.
-        let terms = expect_macro_use(datum, self.name, 2.., diagnostic,
-            DiagnosticKind::err_expand_invalid_begin);
+        let terms = expect_macro_use(
+            datum,
+            self.name,
+            2..,
+            diagnostic,
+            DiagnosticKind::err_expand_invalid_begin,
+        );
 
-        let expressions = terms.iter()
+        let expressions = terms
+            .iter()
             .map(|datum| expand(datum, environment, diagnostic))
             .collect::<Vec<_>>();
 

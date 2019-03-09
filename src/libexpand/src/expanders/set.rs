@@ -26,9 +26,7 @@ pub struct SetExpander {
 impl SetExpander {
     /// Make a new `set!` expander for a given name.
     pub fn new(name: Atom) -> SetExpander {
-        SetExpander {
-            name,
-        }
+        SetExpander { name }
     }
 }
 
@@ -43,8 +41,13 @@ impl Expander for SetExpander {
 
         // The only valid form is (set! variable value). Variable must be mentioned verbatim.
         // The value expression needs to be expanded.
-        let terms = expect_macro_use(datum, self.name, 3, diagnostic,
-            DiagnosticKind::err_expand_invalid_set);
+        let terms = expect_macro_use(
+            datum,
+            self.name,
+            3,
+            diagnostic,
+            DiagnosticKind::err_expand_invalid_set,
+        );
 
         let variable = expand_variable(terms.get(0), diagnostic);
         let new_value = expand_new_value(terms.get(1), datum, environment, diagnostic);

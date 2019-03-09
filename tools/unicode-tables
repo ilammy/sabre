@@ -1285,18 +1285,21 @@ pub mod scheme_identifiers {
     fn lookup(c: char, mapping: &[(char, char)]) -> bool {
         use std::cmp::Ordering;
 
-        mapping.binary_search_by(|&(low, high)| {
-            if (low <= c) && (c <= high) {
-                Ordering::Equal
-            } else if high < c {
-                Ordering::Less
-            } else {
-                Ordering::Greater
-            }
-        }).is_ok()
+        mapping
+            .binary_search_by(|&(low, high)| {
+                if (low <= c) && (c <= high) {
+                    Ordering::Equal
+                } else if high < c {
+                    Ordering::Less
+                } else {
+                    Ordering::Greater
+                }
+            })
+            .is_ok()
     }
 
     /// Lookup table of initial mapping for ASCII.
+    #[rustfmt::skip]
     const ASCII_INITIAL: &[bool; 128] = &[
 """)
     emit_identifier_table_ascii(ascii_initial)
@@ -1304,6 +1307,7 @@ pub mod scheme_identifiers {
     ];
 
     /// Lookup table of subsequent mapping for ASCII.
+    #[rustfmt::skip]
     const ASCII_SUBSEQUENT: &[bool; 128] = &[
 """)
     emit_identifier_table_ascii(ascii_subsequent)
@@ -1311,6 +1315,7 @@ pub mod scheme_identifiers {
     ];
 
     /// Lookup table of initial mapping for full Unicode range.
+    #[rustfmt::skip]
     const FULL_UNICODE_INITIAL: &[(char, char)] = &[
 """)
     emit_identifier_table_unicode(unicode_initial)
@@ -1318,6 +1323,7 @@ pub mod scheme_identifiers {
     ];
 
     /// Lookup table of subsequent mapping for full Unicode range.
+    #[rustfmt::skip]
     const FULL_UNICODE_SUBSEQUENT: &[(char, char)] = &[
 """)
     emit_identifier_table_unicode(unicode_subsequent)
@@ -1381,7 +1387,7 @@ def emit_canonical_combining_class(ucd):
 
         let prefix = (c >> CCC_SUFFIX) as usize;
         let offset = (c & ((1 << CCC_SUFFIX) - 1)) as usize;
-        let base   = CCC_OFFSETS[prefix] as usize;
+        let base = CCC_OFFSETS[prefix] as usize;
 
         CCC_VALUES[base + offset]
     }
@@ -1390,6 +1396,7 @@ def emit_canonical_combining_class(ucd):
     const CCC_SUFFIX: u8 = %d;
 
     /// Lookup table of offsets.
+    #[rustfmt::skip]
     const CCC_OFFSETS: &[u16] = &[
 """ % trie.suffix)
     emit_ccc_offsets(trie.offsets)
@@ -1397,6 +1404,7 @@ def emit_canonical_combining_class(ucd):
     ];
 
     /// Lookup table of values.
+    #[rustfmt::skip]
     const CCC_VALUES: &[u8] = &[
 """)
     emit_ccc_values(trie.values)
@@ -1491,6 +1499,7 @@ pub mod composition_mappings {
 
     /// Hash table buckets for `primary()`. They contain all Primary Composite mappings
     /// except for precomposed Hangul syllables.
+    #[rustfmt::skip]
     const PRIMARY_COMPOSITION_HASH_TABLE: &[(u32, u32, u32)] = &[
 """ % (max_collisions, len(table.buckets)))
     emit_primary_composition_hash_table(ucd, table.buckets)
@@ -1511,6 +1520,7 @@ def primary_composite_hash_function(n1, n2, n3):
     function.params = n1, n2, n3
     function.source = """
     /// Compute hash function of a code point pair.
+    #[rustfmt::skip]
     fn hash(c1: u32, c2: u32) -> u32 {
         let (n1, n2, n3) = (%d, %d, %d);
 
@@ -1591,7 +1601,7 @@ pub mod decomposition_mappings {
 
         let prefix = (c >> DECOMPOSITION_SUFFIX) as usize;
         let offset = (c & ((1 << DECOMPOSITION_SUFFIX) - 1)) as usize;
-        let base   = DECOMPOSITION_OFFSETS[prefix] as usize;
+        let base = DECOMPOSITION_OFFSETS[prefix] as usize;
 
         let (address, length, _, _) = DECOMPOSITION_SLICES[base + offset];
 
@@ -1601,7 +1611,8 @@ pub mod decomposition_mappings {
 
         let (address, length) = (address as usize, length as usize);
 
-        Some(charcc::from_u32_slice(&DECOMPOSITION_CHARS[address..(address + length)]))
+        let slice = &DECOMPOSITION_CHARS[address..(address + length)];
+        Some(charcc::from_u32_slice(slice))
     }
 
     /// Get full compatibility decomposition of character `c`.
@@ -1616,7 +1627,7 @@ pub mod decomposition_mappings {
 
         let prefix = (c >> DECOMPOSITION_SUFFIX) as usize;
         let offset = (c & ((1 << DECOMPOSITION_SUFFIX) - 1)) as usize;
-        let base   = DECOMPOSITION_OFFSETS[prefix] as usize;
+        let base = DECOMPOSITION_OFFSETS[prefix] as usize;
 
         let (_, _, address, length) = DECOMPOSITION_SLICES[base + offset];
 
@@ -1626,13 +1637,15 @@ pub mod decomposition_mappings {
 
         let (address, length) = (address as usize, length as usize);
 
-        Some(charcc::from_u32_slice(&DECOMPOSITION_CHARS[address..(address + length)]))
+        let slice = &DECOMPOSITION_CHARS[address..(address + length)];
+        Some(charcc::from_u32_slice(slice))
     }
 
     /// Length of trie suffix.
     const DECOMPOSITION_SUFFIX: u8 = %d;
 
     /// Lookup table of offsets.
+    #[rustfmt::skip]
     const DECOMPOSITION_OFFSETS: &[u16] = &[
 """ % trie.suffix)
     emit_decomposition_offsets(trie.offsets)
@@ -1640,6 +1653,7 @@ pub mod decomposition_mappings {
     ];
 
     /// Lookup table of slices.
+    #[rustfmt::skip]
     const DECOMPOSITION_SLICES: &[(u16, u8, u16, u8)] = &[
 """)
     emit_decomposition_slices(trie.values)
@@ -1647,6 +1661,7 @@ pub mod decomposition_mappings {
     ];
 
     /// Actual decomposition character data blob.
+    #[rustfmt::skip]
     const DECOMPOSITION_CHARS: &[u32] = &[
 """)
     emit_decomposition_chars(ucd, character_data)
@@ -1782,7 +1797,7 @@ pub mod quick_check {
 
         let prefix = (c >> QUICK_CHECK_SUFFIX) as usize;
         let offset = (c & ((1 << QUICK_CHECK_SUFFIX) - 1)) as usize;
-        let base   = QUICK_CHECK_OFFSETS[prefix] as usize;
+        let base = QUICK_CHECK_OFFSETS[prefix] as usize;
 
         QUICK_CHECK_VALUES[base + offset]
     }
@@ -1796,6 +1811,7 @@ pub mod quick_check {
     const QUICK_CHECK_SUFFIX: u8 = %d;
 
     /// Lookup table of offsets.
+    #[rustfmt::skip]
     const QUICK_CHECK_OFFSETS: &[u16] = &[
 """ % trie.suffix)
     emit_quick_check_offsets(trie.offsets)
@@ -1803,6 +1819,7 @@ pub mod quick_check {
     ];
 
     /// Lookup table of data.
+    #[rustfmt::skip]
     const QUICK_CHECK_VALUES: &[u8] = &[
 """)
     emit_quick_check_values(trie.values)
@@ -1889,7 +1906,7 @@ def emit_nfkc_casefold(ucd):
 
         let prefix = (c >> NFKC_CASEFOLD_SUFFIX) as usize;
         let offset = (c & ((1 << NFKC_CASEFOLD_SUFFIX) - 1)) as usize;
-        let base   = NFKC_CASEFOLD_OFFSETS[prefix] as usize;
+        let base = NFKC_CASEFOLD_OFFSETS[prefix] as usize;
 
         let (start, end) = NFKC_CASEFOLD_SLICES[base + offset];
 
@@ -1904,6 +1921,7 @@ def emit_nfkc_casefold(ucd):
     const NFKC_CASEFOLD_SUFFIX: u8 = %d;
 
     /// Lookup table of offsets.
+    #[rustfmt::skip]
     const NFKC_CASEFOLD_OFFSETS: &[u16] = &[
 """ % trie.suffix)
     emit_nfkc_casefold_offsets(trie.offsets)
@@ -1911,6 +1929,7 @@ def emit_nfkc_casefold(ucd):
     ];
 
     /// Lookup table of slices.
+    #[rustfmt::skip]
     const NFKC_CASEFOLD_SLICES: &[(u16, u16)] = &[
 """)
     emit_nfkc_casefold_slices(trie.values)
@@ -1918,6 +1937,7 @@ def emit_nfkc_casefold(ucd):
     ];
 
     /// Actual case-folded character data blob.
+    #[rustfmt::skip]
     const NFKC_CASEFOLD_CHARS: &str = "\\
 """)
     emit_nfkc_casefold_chars(character_data)
@@ -2075,12 +2095,14 @@ fn conformance_trivial() {
     }
 }
 
+#[rustfmt::skip]
 const EXPLICIT_STRINGS: &[(&str, &str, &str, &str, &str)] = &[
 """)
     emit_nontrivial_tests(ucd.normalization_tests_nontrivial)
     print_data("""
 ];
 
+#[rustfmt::skip]
 const TRIVIAL_RANGES: &[(char, char)] = &[
 """)
     emit_trivial_tests(trivial_test_ranges)

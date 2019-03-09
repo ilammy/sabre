@@ -59,13 +59,18 @@ type ParseResult = Result<Option<ScannedDatum>, ()>;
 
 impl<'a> Parser<'a> {
     /// Construct a new parser that will use the given token stream.
-    pub fn new(scanner: Box<dyn Scanner + 'a>, pool: &'a InternPool, handler: &'a Handler)
-        -> Parser<'a>
-    {
+    pub fn new(
+        scanner: Box<dyn Scanner + 'a>,
+        pool: &'a InternPool,
+        handler: &'a Handler,
+    ) -> Parser<'a> {
         let mut parser = Parser {
             scanner,
             pool,
-            cur: ScannedToken { tok: Token::Eof, span: Span::new(0, 0) },
+            cur: ScannedToken {
+                tok: Token::Eof,
+                span: Span::new(0, 0),
+            },
             diagnostic: handler,
         };
         parser.bump();
@@ -79,10 +84,13 @@ impl<'a> Parser<'a> {
 
             match self.cur.tok {
                 // Skip atmosphere.
-                Token::Whitespace | Token::Comment | Token::Directive(_) | Token::Unrecognized
-                    => { continue; }
+                Token::Whitespace | Token::Comment | Token::Directive(_) | Token::Unrecognized => {
+                    continue;
+                }
 
-                _ => { break; }
+                _ => {
+                    break;
+                }
             }
         }
     }
@@ -502,8 +510,8 @@ impl<'a> Parser<'a> {
 
         self.bump();
 
-        self.next_datum_required(start_span).map(|result| result.map(|datum| {
-            ScannedDatum {
+        self.next_datum_required(start_span).map(|result| {
+            result.map(|datum| ScannedDatum {
                 span: Span::new(start_span.from, datum.span.to),
                 value: DatumValue::ProperList(vec![
                     ScannedDatum {
@@ -512,8 +520,8 @@ impl<'a> Parser<'a> {
                     },
                     datum,
                 ]),
-            }
-        }))
+            })
+        })
     }
 
     /// Parse a labeled datum.
@@ -527,12 +535,12 @@ impl<'a> Parser<'a> {
 
         self.bump();
 
-        self.next_datum_required(start_span).map(|result| result.map(|datum| {
-            ScannedDatum {
+        self.next_datum_required(start_span).map(|result| {
+            result.map(|datum| ScannedDatum {
                 span: Span::new(start_span.from, datum.span.to),
                 value: DatumValue::LabeledDatum(label, Box::new(datum)),
-            }
-        }))
+            })
+        })
     }
 }
 

@@ -108,12 +108,12 @@ mod tests {
     fn intern_pool_sequential_atoms() {
         let p = InternPool::new();
 
-        assert_eq!(p.intern("foo"),                         Atom(0));
-        assert_eq!(p.intern("bar"),                         Atom(1));
-        assert_eq!(p.intern_string("foo".to_string()),      Atom(0));
-        assert_eq!(p.intern_string("example".to_string()),  Atom(2));
-        assert_eq!(p.intern("bar"),                         Atom(1));
-        assert_eq!(p.intern_string("foo".to_string()),      Atom(0));
+        assert_eq!(p.intern("foo"), Atom(0));
+        assert_eq!(p.intern("bar"), Atom(1));
+        assert_eq!(p.intern_string("foo".to_string()), Atom(0));
+        assert_eq!(p.intern_string("example".to_string()), Atom(2));
+        assert_eq!(p.intern("bar"), Atom(1));
+        assert_eq!(p.intern_string("foo".to_string()), Atom(0));
     }
 
     #[test]

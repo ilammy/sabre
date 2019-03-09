@@ -16,12 +16,10 @@ pub struct Atom(pub(super) u32);
 
 impl fmt::Debug for Atom {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        get_formatting_pool(|p|
-            match p {
-                Some(pool) => write!(f, "{}", pool.get(*self)),
-                None       => write!(f, "Atom({})", self.0),
-            }
-        )
+        get_formatting_pool(|p| match p {
+            Some(pool) => write!(f, "{}", pool.get(*self)),
+            None => write!(f, "Atom({})", self.0),
+        })
     }
 }
 
@@ -41,9 +39,7 @@ thread_local! {
 /// dynamic scope does not contain any `with_formatting_pool()` invocations. Otherwise the
 /// Some value set by the (dynamically) closest invocation will be returned.
 fn get_formatting_pool<R, F: FnOnce(Option<&InternPool>) -> R>(f: F) -> R {
-    FORMATTING_POOL.with(|current_pool| {
-        f(get_dynamic_cell(current_pool))
-    })
+    FORMATTING_POOL.with(|current_pool| f(get_dynamic_cell(current_pool)))
 }
 
 /// Set a current intern pool for Atom formatting.

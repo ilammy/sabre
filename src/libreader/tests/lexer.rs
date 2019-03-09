@@ -59,7 +59,7 @@ macro_rules! token {
 
 #[test]
 fn smoke_test_empty_string() {
-    check! { }
+    check! {}
 }
 
 #[test]
@@ -3949,13 +3949,16 @@ fn check(pool: &InternPool, slices: &[ScannerTestSlice]) {
     let expected = compute_expected_results(slices);
     let actual = compute_scanning_results(&test_string, pool);
 
-    let token_mismatches =
-        verify("Tokens", &expected.tokens, &actual.tokens,
-            |token| print_token(token, &test_string, pool));
+    let token_mismatches = verify("Tokens", &expected.tokens, &actual.tokens, |token| {
+        print_token(token, &test_string, pool)
+    });
 
-    let diagnostic_mismatches =
-        verify("Diagnostics", &expected.diagnostics, &actual.diagnostics,
-            |diagnostic| print_diagnostic(diagnostic, &test_string));
+    let diagnostic_mismatches = verify(
+        "Diagnostics",
+        &expected.diagnostics,
+        &actual.diagnostics,
+        |diagnostic| print_diagnostic(diagnostic, &test_string),
+    );
 
     if token_mismatches.is_err() || diagnostic_mismatches.is_err() {
         println!("");
@@ -4002,8 +4005,7 @@ fn compute_expected_results(test_slices: &[ScannerTestSlice]) -> ScannerTestResu
 
             diagnostics.push(Diagnostic {
                 kind: diagnostic.kind.clone(),
-                span: Span::new(byte_offset + diagnostic.from,
-                                byte_offset + diagnostic.to),
+                span: Span::new(byte_offset + diagnostic.from, byte_offset + diagnostic.to),
             });
         }
 
@@ -4033,7 +4035,9 @@ fn compute_scanning_results(string: &str, pool: &InternPool) -> ScannerTestResul
             let token = scanner.next_token();
             let done = token.tok == Token::Eof;
             tokens.push(token);
-            if done { break; }
+            if done {
+                break;
+            }
         }
 
         assert!(scanner.at_eof());
@@ -4050,7 +4054,9 @@ fn compute_scanning_results(string: &str, pool: &InternPool) -> ScannerTestResul
 /// Print out and verifies produced results. Returns Ok if everything is fine,
 /// otherwise an Err with a string to be shown the user is returned.
 fn verify<T, F>(title: &str, expected: &[T], actual: &[T], to_string: F) -> Result<(), String>
-    where T: Eq, F: Fn(&T) -> String
+where
+    T: Eq,
+    F: Fn(&T) -> String,
 {
     let mut report = String::new();
 
@@ -4086,46 +4092,40 @@ fn verify<T, F>(title: &str, expected: &[T], actual: &[T], to_string: F) -> Resu
 
 /// Pretty-print a token in diffs.
 fn print_token(token: &ScannedToken, buf: &str, pool: &InternPool) -> String {
-    format!("{token} @ [{from}, {to}] = {slice:?}",
+    format!(
+        "{token} @ [{from}, {to}] = {slice:?}",
         token = pretty_print_token(token, pool),
-        from  = token.span.from,
-        to    = token.span.to,
+        from = token.span.from,
+        to = token.span.to,
         slice = &buf[token.span.from..token.span.to],
     )
 }
 
 /// Pretty-print a diagnostic in diffs.
 fn print_diagnostic(diagnostic: &Diagnostic, buf: &str) -> String {
-    format!("{diagnostic} @ [{from}, {to}] = {slice:?}",
+    format!(
+        "{diagnostic} @ [{from}, {to}] = {slice:?}",
         diagnostic = pretty_print_diagnostic(diagnostic),
-        from       = diagnostic.span.from,
-        to         = diagnostic.span.to,
-        slice      = &buf[diagnostic.span.from..diagnostic.span.to],
+        from = diagnostic.span.from,
+        to = diagnostic.span.to,
+        slice = &buf[diagnostic.span.from..diagnostic.span.to],
     )
 }
 
 /// Pretty-print a token.
 fn pretty_print_token(token: &ScannedToken, pool: &InternPool) -> String {
     match token.tok {
-        Token::String(value) => {
-            format!("String({:?})", pool.get(value))
-        }
-        Token::Number(value) => {
-            format!("Number({:?})", pool.get(value))
-        }
-        Token::Identifier(value) => {
-            format!("Identifier({:?})", pool.get(value))
-        }
-        Token::Directive(value) => {
-            format!("Directive({:?})", pool.get(value))
-        }
-        _ => format!("{:?}", token.tok)
+        Token::String(value) => format!("String({:?})", pool.get(value)),
+        Token::Number(value) => format!("Number({:?})", pool.get(value)),
+        Token::Identifier(value) => format!("Identifier({:?})", pool.get(value)),
+        Token::Directive(value) => format!("Directive({:?})", pool.get(value)),
+        _ => format!("{:?}", token.tok),
     }
 }
 
 /// Pretty-print a diagnostic.
 fn pretty_print_diagnostic(diagnostic: &Diagnostic) -> String {
     match diagnostic.kind {
-        _ => format!("{:?}", diagnostic.kind)
+        _ => format!("{:?}", diagnostic.kind),
     }
 }

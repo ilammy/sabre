@@ -26,9 +26,7 @@ pub struct QuoteExpander {
 impl QuoteExpander {
     /// Make a new `quote` expander for a given name.
     pub fn new(name: Atom) -> QuoteExpander {
-        QuoteExpander {
-            name,
-        }
+        QuoteExpander { name }
     }
 }
 
@@ -43,8 +41,13 @@ impl Expander for QuoteExpander {
 
         // The only valid form is (quote datum). Do not expand anything. Use the first datum
         // available or pull some placeholder out of thin air if this is a (quote) form.
-        let terms = expect_macro_use(datum, self.name, 2, diagnostic,
-            DiagnosticKind::err_expand_invalid_quote);
+        let terms = expect_macro_use(
+            datum,
+            self.name,
+            2,
+            diagnostic,
+            DiagnosticKind::err_expand_invalid_quote,
+        );
 
         Expression {
             kind: if let Some(quoted_datum) = terms.first().cloned() {

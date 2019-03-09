@@ -109,7 +109,9 @@ impl<'a> StringScanner<'a> {
         let mut scanner = StringScanner {
             buf: s,
             pool,
-            cur: None, pos: 0, prev_pos: 0,
+            cur: None,
+            pos: 0,
+            prev_pos: 0,
             folding_case: false,
             diagnostic: handler,
         };
@@ -146,7 +148,7 @@ impl<'a> StringScanner<'a> {
         if self.at_eof() {
             return ScannedToken {
                 tok: Token::Eof,
-                span: Span::new(self.pos, self.pos)
+                span: Span::new(self.pos, self.pos),
             };
         }
 
@@ -158,7 +160,7 @@ impl<'a> StringScanner<'a> {
 
         ScannedToken {
             tok,
-            span: Span::new(start, end)
+            span: Span::new(start, end),
         }
     }
 
@@ -190,21 +192,11 @@ impl<'a> StringScanner<'a> {
                     Token::Comma
                 }
             }
-            '#' => {
-                self.scan_hash_token()
-            }
-            '"' => {
-                self.scan_string_literal()
-            }
-            '|' => {
-                self.scan_escaped_identifier()
-            }
-            '0'..='9' => {
-                self.scan_number_literal()
-            }
-            '-' | '+' => {
-                self.scan_number_literal()
-            }
+            '#' => self.scan_hash_token(),
+            '"' => self.scan_string_literal(),
+            '|' => self.scan_escaped_identifier(),
+            '0'..='9' => self.scan_number_literal(),
+            '-' | '+' => self.scan_number_literal(),
             '.' => {
                 if self.peek().map_or(true, is_delimiter) {
                     self.read();
@@ -216,9 +208,7 @@ impl<'a> StringScanner<'a> {
 
             // Syntax of Scheme identifiers is *sooo* permissive that it makes
             // pretty much sense to have them as a catch-all clause.
-            _ => {
-                self.scan_identifier()
-            }
+            _ => self.scan_identifier(),
         }
     }
 
@@ -476,9 +466,15 @@ impl<'a> StringScanner<'a> {
 
         loop {
             match self.cur {
-                Some(c) if is_delimiter(c) => { break; }
-                None                       => { break; }
-                Some(_) => { self.read(); }
+                Some(c) if is_delimiter(c) => {
+                    break;
+                }
+                None => {
+                    break;
+                }
+                Some(_) => {
+                    self.read();
+                }
             }
         }
 
@@ -523,14 +519,22 @@ impl<'a> StringScanner<'a> {
         loop {
             match self.cur {
                 // Scan over valid digits.
-                Some(c) if is_digit(10, c) => { self.read(); }
+                Some(c) if is_digit(10, c) => {
+                    self.read();
+                }
 
                 // Stop at label terminators.
-                Some('#') | Some('=')      => { break; }
+                Some('#') | Some('=') => {
+                    break;
+                }
 
                 // Also stop if we see an explicit delimiter.
-                Some(c) if is_delimiter(c) => { break; }
-                None                       => { break; }
+                Some(c) if is_delimiter(c) => {
+                    break;
+                }
+                None => {
+                    break;
+                }
 
                 // Scan over and report everything else.
                 Some(_) => {
@@ -558,7 +562,11 @@ impl<'a> StringScanner<'a> {
         let value = &self.buf[start..end];
         let atom = self.pool.intern(value);
 
-        if is_reference { Token::LabelRef(atom) } else { Token::LabelMark(atom) }
+        if is_reference {
+            Token::LabelRef(atom)
+        } else {
+            Token::LabelMark(atom)
+        }
     }
 
     /// Scan a string literal. This method also expands any escape sequences and normalizes line
@@ -656,7 +664,7 @@ impl<'a> StringScanner<'a> {
             }
 
             // If we encounter an EOF then just return None. The caller will report this condition.
-            None => { None }
+            None => None,
         }
     }
 
@@ -797,8 +805,12 @@ impl<'a> StringScanner<'a> {
 
         match &value[..] {
             // Handle case-folding directives.
-            "fold-case"     => { self.folding_case = true; }
-            "no-fold-case"  => { self.folding_case = false; }
+            "fold-case" => {
+                self.folding_case = true;
+            }
+            "no-fold-case" => {
+                self.folding_case = false;
+            }
 
             // Report anything else as unknown.
             _ => {
@@ -825,11 +837,17 @@ impl<'a> StringScanner<'a> {
             loop {
                 match self.cur {
                     // Scan over valid identifier constituents.
-                    Some(c) if is_identifier_subsequent(c) => { self.read(); }
+                    Some(c) if is_identifier_subsequent(c) => {
+                        self.read();
+                    }
 
                     // Stop at the first delimiter.
-                    Some(c) if is_delimiter(c) => { break; }
-                    None                       => { break; }
+                    Some(c) if is_delimiter(c) => {
+                        break;
+                    }
+                    None => {
+                        break;
+                    }
 
                     // Report and scan over anything else.
                     Some(_) => {
@@ -940,7 +958,7 @@ impl<'a> StringScanner<'a> {
             }
 
             // If we encounter an EOF then just return None. The caller will report this condition.
-            None => { None }
+            None => None,
         }
     }
 
@@ -961,8 +979,12 @@ impl<'a> StringScanner<'a> {
         if self.cur_is('#') {
             has_prefix = true;
 
-            self.scan_number_prefix(&mut radix_value, &mut radix_location,
-                                    &mut exact_value, &mut exact_location);
+            self.scan_number_prefix(
+                &mut radix_value,
+                &mut radix_location,
+                &mut exact_value,
+                &mut exact_location,
+            );
 
             effective_radix = radix_value.unwrap_or(10);
         }
@@ -972,19 +994,28 @@ impl<'a> StringScanner<'a> {
         // right here and now, and forget about them for the rest of the _number-scanning_ code.
         // If the token has a prefix but surely is a pecualiar identifier then report the prefix.
         // Accept all decimal digits regardless of specified radix to allow for user mistakes.
-        let check_radix = if effective_radix <= 10 { 10 } else { effective_radix };
+        let check_radix = if effective_radix <= 10 {
+            10
+        } else {
+            effective_radix
+        };
         if self.peculiar_identifier_ahead(check_radix) {
             if has_prefix {
-                self.diagnostic.report(DiagnosticKind::err_lexer_prefixed_identifier,
-                    Span::new(start, self.prev_pos));
+                self.diagnostic.report(
+                    DiagnosticKind::err_lexer_prefixed_identifier,
+                    Span::new(start, self.prev_pos),
+                );
             }
 
             return self.scan_identifier();
         }
 
         // Now scan the actual number value.
-        self.scan_number_part(effective_radix, ComplexScanningMode::Initial,
-            &mut not_integer);
+        self.scan_number_part(
+            effective_radix,
+            ComplexScanningMode::Initial,
+            &mut not_integer,
+        );
 
         // Scan possible (complex) parts of a number.
         loop {
@@ -995,20 +1026,28 @@ impl<'a> StringScanner<'a> {
                 Some('@') => {
                     self.read();
 
-                    self.scan_number_part(effective_radix, ComplexScanningMode::Argument,
-                        &mut not_integer);
+                    self.scan_number_part(
+                        effective_radix,
+                        ComplexScanningMode::Argument,
+                        &mut not_integer,
+                    );
                 }
 
                 // If we stopped at a sign then this is a complex number in rectangular form and
                 // we've just scanned over of the real part of it. Leave the sign (for possible
                 // infnans) and scan the imaginary part.
                 Some('+') | Some('-') => {
-                    self.scan_number_part(effective_radix, ComplexScanningMode::Subsequent,
-                        &mut not_integer);
+                    self.scan_number_part(
+                        effective_radix,
+                        ComplexScanningMode::Subsequent,
+                        &mut not_integer,
+                    );
                 }
 
                 // Anything else should have been handled by `scan_number_part()`.
-                _ =>  { assert!(self.cur.map_or(true, is_delimiter)); }
+                _ => {
+                    assert!(self.cur.map_or(true, is_delimiter));
+                }
             }
             let part_end = self.prev_pos;
 
@@ -1038,10 +1077,13 @@ impl<'a> StringScanner<'a> {
 
     /// Scan all number literal prefixes. Fills in values and locations of radix and exactness
     /// prefixes (if encountered).
-    fn scan_number_prefix(&mut self,
-        radix_value: &mut Option<u8>, radix_location: &mut Option<Span>,
-        exact_value: &mut Option<bool>, exact_location: &mut Option<Span>)
-    {
+    fn scan_number_prefix(
+        &mut self,
+        radix_value: &mut Option<u8>,
+        radix_location: &mut Option<Span>,
+        exact_value: &mut Option<bool>,
+        exact_location: &mut Option<Span>,
+    ) {
         assert!(self.cur_is('#'));
 
         // Check if we can scan the next prefix (i.e., we have some # ahead), and then scan it.
@@ -1145,9 +1187,12 @@ impl<'a> StringScanner<'a> {
 
     /// Scan a real part of a number (an integer, a fractional, or a rational number).
     /// Sets `not_integer` to true if the number is fractional or has an exponent anywhere.
-    fn scan_number_part(&mut self, radix: u8, complex_mode: ComplexScanningMode,
-        not_integer: &mut bool)
-    {
+    fn scan_number_part(
+        &mut self,
+        radix: u8,
+        complex_mode: ComplexScanningMode,
+        not_integer: &mut bool,
+    ) {
         let mut infnan_numerator = false;
         let mut infnan_denominator = false;
         let mut noninteger_numerator = false;
@@ -1155,8 +1200,14 @@ impl<'a> StringScanner<'a> {
         let mut terminal_i = false;
 
         let numerator_start = self.prev_pos;
-        self.scan_number_value(radix, RationalScanningMode::Numerator, complex_mode,
-            &mut infnan_numerator, &mut noninteger_numerator, &mut terminal_i);
+        self.scan_number_value(
+            radix,
+            RationalScanningMode::Numerator,
+            complex_mode,
+            &mut infnan_numerator,
+            &mut noninteger_numerator,
+            &mut terminal_i,
+        );
 
         let numerator_end = self.prev_pos;
 
@@ -1164,8 +1215,14 @@ impl<'a> StringScanner<'a> {
             self.read();
 
             let denominator_start = self.prev_pos;
-            self.scan_number_value(radix, RationalScanningMode::Denominator, complex_mode,
-                &mut infnan_denominator, &mut noninteger_denominator, &mut terminal_i);
+            self.scan_number_value(
+                radix,
+                RationalScanningMode::Denominator,
+                complex_mode,
+                &mut infnan_denominator,
+                &mut noninteger_denominator,
+                &mut terminal_i,
+            );
             let denominator_end = self.prev_pos;
 
             // Fractions must be exact, they cannot contain floating-point parts.
@@ -1193,9 +1250,9 @@ impl<'a> StringScanner<'a> {
 
         // There should be only one subsequent part (followed by a delimiter), and it should be
         // imaginary (i.e., the digits should be followed by an 'i').
-        if complex_mode == ComplexScanningMode::Subsequent &&
-            self.cur.map_or(true, is_delimiter) &&
-            !terminal_i
+        if complex_mode == ComplexScanningMode::Subsequent
+            && self.cur.map_or(true, is_delimiter)
+            && !terminal_i
         {
             self.diagnostic.report(DiagnosticKind::err_lexer_missing_i,
                 Span::new(self.prev_pos, self.prev_pos));
@@ -1206,10 +1263,15 @@ impl<'a> StringScanner<'a> {
     /// Sets `is_infnan` to true if the scanned value was /[+-]inf.0/ or /[+-]nan.0/.
     /// Sets `not_integer` to true if the number is fractional and/or has an exponent.
     /// Sets `terminal_i` to true if the scanned (imaginary) value is terminated by an 'i'.
-    fn scan_number_value(&mut self, radix: u8,
-        rational_mode: RationalScanningMode, complex_mode: ComplexScanningMode,
-        is_infnan: &mut bool, not_integer: &mut bool, terminal_i: &mut bool)
-    {
+    fn scan_number_value(
+        &mut self,
+        radix: u8,
+        rational_mode: RationalScanningMode,
+        complex_mode: ComplexScanningMode,
+        is_infnan: &mut bool,
+        not_integer: &mut bool,
+        terminal_i: &mut bool,
+    ) {
         // Skip over an optional sign.
         if self.cur_is('+') || self.cur_is('-') {
             // Allow signs right after a rational slash, but report them.
@@ -1258,8 +1320,8 @@ impl<'a> StringScanner<'a> {
             // Handle the special case of a sign immediately followed by an 'i' and a delimiter.
             // This form is valid in rectangular form of complex numbers. However, treat 'i' as
             // a regular invalid character in polar form.
-            if (complex_mode != ComplexScanningMode::Argument) &&
-                (self.cur_is('i') || self.cur_is('I'))
+            if (complex_mode != ComplexScanningMode::Argument)
+                && (self.cur_is('i') || self.cur_is('I'))
             {
                 if self.peek().map_or(true, is_delimiter) {
                     *terminal_i = true;
@@ -1278,8 +1340,14 @@ impl<'a> StringScanner<'a> {
             }
         }
 
-        self.scan_number_digits(radix, FractionScanningMode::Value,
-            rational_mode, complex_mode, not_integer, terminal_i);
+        self.scan_number_digits(
+            radix,
+            FractionScanningMode::Value,
+            rational_mode,
+            complex_mode,
+            not_integer,
+            terminal_i,
+        );
 
         if self.cur.map_or(false, is_exponent_marker) {
             *not_integer = true;
@@ -1299,8 +1367,14 @@ impl<'a> StringScanner<'a> {
                 }
             }
 
-            self.scan_number_digits(radix, FractionScanningMode::Exponent,
-                rational_mode, complex_mode, not_integer, terminal_i);
+            self.scan_number_digits(
+                radix,
+                FractionScanningMode::Exponent,
+                rational_mode,
+                complex_mode,
+                not_integer,
+                terminal_i,
+            );
         }
     }
 
@@ -1309,13 +1383,15 @@ impl<'a> StringScanner<'a> {
     /// like any other invalid character). Sets `not_integer` to true if a decimal dot has been
     /// scanned over. Sets `terminal_i` to true if the digits terminate with an 'i' followed by
     /// a delimiter, concluding the imaginary part of a complex number in rectangular form.
-    fn scan_number_digits(&mut self, radix: u8,
+    fn scan_number_digits(
+        &mut self,
+        radix: u8,
         fraction_mode: FractionScanningMode,
         rational_mode: RationalScanningMode,
         complex_mode: ComplexScanningMode,
         not_integer: &mut bool,
-        terminal_i: &mut bool)
-    {
+        terminal_i: &mut bool,
+    ) {
         let mut seen_dot = false;
         let mut seen_i = false;
 
@@ -1377,8 +1453,8 @@ impl<'a> StringScanner<'a> {
                 // this 'i' as special when scanning argument of a polar form (it is just another
                 // invalid character then).
                 Some('i') | Some('I')
-                    if (complex_mode != ComplexScanningMode::Argument) &&
-                        self.peek().map_or(true, is_delimiter) =>
+                    if (complex_mode != ComplexScanningMode::Argument)
+                        && self.peek().map_or(true, is_delimiter) =>
                 {
                     seen_i = true;
                     break;
@@ -1388,8 +1464,8 @@ impl<'a> StringScanner<'a> {
                 // wanted to write the imaginary part of a rectangular form followed by the real
                 // part.
                 Some('i') | Some('I')
-                    if (complex_mode != ComplexScanningMode::Argument) &&
-                        (self.peek_is('+') || self.peek_is('-')) =>
+                    if (complex_mode != ComplexScanningMode::Argument)
+                        && (self.peek_is('+') || self.peek_is('-')) =>
                 {
                     self.diagnostic.report(DiagnosticKind::err_lexer_misplaced_i,
                         Span::new(self.prev_pos, self.pos));
@@ -1426,7 +1502,10 @@ impl<'a> StringScanner<'a> {
         // Check that there is at least one digit in the slice we have scanned over.
         // Treat all decimal digits as valid to allow for user mistakes.
         let check_radix = if radix <= 10 { 10 } else { radix };
-        if !self.buf[start..end].chars().any(|c| is_digit(check_radix, c)) {
+        if !self.buf[start..end]
+            .chars()
+            .any(|c| is_digit(check_radix, c))
+        {
             self.diagnostic.report(DiagnosticKind::err_lexer_digits_missing,
                 Span::new(start, end));
         }
@@ -1470,7 +1549,9 @@ impl<'a> StringScanner<'a> {
     fn try_scan(&mut self, prefix: &str) -> bool {
         let has_prefix = has_ascii_prefix_ci(&self.buf[self.prev_pos..], prefix);
         if has_prefix {
-            for _ in 0..prefix.len() { self.read(); }
+            for _ in 0..prefix.len() {
+                self.read();
+            }
         }
         has_prefix
     }
@@ -1481,7 +1562,9 @@ impl<'a> StringScanner<'a> {
     fn try_scan_exactly(&mut self, prefix: &str) -> bool {
         let has_prefix = has_ascii_prefix_ci_exact(&self.buf[self.prev_pos..], prefix);
         if has_prefix {
-            for _ in 0..prefix.len() { self.read(); }
+            for _ in 0..prefix.len() {
+                self.read();
+            }
         }
         has_prefix
     }
@@ -1492,7 +1575,9 @@ impl<'a> StringScanner<'a> {
         loop {
             match self.cur {
                 // Stop scanning suffix on slash only if we haven't seen one yet.
-                Some('/') if rational_mode == RationalScanningMode::Numerator => { break; }
+                Some('/') if rational_mode == RationalScanningMode::Numerator => {
+                    break;
+                }
 
                 // Scan over exponent markers *and* their optional signs. Do not treat
                 // signs as starters of the imaginary part of a complex number.
@@ -1519,15 +1604,25 @@ impl<'a> StringScanner<'a> {
                 }
 
                 // Stop scanning the suffix if we see a starter of a complex part.
-                Some('+') | Some('-') => { break; }
-                Some('@')             => { break; }
+                Some('+') | Some('-') => {
+                    break;
+                }
+                Some('@') => {
+                    break;
+                }
 
                 // Also obviously stop scanning if we're faced with a delimiter.
-                Some(c) if is_delimiter(c) => { break; }
-                None                       => { break; }
+                Some(c) if is_delimiter(c) => {
+                    break;
+                }
+                None => {
+                    break;
+                }
 
                 // Scan over anything else.
-                Some(_) => { self.read(); }
+                Some(_) => {
+                    self.read();
+                }
             }
         }
         let suffix_end = self.prev_pos;
@@ -1639,8 +1734,7 @@ fn is_identifier_initial(c: char) -> bool {
         // <letter>
         'A'..='Z' | 'a'..='z' => true,
         // <special-initial>
-        '!' | '$' | '%' | '&' | '*' | '/' | ':' |
-        '<' | '=' | '>' | '?' | '^' | '_' | '~' => true,
+        '!' | '$' | '%' | '&' | '*' | '/' | ':' | '<' | '=' | '>' | '?' | '^' | '_' | '~' => true,
         // <pecualiar> (= <special-subsequent>, they can be in the first position)
         '+' | '-' | '.' | '@' => true,
         // anything else is not allowed to start identifiers
@@ -1677,6 +1771,7 @@ fn is_identifier_subsequent(c: char) -> bool {
 const REPLACEMENT_CHARACTER: char = '\u{FFFD}';
 
 /// Check whether `c` is a valid digit of base `base`.
+#[rustfmt::skip]
 fn is_digit(base: u8, c: char) -> bool {
     match base {
          2 => {  ('0' <= c) && (c <= '1') }
@@ -1693,6 +1788,7 @@ fn is_digit(base: u8, c: char) -> bool {
 fn hex_value(c: char) -> u8 {
     assert!(is_digit(16, c));
 
+    #[rustfmt::skip]
     const H: &[u8; 128] = &[
         0, 0, 0, 0, 0, 0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
         0, 0, 0, 0, 0, 0, 0,0,0,0,0,0,0,0,0,0,0,1,2,3,4,5,6,7,8,9,0,0,0,0,0,0,
@@ -1734,9 +1830,10 @@ fn normalize_case_sensitive_identifier(s: &str) -> String {
 
     // Scheme identifier syntax permits only ZWNJ and ZWJ to occur in valid identifiers,
     // so we remove only these (and do not need a table of Default_Ignorable_Code_Points).
-    normalized.chars()
-              .filter(|&c| !(c == ZERO_WIDTH_NON_JOINER || c == ZERO_WIDTH_JOINER))
-              .collect()
+    normalized
+        .chars()
+        .filter(|&c| !(c == ZERO_WIDTH_NON_JOINER || c == ZERO_WIDTH_JOINER))
+        .collect()
 }
 
 /// Normalize a string as a case-insensitive identifier.

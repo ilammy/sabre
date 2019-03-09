@@ -69,8 +69,9 @@ impl fmt::Debug for ScannedDatum {
 }
 
 impl fmt::Debug for DatumValue {
+    #[rustfmt::skip]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use crate::format::{write_list, write_dotted_list};
+        use crate::format::{write_dotted_list, write_list};
 
         match *self {
             DatumValue::Boolean(value) =>

@@ -16,12 +16,14 @@ use libunicode::case_algorithms::to_nfkc_casefold;
 //
 
 #[test]
+#[rustfmt::skip]
 fn nfkc_casefold_ascii() {
     assert_eq!(to_nfkc_casefold("Hello World!"), "hello world!");
     assert_eq!(to_nfkc_casefold("CAPS LOCK111"), "caps lock111");
 }
 
 #[test]
+#[rustfmt::skip]
 fn nfkc_casefold_bicameral_scripts() {
     // Latin
     assert_eq!(to_nfkc_casefold("\u{00C6}\u{0043}\u{0301}\u{0126}\u{0131}\u{00DF}\u{01C6}\u{1E4D}"),
@@ -44,6 +46,7 @@ fn nfkc_casefold_bicameral_scripts() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn nfkc_casefold_unicameral_scripts() {
     // Arabic
     assert_eq!(to_nfkc_casefold("\u{0645}\u{06CC}\u{200C}\u{062E}\u{0648}\u{0627}\u{0647}\u{0645}"),
@@ -66,6 +69,7 @@ fn nfkc_casefold_unicameral_scripts() {
 }
 
 #[test]
+#[rustfmt::skip]
 fn nfkc_casefold_misc_characters() {
     // Math symbols
     assert_eq!(to_nfkc_casefold("\u{2150}\u{212B}\u{2106}\u{3391}"),

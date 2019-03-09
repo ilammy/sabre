@@ -18,14 +18,14 @@ use libreader::intern_pool::Atom;
 /// `datum` must represent a non-empty list or vector (otherwise the function panics).
 pub fn missing_last_span(datum: &ScannedDatum) -> Span {
     match datum.value {
-        DatumValue::ProperList(ref terms) |
-        DatumValue::DottedList(ref terms) |
-        DatumValue::Vector(ref terms) => {
+        DatumValue::ProperList(ref terms)
+        | DatumValue::DottedList(ref terms)
+        | DatumValue::Vector(ref terms) => {
             assert!(!terms.is_empty());
             let last_span = terms.last().unwrap().span;
             Span::new(last_span.to, datum.span.to - 1)
         }
-        _ => panic!("datum must be a list or a vector")
+        _ => panic!("datum must be a list or a vector"),
     }
 }
 
@@ -46,8 +46,10 @@ pub fn expect_form(keyword: Atom, datum: &ScannedDatum) -> (bool, &[ScannedDatum
     match terms[0].value {
         DatumValue::Symbol(name) => {
             if name != keyword {
-                panic!("the first term is not the expected keyword: {:?} (expected {:?})",
-                    name, keyword);
+                panic!(
+                    "the first term is not the expected keyword: {:?} (expected {:?})",
+                    name, keyword
+                );
             }
         }
         _ => panic!("the first term is not a symbol: {:?}", terms[0]),

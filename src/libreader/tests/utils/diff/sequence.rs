@@ -17,7 +17,10 @@
 
 /// Result of sequence element comparison.
 #[derive(Debug, PartialEq)]
-pub enum Diff<'a, T> where T: 'a {
+pub enum Diff<'a, T>
+where
+    T: 'a,
+{
     /// The element is present only in the left sequence.
     Left(&'a T),
 
@@ -33,7 +36,8 @@ pub enum Diff<'a, T> where T: 'a {
 
 /// Compute the difference between two sequences of comparable elements.
 pub fn diff<'a, T>(lhs: &'a [T], rhs: &'a [T]) -> Vec<Diff<'a, T>>
-    where T: PartialEq
+where
+    T: PartialEq,
 {
     diff_with(lhs, rhs, |lhs, rhs| lhs == rhs)
 }
@@ -45,7 +49,8 @@ pub fn diff<'a, T>(lhs: &'a [T], rhs: &'a [T]) -> Vec<Diff<'a, T>>
 
 /// Compute the difference between two sequences using the provided comparator.
 pub fn diff_with<'a, T, F>(lhs: &'a [T], rhs: &'a [T], equal: F) -> Vec<Diff<'a, T>>
-    where F: Fn(&T, &T) -> bool
+where
+    F: Fn(&T, &T) -> bool,
 {
     let fwd = lhs.iter().zip(rhs.iter());
     let rev = lhs.iter().rev().zip(rhs.iter().rev());
@@ -54,18 +59,20 @@ pub fn diff_with<'a, T, F>(lhs: &'a [T], rhs: &'a [T], equal: F) -> Vec<Diff<'a,
     // an O(n^2) algorithm to actually compute the diff, so we would like to minimize the size
     // of input data. One way to do this is to strip the equal prefix and suffix from sequences.
 
-    let prefix = fwd.take_while(|&(lhs, rhs)| equal(lhs, rhs))
-                    .map(|(lhs, rhs)| Diff::Equal(lhs, rhs))
-                    .collect::<Vec<_>>();
+    let prefix = fwd
+        .take_while(|&(lhs, rhs)| equal(lhs, rhs))
+        .map(|(lhs, rhs)| Diff::Equal(lhs, rhs))
+        .collect::<Vec<_>>();
 
     // We may even get lucky and find out that the sequences are in fact equal.
     if (lhs.len() == rhs.len()) && (prefix.len() == lhs.len()) {
         return prefix;
     }
 
-    let suffix = rev.take_while(|&(lhs, rhs)| equal(lhs, rhs))
-                    .map(|(lhs, rhs)| Diff::Equal(lhs, rhs))
-                    .collect::<Vec<_>>();
+    let suffix = rev
+        .take_while(|&(lhs, rhs)| equal(lhs, rhs))
+        .map(|(lhs, rhs)| Diff::Equal(lhs, rhs))
+        .collect::<Vec<_>>();
 
     // Otherwise, we now have the prefix and the (reversed) suffix. Compute the actual diff for
     // the sequence slices that are different.
@@ -81,17 +88,19 @@ pub fn diff_with<'a, T, F>(lhs: &'a [T], rhs: &'a [T], equal: F) -> Vec<Diff<'a,
 
     let mut prefix = prefix;
     let mut suffix = suffix;
-    let mut diff   = diff;
+    let mut diff = diff;
 
-    return prefix.drain(..)
-                 .chain(diff.drain(..).rev())
-                 .chain(suffix.drain(..).rev())
-                 .collect();
+    return prefix
+        .drain(..)
+        .chain(diff.drain(..).rev())
+        .chain(suffix.drain(..).rev())
+        .collect();
 }
 
 /// Actually compute the diff between the sequences using the provided comparator.
 fn compute_diff<'a, T, F>(lhs: &'a [T], rhs: &'a [T], equal: F) -> Vec<Diff<'a, T>>
-    where F: Fn(&T, &T) -> bool
+where
+    F: Fn(&T, &T) -> bool,
 {
     let (lcs, eqv) = compute_lcs_lookup(lhs, rhs, equal);
 
@@ -109,7 +118,8 @@ fn compute_diff<'a, T, F>(lhs: &'a [T], rhs: &'a [T], equal: F) -> Vec<Diff<'a, 
 /// The matrices are represented with just Vecs. You have to compute offsets manually.
 /// Thanks for having built-in array support, Rust!
 fn compute_lcs_lookup<T, F>(lhs: &[T], rhs: &[T], equal: F) -> (Vec<usize>, Vec<bool>)
-    where F: Fn(&T, &T) -> bool
+where
+    F: Fn(&T, &T) -> bool,
 {
     use std::cmp::max;
 
@@ -147,9 +157,12 @@ fn compute_lcs_lookup<T, F>(lhs: &[T], rhs: &[T], equal: F) -> (Vec<usize>, Vec<
 /// the optimal path in reverse order.
 ///
 /// Refer to any book on dynamic programming for a better explanation of how this works.
-fn backtrace_diff<'a, T>(lhs: &'a [T], rhs: &'a [T],
-                         lcs: &[usize], eqv: &[bool]) -> Vec<Diff<'a, T>>
-{
+fn backtrace_diff<'a, T>(
+    lhs: &'a [T],
+    rhs: &'a [T],
+    lcs: &[usize],
+    eqv: &[bool],
+) -> Vec<Diff<'a, T>> {
     let h = lhs.len() + 1;
     let w = rhs.len() + 1;
 
@@ -208,6 +221,7 @@ mod tests {
     }
 
     #[test]
+    #[rustfmt::skip]
     fn partially_empty_1() {
         let a: Vec<i32> = vec![1, 2, 3];
         let b: Vec<i32> = vec![];
@@ -222,6 +236,7 @@ mod tests {
     }
 
     #[test]
+    #[rustfmt::skip]
     fn partially_empty_2() {
         let a: Vec<i32> = vec![];
         let b: Vec<i32> = vec![1, 2, 3];
@@ -236,6 +251,7 @@ mod tests {
     }
 
     #[test]
+    #[rustfmt::skip]
     fn equal() {
         let a = vec![1, 2, 3];
         let b = vec![1, 2, 3];
@@ -250,6 +266,7 @@ mod tests {
     }
 
     #[test]
+    #[rustfmt::skip]
     fn different_1() {
         let a = vec![1, 2,    3, 4, 5, 6, 7, 8, 2   ];
         let b = vec![8, 2, 4, 3, 1, 1, 6, 7, 5, 2, 3];
@@ -273,6 +290,7 @@ mod tests {
     }
 
     #[test]
+    #[rustfmt::skip]
     fn different_2() {
         let a = vec!['O','h','a','i',',',' ',    'I',' ','a',    'm',' ','B','o','b'    ];
         let b = vec![        'H','i',',',' ','w','e',' ','a','r','e',' ','B','o','b','!'];
@@ -302,6 +320,7 @@ mod tests {
     }
 
     #[test]
+    #[rustfmt::skip]
     fn different_3() {
         let a = vec!["foo", "bar", "baz"];
         let b = vec!["foo", "BAR", "baz"];
@@ -317,6 +336,7 @@ mod tests {
     }
 
     #[test]
+    #[rustfmt::skip]
     fn custom_comparator() {
         let a: Vec<i32> = vec![0, -1,  2, -3    ];
         let b: Vec<i32> = vec![    1, -2,  3, -4];

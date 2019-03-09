@@ -68,7 +68,12 @@ fn cleaned_up_string(normalized: Vec<charcc>) -> String {
 // Quick Check
 //
 
-enum NormalizationForm { C, D, KC, KD }
+enum NormalizationForm {
+    C,
+    D,
+    KC,
+    KD,
+}
 
 /// Check whether a string is already in the specified normalization form.
 fn already_normalized(s: &str, form: NormalizationForm) -> bool {
@@ -93,8 +98,8 @@ fn already_normalized(s: &str, form: NormalizationForm) -> bool {
 
         // Finally check for explicit exceptions.
         let not_allowed = match form {
-            NormalizationForm::C  => quick_check::not_allowed_in_nfc(c),
-            NormalizationForm::D  => quick_check::not_allowed_in_nfd(c),
+            NormalizationForm::C => quick_check::not_allowed_in_nfc(c),
+            NormalizationForm::D => quick_check::not_allowed_in_nfd(c),
             NormalizationForm::KC => quick_check::not_allowed_in_nfkc(c),
             NormalizationForm::KD => quick_check::not_allowed_in_nfkd(c),
         };
@@ -115,7 +120,8 @@ fn already_normalized(s: &str, form: NormalizationForm) -> bool {
 
 /// Produce a Compatibility decomposition (D65) of a character sequence.
 fn compatibility_decomposition<I>(chars: I) -> Vec<charcc>
-    where I: IntoIterator<Item=char>
+where
+    I: IntoIterator<Item = char>,
 {
     let mut buffer = Vec::new();
 
@@ -130,7 +136,8 @@ fn compatibility_decomposition<I>(chars: I) -> Vec<charcc>
 
 /// Produce a Canonical decomposition (D68) of a character sequence.
 fn canonical_decomposition<I>(chars: I) -> Vec<charcc>
-    where I: IntoIterator<Item=char>
+where
+    I: IntoIterator<Item = char>,
 {
     let mut buffer = Vec::new();
 
@@ -238,9 +245,9 @@ fn compose_hangul(c1: char, c2: char) -> Option<charcc> {
     // validity here, and precomposed Hangul syllables also have canonical combining class zero.
 
     // <L, V> pair
-    if ((L_BASE <= (c1 as u32)) && ((c1 as u32) < L_BASE + L_COUNT)) &&
-       ((V_BASE <= (c2 as u32)) && ((c2 as u32) < V_BASE + V_COUNT))
-    {
+    let l = (L_BASE <= (c1 as u32)) && ((c1 as u32) < L_BASE + L_COUNT);
+    let v = (V_BASE <= (c2 as u32)) && ((c2 as u32) < V_BASE + V_COUNT);
+    if l && v {
         let l_index = (c1 as u32) - L_BASE;
         let v_index = (c2 as u32) - V_BASE;
 
@@ -253,10 +260,10 @@ fn compose_hangul(c1: char, c2: char) -> Option<charcc> {
     }
 
     // <LV, T> pair
-    if ((S_BASE <= (c1 as u32)) && ((c1 as u32) < S_BASE + S_COUNT)) &&
-       (((c1 as u32) - S_BASE) % T_COUNT == 0) &&
-       (((T_BASE + 1) <= (c2 as u32)) && ((c2 as u32) < T_BASE + T_COUNT))
-    {
+    let lv = ((S_BASE <= (c1 as u32)) && ((c1 as u32) < S_BASE + S_COUNT))
+        && (((c1 as u32) - S_BASE) % T_COUNT == 0);
+    let t = ((T_BASE + 1) <= (c2 as u32)) && ((c2 as u32) < T_BASE + T_COUNT);
+    if lv && t {
         let t_index = (c2 as u32) - T_BASE;
 
         // This is safe as the codepoint is guaranteed to have correct value.

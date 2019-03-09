@@ -1105,7 +1105,7 @@ impl TestCase {
     fn diagnostic(mut self, from: usize, to: usize, kind: DiagnosticKind) -> Self {
         self.expected_diagnostics.push(Diagnostic {
             kind: kind,
-            span: Span::new(from, to)
+            span: Span::new(from, to),
         });
         self
     }
@@ -1132,20 +1132,23 @@ fn check(input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]
         let mut parser = Parser::new(scanner, &pool, handler);
 
         let all_data = parser.parse_all_data();
-        assert!(parser.parse_all_data().is_empty(), "parser did not consume the whole stream");
+        assert!(
+            parser.parse_all_data().is_empty(),
+            "parser did not consume the whole stream"
+        );
         all_data
     });
 
-    let result = with_formatting_pool(&pool,
-        || join(data.iter().map(|d| format!("{:?}", d)), " "));
+    let result = with_formatting_pool(&pool, || join(data.iter().map(|d| format!("{:?}", d)), " "));
 
     assert_eq!(result, expected_result);
     assert_eq!(diagnostics, expected_diagnostics);
 }
 
 fn join<I, T>(items: I, sep: &str) -> String
-    where I: IntoIterator<Item=T>,
-          T: AsRef<str>
+where
+    I: IntoIterator<Item = T>,
+    T: AsRef<str>,
 {
     let mut result = String::new();
 

@@ -27,9 +27,7 @@ impl Reporter for SinkReporter {
 impl SinkReporter {
     /// Make a new sink reporter.
     pub fn new(diagnostics: Rc<RefCell<Vec<Diagnostic>>>) -> SinkReporter {
-        SinkReporter {
-            diagnostics,
-        }
+        SinkReporter { diagnostics }
     }
 }
 
@@ -38,7 +36,8 @@ impl SinkReporter {
 /// All diagnostics reported to the provided handler will be returned back together with the
 /// value returned by the function.
 pub fn collect_diagnostics<T, F>(body: F) -> (T, Vec<Diagnostic>)
-    where F: FnOnce(&Handler) -> T
+where
+    F: FnOnce(&Handler) -> T,
 {
     let diagnostics = Rc::new(RefCell::new(Vec::new()));
     let value = {
@@ -69,15 +68,18 @@ mod tests {
             diagnostic.report(DiagnosticKind::err_parser_misplaced_dot, Span::new(34, 51));
         });
         assert_eq!(value, ());
-        assert_eq!(diagnostics, vec![
-            Diagnostic {
-                kind: DiagnosticKind::fatal_lexer_unterminated_comment,
-                span: Span::new(0, 1),
-            },
-            Diagnostic {
-                kind: DiagnosticKind::err_parser_misplaced_dot,
-                span: Span::new(34, 51),
-            },
-        ]);
+        assert_eq!(
+            diagnostics,
+            vec![
+                Diagnostic {
+                    kind: DiagnosticKind::fatal_lexer_unterminated_comment,
+                    span: Span::new(0, 1),
+                },
+                Diagnostic {
+                    kind: DiagnosticKind::err_parser_misplaced_dot,
+                    span: Span::new(34, 51),
+                },
+            ]
+        );
     }
 }
