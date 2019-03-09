@@ -17,7 +17,7 @@ use liblocus::diagnostics::{DiagnosticKind, Handler, Span};
 use libreader::datum::{DatumValue, ScannedDatum};
 use libreader::intern_pool::Atom;
 
-use crate::environment::{Environment, VariableKind};
+use crate::environment::{Environment, ReferenceKind};
 use crate::expression::{Arguments, Expression, ExpressionKind, Literal, Variable};
 
 pub struct Meaning {
@@ -234,6 +234,7 @@ fn meaning_expression(
                 meaning_abstraction(diagnostic, arguments, body, constants),
             ExpressionKind::Application(ref terms) =>
                 meaning_application(diagnostic, terms, constants),
+            ExpressionKind::Undefined => MeaningKind::Undefined,
         },
         span: expression.span,
     }
@@ -272,27 +273,36 @@ fn meaning_reference(
     name: Atom, span: Span,
     environment: &Rc<Environment>) -> MeaningKind
 {
-    match environment.resolve_variable(name)  {
-        VariableKind::Local { depth, index } => {
-            if depth == 0 {
-                MeaningKind::ShallowArgumentReference(index)
-            } else {
-                MeaningKind::DeepArgumentReference(depth, index)
+    if let Some(reference) = environment.resolve_variable(name) {
+        match reference.kind {
+            ReferenceKind::Local { depth, index } => {
+                if depth == 0 {
+                    MeaningKind::ShallowArgumentReference(index)
+                } else {
+                    MeaningKind::DeepArgumentReference(depth, index)
+                }
+            }
+            ReferenceKind::Global { index } => {
+                MeaningKind::GlobalReference(index)
+            }
+            ReferenceKind::Imported { index } => {
+                MeaningKind::ImportedReference(index)
+            }
+            ReferenceKind::Syntactic { .. } => {
+                // TODO: provide suggestions based on the environment
+                diagnostic.report(DiagnosticKind::err_meaning_reference_to_syntactic_binding,
+                    span);
+
+                // Syntactic variables do not have runtime values, so return a placeholder.
+                MeaningKind::Undefined
             }
         }
-        VariableKind::Global { index } => {
-            MeaningKind::GlobalReference(index)
-        }
-        VariableKind::Imported { index } => {
-            MeaningKind::ImportedReference(index)
-        }
-        VariableKind::Unresolved => {
-            // TODO: provide suggestions based on the environment
-            diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable, span);
+    } else {
+        // TODO: provide suggestions based on the environment
+        diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable, span);
 
-            // We cannot return an actual value or reference here, so return a poisoned value.
-            MeaningKind::Undefined
-        }
+        // We cannot return an actual value or reference here, so return a poisoned value.
+        MeaningKind::Undefined
     }
 }
 
@@ -314,39 +324,58 @@ fn meaning_assignment(
     environment: &Rc<Environment>,
     constants: &mut Vec<Value>) -> MeaningKind
 {
-    let variable_kind = environment.resolve_variable(variable.name);
+    let reference = environment.resolve_variable(variable.name);
 
     // Report the errors before computing the meaning of the assigned value
     // so that the reported diagnostics are ordered better.
-    if let VariableKind::Unresolved = variable_kind {
+    if let Some(ref reference) = reference {
+        if let ReferenceKind::Imported { .. } = reference.kind {
+            // TODO: show where the variable is imported from
+            diagnostic.report(DiagnosticKind::err_meaning_assign_to_imported_binding,
+                variable.span);
+        }
+        if let ReferenceKind::Syntactic { .. } = reference.kind {
+            // TODO: provide suggestions based on the environment
+            // TODO: show where the variable is imported from
+            diagnostic.report(DiagnosticKind::err_meaning_assign_to_syntactic_binding,
+                variable.span);
+        }
+    } else {
         // TODO: provide suggestions based on the environment
         diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable,
-            variable.span.expect("BUG: unresolved variable"));
-    }
-    if let VariableKind::Imported { .. } = variable_kind {
-        diagnostic.report(DiagnosticKind::err_meaning_assign_to_imported_binding,
-            variable.span.expect("BUG: unresolved variable"));
+            variable.span);
     }
 
     let new_value = Box::new(meaning_expression(diagnostic, value, constants));
 
-    match variable_kind {
-        VariableKind::Local { depth, index } => {
-            if depth == 0 {
-                MeaningKind::ShallowArgumentSet(index, new_value)
-            } else {
-                MeaningKind::DeepArgumentSet(depth, index, new_value)
+    if let Some(ref reference) = reference {
+        match reference.kind {
+            ReferenceKind::Local { depth, index } => {
+                if depth == 0 {
+                    MeaningKind::ShallowArgumentSet(index, new_value)
+                } else {
+                    MeaningKind::DeepArgumentSet(depth, index, new_value)
+                }
+            }
+            ReferenceKind::Global { index } => {
+                MeaningKind::GlobalSet(index, new_value)
+            }
+            // We really can't assign to the imported variable, so return the meaning of the new
+            // value being computed in order to allow further passes to analyze it if necessary
+            // (and see any side-effects and errors that the new value computation may contain).
+            //
+            // In the same vein, Scheme allows to reassign syntactic binding to a runtime binding
+            // via a (define ...) form, but in that case the variable should resolve into Global.
+            // So if we see Syntactic here then it's really (set! macro-expander ...) in source
+            // which is an error.
+            ReferenceKind::Imported { .. } | ReferenceKind::Syntactic { .. } => {
+                new_value.kind
             }
         }
-        VariableKind::Global { index } => {
-            MeaningKind::GlobalSet(index, new_value)
-        }
-        // Well... in these cases return the meaning of the new value being computed
-        // in order to allow further passes to analyze it if necessary (and see any
-        // side-effects and errors that the new value computation may contain).
-        VariableKind::Imported { .. } | VariableKind::Unresolved => {
-            new_value.kind
-        }
+    } else {
+        // The same goes for assignments to unresolved variables. Instead of replacing them with
+        // MeaningKind::Undefined return the computation of the new value.
+        new_value.kind
     }
 }
 

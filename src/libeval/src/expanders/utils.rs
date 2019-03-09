@@ -7,109 +7,11 @@
 
 //! Miscellaneous expander utilities.
 
+use std::ops::RangeFrom;
+
 use liblocus::diagnostics::{DiagnosticKind, Handler, Span};
 use libreader::datum::{DatumValue, ScannedDatum};
 use libreader::intern_pool::Atom;
-
-/// Check if `datum` is a form (possibly empty).
-/// Return `Some((dotted, values))` if it is, `None` otherwise.
-pub fn is_form(datum: &ScannedDatum) -> Option<(bool, &[ScannedDatum])> {
-    match datum.value {
-        DatumValue::ProperList(ref values) => Some((false, values)),
-        DatumValue::DottedList(ref values) => Some((true, values)),
-        _ => None,
-    }
-}
-
-/// Check if `datum` is a form with `expected_name` as its car.
-/// Return `Some((dotted, values))` if it is, `None` otherwise.
-pub fn is_named_form(datum: &ScannedDatum, expected_name: Atom)
-    -> Option<(bool, &[ScannedDatum])>
-{
-    let (dotted, values) = match is_form(datum) {
-        Some(v) => v,
-        None => { return None; }
-    };
-
-    if values.is_empty() {
-        return None;
-    }
-    match values[0].value {
-        DatumValue::Symbol(actual_name) => {
-            if actual_name != expected_name {
-                return None;
-            }
-        }
-        _ => {
-            return None;
-        }
-    }
-
-    Some((dotted, values))
-}
-
-/// Check that a proper list has given number of elements.
-///
-/// `datum` is a the datum to be tested. It must be a proper or dotted list (as specified by
-/// `dotted`), with `elements` being its elements. The list must have exactly `expected_length`.
-/// If any of the above is not true then diagnostic `kind` is reported to provided `diagnostic`
-/// handler with the offending range.
-pub fn expect_list_length_fixed(datum: &ScannedDatum, dotted: bool, elements: &[ScannedDatum],
-    expected_length: usize, diagnostic: &Handler, kind: DiagnosticKind)
-{
-    if elements.is_empty() {
-        diagnostic.report(kind,
-            Span::new(datum.span.from + 1, datum.span.to - 1));
-
-        return;
-    }
-
-    let last = elements.len() - 1;
-
-    if elements.len() < expected_length {
-        diagnostic.report(kind, missing_last_span(datum));
-    }
-
-    if elements.len() > expected_length {
-        diagnostic.report(kind,
-            Span::new(elements[expected_length].span.from, elements[last].span.to));
-    }
-
-    if dotted && (elements.len() == expected_length || expected_length > 2) {
-        assert!(elements.len() >= 2);
-        diagnostic.report(kind,
-            Span::new(elements[last - 1].span.to, elements[last].span.from));
-    }
-}
-
-/// Check that a proper list has at least given number of elements.
-///
-/// `datum` is a the datum to be tested. It must be a proper or dotted list (as specified by
-/// `dotted`), with `elements` being its elements. The list must have at least `expected_length`
-/// elements or more. If any of the above is not true then diagnostic `kind` is reported to
-/// the provided `diagnostic` handler with the offending range.
-pub fn expect_list_length_at_least(datum: &ScannedDatum, dotted: bool, elements: &[ScannedDatum],
-    expected_length: usize, diagnostic: &Handler, kind: DiagnosticKind)
-{
-    if elements.is_empty() {
-        diagnostic.report(kind,
-            Span::new(datum.span.from + 1, datum.span.to - 1));
-
-        return;
-    }
-
-    let last = elements.len() - 1;
-
-    if elements.len() < expected_length {
-        diagnostic.report(kind, missing_last_span(datum));
-    }
-
-    if dotted && (elements.len() >= expected_length || expected_length > 2) {
-        assert!(elements.len() >= 2);
-        diagnostic.report(kind,
-            Span::new(elements[last - 1].span.to, elements[last].span.from));
-    }
-}
 
 /// Return a span between the last term and the closing parenthesis.
 ///
@@ -124,5 +26,129 @@ pub fn missing_last_span(datum: &ScannedDatum) -> Span {
             Span::new(last_span.to, datum.span.to - 1)
         }
         _ => panic!("datum must be a list or a vector")
+    }
+}
+
+/// Unwrap an expected form with expected keyword.
+///
+/// Expanders should be invoked only on valid forms. This function checks this and panics if the
+/// datum is not an expected form. It returns all the terms of the form and a flag whether the
+/// form is dotted.
+pub fn expect_form(keyword: Atom, datum: &ScannedDatum) -> (bool, &[ScannedDatum]) {
+    let (dotted, terms) = match datum.value {
+        DatumValue::ProperList(ref terms) => (false, terms),
+        DatumValue::DottedList(ref terms) => (true, terms),
+        _ => panic!("the expanded datum is not a list: {:?}", datum),
+    };
+
+    assert!(!terms.is_empty());
+
+    match terms[0].value {
+        DatumValue::Symbol(name) => {
+            if name != keyword {
+                panic!("the first term is not the expected keyword: {:?} (expected {:?})",
+                    name, keyword);
+            }
+        }
+        _ => panic!("the first term is not a symbol: {:?}", terms[0]),
+    }
+
+    (dotted, terms)
+}
+
+/// Expected bounds for the term count in a macro use.
+pub struct MacroUseBounds {
+    /// Minimum required number of terms, inclusive.
+    pub min: usize,
+    /// Maximum allowed number of terms, inclusive.
+    pub max: usize,
+}
+
+/// Diagnostics reported by `expect_macro_use()`.
+pub struct MacroUseErrors {
+    /// Reported when the form does not have enough terms.
+    pub not_enough_terms: Option<DiagnosticKind>,
+    /// Reported when the form has too many terms.
+    pub too_many_terms: Option<DiagnosticKind>,
+    /// Reported when the form is not a proper list (i.e., is a dotted form).
+    pub dotted_form: Option<DiagnosticKind>,
+}
+
+/// Verify and unwrap a macro use.
+///
+/// This function first verifies that `datum` is a macro use for the `keyword`. It panics if
+/// the datum is not an expected form. This enforces correctness of the expander operation
+/// which should not invoke expanders for unrelated forms.
+///
+/// After that the function verifies that the macro is a proper form which has enought terms
+/// for the specified `bounds` (which can be either a fixed number or a closed or open range).
+/// Corresponding `errors` are reported to the provided `diagnostic` handler. The errors may
+/// be all specified explicitly via `MacroUseErrors` struct, or a single diagnostic kind may
+/// be used for all conditions. Note that you may omit some diagnostics if you are sure that
+/// they will never be reported (if they are actually reported then you'll get a panic).
+///
+/// The function returns the slice of the terms of the macro use, without the leading keyword.
+/// Note that the length of the slice may not be in `bounds`.
+pub fn expect_macro_use<'a, B: Into<MacroUseBounds>, E: Into<MacroUseErrors>>(
+    datum: &'a ScannedDatum,
+    keyword: Atom,
+    bounds: B,
+    diagnostic: &Handler,
+    errors: E,
+) -> &'a [ScannedDatum] {
+    let bounds = bounds.into();
+    let errors = errors.into();
+
+    let (dotted, terms) = expect_form(keyword, datum);
+    let last = terms.len() - 1;
+
+    if terms.len() < bounds.min {
+        let missing_terms = Span::new(terms[last].span.to, datum.span.to - 1);
+        diagnostic.report(errors.not_enough_terms.unwrap(), missing_terms);
+    }
+    if terms.len() > bounds.max {
+        let extra_terms = Span::new(terms[bounds.max - 1].span.to, terms[last].span.to);
+        diagnostic.report(errors.too_many_terms.unwrap(), extra_terms);
+    }
+
+    // Don't report an error for the dot if its falls into the range
+    // previously reported for extra unexpected terms.
+    if dotted && !((terms.len() > bounds.max) && (bounds.max > 1)) {
+        assert!(terms.len() >= 2);
+        let around_dot = Span::new(terms[last - 1].span.to, terms[last].span.from);
+        diagnostic.report(errors.dotted_form.unwrap(), around_dot);
+    }
+
+    &terms[1..]
+}
+
+// Provide some convenience conversions for expect_macro_use() configuration,
+// based on what the actual expanders use most.
+
+impl From<usize> for MacroUseBounds {
+    fn from(value: usize) -> MacroUseBounds {
+        MacroUseBounds {
+            min: value,
+            max: value,
+        }
+    }
+}
+
+impl From<RangeFrom<usize>> for MacroUseBounds {
+    fn from(value: RangeFrom<usize>) -> MacroUseBounds {
+        MacroUseBounds {
+            min: value.start,
+            max: <usize>::max_value(),
+        }
+    }
+}
+
+impl From<DiagnosticKind> for MacroUseErrors {
+    fn from(value: DiagnosticKind) -> MacroUseErrors {
+        MacroUseErrors {
+            not_enough_terms: Some(value),
+            too_many_terms: Some(value),
+            dotted_form: Some(value),
+        }
     }
 }

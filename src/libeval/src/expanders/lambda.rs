@@ -14,7 +14,7 @@ use libreader::datum::{DatumValue, ScannedDatum};
 use libreader::intern_pool::Atom;
 
 use crate::environment::Environment;
-use crate::expanders::{Expander, ExpansionResult};
+use crate::expand::Expander;
 use crate::expression::{Arguments, Expression, ExpressionKind, Variable};
 
 /// Expand `lambda` special forms into abstractions.
@@ -33,40 +33,34 @@ impl LambdaExpander {
 }
 
 impl Expander for LambdaExpander {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &dyn Expander) -> ExpansionResult {
-        use crate::expanders::utils::{is_named_form, expect_list_length_at_least};
+    fn expand_form(
+        &self,
+        datum: &ScannedDatum,
+        environment: &Rc<Environment>,
+        diagnostic: &Handler,
+    ) -> Expression {
+        use crate::expand::expand;
+        use crate::expanders::utils::expect_macro_use;
 
-        // Filter out anything that certainly does not look as a lambda form.
-        let (dotted, values) = match is_named_form(datum, self.name) {
-            Some(v) => v,
-            None => { return ExpansionResult::Unknown; }
-        };
-
-        // The only valid form is (lambda (variable...) body1 body2...).
-        expect_list_length_at_least(datum, dotted, values, 3,
-            diagnostic, DiagnosticKind::err_expand_invalid_lambda);
-
-        // The first element describes the abstraction's arguments. They form a new local
+        // The only valid form is (lambda (variable...) body1 body2...). We need to expand only
+        // the procedure body. Arguments have their own peculiar syntax and describe the new
         // environment for the procedure body.
-        let arguments = expand_arguments(values.get(1), diagnostic);
+        let terms = expect_macro_use(datum, self.name, 3.., diagnostic,
+            DiagnosticKind::err_expand_invalid_lambda);
+
+        let arguments = expand_arguments(terms.get(0), diagnostic);
         let new_environment = new_local_environment(&arguments, environment);
 
-        // All other elements (except for the first two) are the procedure body.
-        // Expand them sequentially, as in the begin form.
-        let expressions = values.iter()
-            .skip(2)
-            .filter_map(|datum| match expander.expand(datum, &new_environment, diagnostic, expander) {
-                ExpansionResult::Some(expression) => Some(expression),
-                ExpansionResult::None => None,
-                ExpansionResult::Unknown => None,
-            })
+        let expressions = terms.iter()
+            .skip(1)
+            .map(|datum| expand(datum, &new_environment, diagnostic))
             .collect();
 
-        ExpansionResult::Some(Expression {
+        Expression {
             kind: ExpressionKind::Abstraction(arguments, expressions),
             span: datum.span,
-            environment: environment.clone(), // note that this is *not* the new environment
-        })
+            environment: environment.clone(),
+        }
     }
 }
 
@@ -80,10 +74,10 @@ fn expand_arguments(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Argum
             let raw_variables: Vec<Variable> = arguments.iter()
                 .filter_map(|argument| {
                     if let DatumValue::Symbol(name) = argument.value {
-                        Some(Variable { name, span: Some(argument.span) })
+                        Some(Variable { name, span: argument.span })
                     } else {
                         diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
-                                          argument.span);
+                            argument.span);
                         None
                     }
                 })
@@ -137,7 +131,7 @@ fn deduplicate_variables(raw_variables: Vec<Variable>, diagnostic: &Handler) -> 
         for previous in &variables {
             if variable.name == previous.name {
                 diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
-                    variable.span.expect("all lambda args have spans"));
+                    variable.span);
 
                 continue 'next_variable;
             }

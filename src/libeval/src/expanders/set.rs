@@ -14,8 +14,8 @@ use libreader::datum::{DatumValue, ScannedDatum};
 use libreader::intern_pool::Atom;
 
 use crate::environment::Environment;
-use crate::expanders::{Expander, ExpansionResult};
-use crate::expression::{Expression, ExpressionKind, Literal, Variable};
+use crate::expand::Expander;
+use crate::expression::{Expression, ExpressionKind, Variable};
 
 /// Expand `set!` special forms into assignments.
 pub struct SetExpander {
@@ -33,35 +33,33 @@ impl SetExpander {
 }
 
 impl Expander for SetExpander {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &dyn Expander) -> ExpansionResult {
-        use crate::expanders::utils::{is_named_form, expect_list_length_fixed};
+    fn expand_form(
+        &self,
+        datum: &ScannedDatum,
+        environment: &Rc<Environment>,
+        diagnostic: &Handler,
+    ) -> Expression {
+        use crate::expanders::utils::expect_macro_use;
 
-        // Filter out anything that certainly does not look as a set! form.
-        let (dotted, values) = match is_named_form(datum, self.name) {
-            Some(v) => v,
-            None => { return ExpansionResult::Unknown; }
-        };
+        // The only valid form is (set! variable value). Variable must be mentioned verbatim.
+        // The value expression needs to be expanded.
+        let terms = expect_macro_use(datum, self.name, 3, diagnostic,
+            DiagnosticKind::err_expand_invalid_set);
 
-        // The only valid form is (set! variable value).
-        expect_list_length_fixed(datum, dotted, values, 3,
-            diagnostic, DiagnosticKind::err_expand_invalid_set);
-
-        // The first element should be the variable name, followed by the new variable value.
-        let variable = expand_variable(values.get(1), diagnostic);
-        let value = expand_value(datum, values.get(2), environment, diagnostic, expander);
+        let variable = expand_variable(terms.get(0), diagnostic);
+        let new_value = expand_new_value(terms.get(1), datum, environment, diagnostic);
 
         // If we have a variable to assign then use that variable. Otherwise leave only the value.
-        ExpansionResult::Some(
-            if let Some(variable) = variable {
-                Expression {
-                    kind: ExpressionKind::Assignment(variable, Box::new(value)),
-                    span: datum.span,
-                    environment: environment.clone(),
-                }
+        // Use the same span though.
+        Expression {
+            kind: if let Some(variable) = variable {
+                ExpressionKind::Assignment(variable, Box::new(new_value))
             } else {
-                value
-            }
-        )
+                new_value.kind
+            },
+            span: datum.span,
+            environment: environment.clone(),
+        }
     }
 }
 
@@ -73,7 +71,7 @@ fn expand_variable(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Option
         if let DatumValue::Symbol(name) = datum.value {
             return Some(Variable {
                 name,
-                span: Some(datum.span),
+                span: datum.span,
             });
         }
         diagnostic.report(DiagnosticKind::err_expand_invalid_set, datum.span);
@@ -84,24 +82,19 @@ fn expand_variable(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Option
 /// Expand the subexpression denoting variable value in a set! expression.
 ///
 /// In case of errors return an #f literal as a placeholder.
-fn expand_value(datum: &ScannedDatum, term: Option<&ScannedDatum>, environment: &Rc<Environment>, diagnostic: &Handler, expander: &dyn Expander) -> Expression {
+fn expand_new_value(
+    term: Option<&ScannedDatum>,
+    datum: &ScannedDatum,
+    environment: &Rc<Environment>,
+    diagnostic: &Handler,
+) -> Expression {
+    use crate::expand::expand;
     use crate::expanders::utils::missing_last_span;
 
-    if let Some(term) = term {
-        if let ExpansionResult::Some(expression) = expander.expand(term, environment, diagnostic, expander) {
-            expression
-        } else {
-            Expression {
-                kind: ExpressionKind::Literal(Literal::Boolean(false)),
-                span: term.span,
-                environment: environment.clone(),
-            }
-        }
-    } else {
-        Expression {
-            kind: ExpressionKind::Literal(Literal::Boolean(false)),
+    term.map(|datum| expand(datum, environment, diagnostic))
+        .unwrap_or(Expression {
+            kind: ExpressionKind::Undefined,
             span: missing_last_span(datum),
             environment: environment.clone(),
-        }
-    }
+        })
 }

@@ -12,23 +12,15 @@
 //! convert data into code, just like user-defined macros do. Sometimes they are referred to
 //! as _magic keywords_.
 
-mod application;
-mod basic;
 mod begin;
-mod expander;
 mod if_expander;
 mod lambda;
 mod quote;
 mod set;
-mod stack;
 mod utils;
 
-pub use self::application::ApplicationExpander;
-pub use self::basic::BasicExpander;
 pub use self::begin::BeginExpander;
-pub use self::expander::{Expander, ExpansionResult};
 pub use self::if_expander::IfExpander;
 pub use self::lambda::LambdaExpander;
 pub use self::quote::QuoteExpander;
 pub use self::set::SetExpander;
-pub use self::stack::ExpanderStack;

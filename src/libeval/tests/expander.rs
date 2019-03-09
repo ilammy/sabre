@@ -11,20 +11,16 @@
 
 use std::rc::Rc;
 
-use libeval::{
-    environment::Environment,
-    expanders::{
-        ApplicationExpander, BasicExpander, BeginExpander, Expander, ExpanderStack,
-        ExpansionResult, IfExpander, LambdaExpander, QuoteExpander, SetExpander,
-    },
-};
-use liblocus::diagnostics::DiagnosticKind;
+use libeval::environment::Environment;
+use libeval::expanders::{BeginExpander, IfExpander, LambdaExpander, QuoteExpander, SetExpander};
+use libeval::expression::Variable;
+use liblocus::diagnostics::{DiagnosticKind, Span};
 use libreader::intern_pool::InternPool;
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Tested expanders
 
-struct SchemeBase {
+struct MagicKeywords {
     quote: &'static str,
     begin: &'static str,
     if_: &'static str,
@@ -32,9 +28,9 @@ struct SchemeBase {
     lambda: &'static str,
 }
 
-impl Default for SchemeBase {
-    fn default() -> SchemeBase {
-        SchemeBase {
+impl Default for MagicKeywords {
+    fn default() -> MagicKeywords {
+        MagicKeywords {
             quote: "quote",
             begin: "begin",
             if_: "if",
@@ -44,20 +40,21 @@ impl Default for SchemeBase {
     }
 }
 
-impl SchemeBase {
-    fn make(&self, pool: &InternPool) -> ExpanderStack {
-        ExpanderStack::new(Box::new(BasicExpander::new()))
-            .push(Box::new(ApplicationExpander::new()))
-            .push(Box::new( QuoteExpander::new(pool.intern(self.quote))))
-            .push(Box::new( BeginExpander::new(pool.intern(self.begin))))
-            .push(Box::new(    IfExpander::new(pool.intern(self.if_))))
-            .push(Box::new(   SetExpander::new(pool.intern(self.set))))
-            .push(Box::new(LambdaExpander::new(pool.intern(self.lambda))))
-    }
+macro_rules! syntax {
+    ($pool:expr, $name:expr, $type:ty) => ({
+        let name = $pool.intern($name);
+        (Variable { name, span: Span::new(0, 0) }, Box::new(<$type>::new(name)))
+    })
 }
 
-fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
-    Environment::new_imported(&[])
+fn basic_scheme_environment(pool: &InternPool, names: &MagicKeywords) -> Rc<Environment> {
+    Environment::new_imported(&[], vec![
+        syntax!(pool, names.quote,  QuoteExpander),
+        syntax!(pool, names.begin,  BeginExpander),
+        syntax!(pool, names.if_,    IfExpander),
+        syntax!(pool, names.set,    SetExpander),
+        syntax!(pool, names.lambda, LambdaExpander),
+    ])
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -160,7 +157,7 @@ fn quote_nested() {
 fn quote_empty() {
     TestCase::new()
         .input("(quote)")
-        .result("(Quotation #f)")
+        .result("(Undefined)")
         .diagnostic(6, 6, DiagnosticKind::err_expand_invalid_quote)
         .check();
 }
@@ -178,8 +175,8 @@ fn quote_dotted() {
 fn quote_extra() {
     TestCase::new()
         .input("(quote 1 2 3)")
-        .result("(Quotation 3)")
-        .diagnostic(9, 12, DiagnosticKind::err_expand_invalid_quote)
+        .result("(Quotation 1)")
+        .diagnostic(8, 12, DiagnosticKind::err_expand_invalid_quote)
         .check();
 }
 
@@ -187,8 +184,8 @@ fn quote_extra() {
 fn quote_extra_dotted() {
     TestCase::new()
         .input("(quote 1 2 . 3)")
-        .result("(Quotation 3)")
-        .diagnostic(9, 14, DiagnosticKind::err_expand_invalid_quote)
+        .result("(Quotation 1)")
+        .diagnostic(8, 14, DiagnosticKind::err_expand_invalid_quote)
         .check();
 }
 
@@ -196,14 +193,14 @@ fn quote_extra_dotted() {
 fn quote_renaming() {
     TestCase::new()
         .input("'(1 2 3)")
-        .expander(SchemeBase { quote: "not-a-quote", ..Default::default() })
+        .keywords(MagicKeywords { quote: "not-a-quote", ..Default::default() })
         .result("(Application (Reference quote) \
                   (Application (Literal 1) (Literal 2) (Literal 3)))")
         .check();
 
     TestCase::new()
         .input("(a-quote 5)")
-        .expander(SchemeBase { quote: "a-quote", ..Default::default() })
+        .keywords(MagicKeywords { quote: "a-quote", ..Default::default() })
         .result("(Quotation 5)")
         .check();
 }
@@ -237,7 +234,7 @@ fn begin_nested() {
 fn begin_empty() {
     TestCase::new()
         .input("(begin)")
-        .result("(Sequence)")
+        .result("(Undefined)")
         .diagnostic(6, 6, DiagnosticKind::err_expand_invalid_begin)
         .check();
 }
@@ -261,7 +258,7 @@ fn begin_dotted() {
 fn begin_renaming() {
     TestCase::new()
         .input("(seq 1 (seq 2 3))")
-        .expander(SchemeBase { begin: "seq", ..Default::default() })
+        .keywords(MagicKeywords { begin: "seq", ..Default::default() })
         .result("(Sequence (Literal 1) (Sequence (Literal 2) (Literal 3)))")
         .check();
 }
@@ -291,7 +288,7 @@ fn if_nested() {
 fn if_forms_0() {
     TestCase::new()
         .input("( if )")
-        .result("(Alternative (Literal #f) (Literal #f) (Literal #f))")
+        .result("(Alternative (Undefined) (Undefined) (Undefined))")
         .diagnostic(4, 5, DiagnosticKind::err_expand_invalid_if)
         .check();
 }
@@ -300,7 +297,7 @@ fn if_forms_0() {
 fn if_forms_1() {
     TestCase::new()
         .input("( if #false )")
-        .result("(Alternative (Literal #f) (Literal #f) (Literal #f))")
+        .result("(Alternative (Literal #f) (Undefined) (Undefined))")
         .diagnostic(11, 12, DiagnosticKind::err_expand_invalid_if)
         .check();
 }
@@ -309,7 +306,7 @@ fn if_forms_1() {
 fn if_forms_1_dotted() {
     TestCase::new()
         .input("(if . #f)")
-        .result("(Alternative (Literal #f) (Literal #f) (Literal #f))")
+        .result("(Alternative (Literal #f) (Undefined) (Undefined))")
         .diagnostic(8, 8, DiagnosticKind::err_expand_invalid_if)
         .diagnostic(3, 6, DiagnosticKind::err_expand_invalid_if)
         .check();
@@ -319,7 +316,7 @@ fn if_forms_1_dotted() {
 fn if_forms_2() {
     TestCase::new()
         .input("(if #f 1)")
-        .result("(Alternative (Literal #f) (Literal 1) (Literal #f))")
+        .result("(Alternative (Literal #f) (Literal 1) (Undefined))")
         .diagnostic(8, 8, DiagnosticKind::err_expand_invalid_if)
         .check();
 }
@@ -328,7 +325,7 @@ fn if_forms_2() {
 fn if_forms_2_dotted() {
     TestCase::new()
         .input("(if #f . 1)")
-        .result("(Alternative (Literal #f) (Literal 1) (Literal #f))")
+        .result("(Alternative (Literal #f) (Literal 1) (Undefined))")
         .diagnostic(10, 10, DiagnosticKind::err_expand_invalid_if)
         .diagnostic( 6,  9, DiagnosticKind::err_expand_invalid_if)
         .check();
@@ -348,7 +345,7 @@ fn if_forms_5() {
     TestCase::new()
         .input("(if #f 1 2 3 4)")
         .result("(Alternative (Literal #f) (Literal 1) (Literal 2))")
-        .diagnostic(11, 14, DiagnosticKind::err_expand_invalid_if)
+        .diagnostic(10, 14, DiagnosticKind::err_expand_invalid_if)
         .check();
 }
 
@@ -357,8 +354,7 @@ fn if_forms_5_dotted() {
     TestCase::new()
         .input("(if #f 1 2 3 . 4)")
         .result("(Alternative (Literal #f) (Literal 1) (Literal 2))")
-        .diagnostic(11, 16, DiagnosticKind::err_expand_invalid_if)
-        .diagnostic(12, 15, DiagnosticKind::err_expand_invalid_if)
+        .diagnostic(10, 16, DiagnosticKind::err_expand_invalid_if)
         .check();
 }
 
@@ -366,7 +362,7 @@ fn if_forms_5_dotted() {
 fn if_renaming() {
     TestCase::new()
         .input("(whether #false or not)")
-        .expander(SchemeBase { if_: "whether", ..Default::default() })
+        .keywords(MagicKeywords { if_: "whether", ..Default::default() })
         .result("(Alternative (Literal #f) (Reference or) (Reference not))")
         .check();
 }
@@ -396,7 +392,7 @@ fn set_nested() {
 fn set_forms_0() {
     TestCase::new()
         .input("(set!)")
-        .result("(Literal #f)")
+        .result("(Undefined)")
         .diagnostic(5, 5, DiagnosticKind::err_expand_invalid_set)
         .check();
 }
@@ -405,7 +401,7 @@ fn set_forms_0() {
 fn set_forms_1() {
     TestCase::new()
         .input("(set! i)")
-        .result("(Assignment i (Literal #f))")
+        .result("(Assignment i (Undefined))")
         .diagnostic(7, 7, DiagnosticKind::err_expand_invalid_set)
         .check();
 }
@@ -414,7 +410,7 @@ fn set_forms_1() {
 fn set_forms_1_dotted() {
     TestCase::new()
         .input("(set! . i)")
-        .result("(Assignment i (Literal #f))")
+        .result("(Assignment i (Undefined))")
         .diagnostic(9, 9, DiagnosticKind::err_expand_invalid_set)
         .diagnostic(5, 8, DiagnosticKind::err_expand_invalid_set)
         .check();
@@ -434,7 +430,7 @@ fn set_forms_3() {
     TestCase::new()
         .input("(set! i 1 2)")
         .result("(Assignment i (Literal 1))")
-        .diagnostic(10, 11, DiagnosticKind::err_expand_invalid_set)
+        .diagnostic(9, 11, DiagnosticKind::err_expand_invalid_set)
         .check();
 }
 
@@ -443,8 +439,7 @@ fn set_forms_3_dotted() {
     TestCase::new()
         .input("(set! i 5 . 4)")
         .result("(Assignment i (Literal 5))")
-        .diagnostic(12, 13, DiagnosticKind::err_expand_invalid_set)
-        .diagnostic( 9, 12, DiagnosticKind::err_expand_invalid_set)
+        .diagnostic(9, 13, DiagnosticKind::err_expand_invalid_set)
         .check();
 }
 
@@ -473,8 +468,8 @@ fn set_non_variable() {
 fn set_renaming() {
     TestCase::new()
         .input("(!!!SUMMER-ASSIGNMENT!!!)")
-        .expander(SchemeBase { set: "!!!SUMMER-ASSIGNMENT!!!", ..Default::default() })
-        .result("(Literal #f)")
+        .keywords(MagicKeywords { set: "!!!SUMMER-ASSIGNMENT!!!", ..Default::default() })
+        .result("(Undefined)")
         .diagnostic(24, 24, DiagnosticKind::err_expand_invalid_set)
         .check();
 }
@@ -622,7 +617,7 @@ fn lambda_args_non_unique() {
 fn lambda_renaming() {
     TestCase::new()
         .input("(\u{03BB} (a) #f)")
-        .expander(SchemeBase { lambda: "\u{03BB}", ..Default::default() })
+        .keywords(MagicKeywords { lambda: "\u{03BB}", ..Default::default() })
         .result("(Abstraction (a) (Literal #f))")
         .check();
 }
@@ -719,7 +714,7 @@ fn altogether() {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use liblocus::diagnostics::{Diagnostic, Span};
+use liblocus::diagnostics::Diagnostic;
 use libreader::lexer::StringScanner;
 use libreader::parser::Parser;
 
@@ -728,7 +723,7 @@ struct TestCase {
     input: Option<String>,
     expected_result: Option<String>,
     expected_diagnostics: Vec<Diagnostic>,
-    expander_factory: Option<SchemeBase>,
+    keywords: Option<MagicKeywords>,
 }
 
 impl TestCase {
@@ -756,9 +751,9 @@ impl TestCase {
         self
     }
 
-    fn expander(mut self, factory: SchemeBase) -> Self {
-        assert!(self.expander_factory.is_none(), "don't set expander twice");
-        self.expander_factory = Some(factory);
+    fn keywords(mut self, keywords: MagicKeywords) -> Self {
+        assert!(self.keywords.is_none(), "don't set keywords twice");
+        self.keywords = Some(keywords);
         self
     }
 
@@ -766,15 +761,17 @@ impl TestCase {
         let input = self.input.expect("input not set");
         let expected_result = self.expected_result.expect("result not set");
         let expected_diagnostics = self.expected_diagnostics;
-        let expander_factory = self.expander_factory.unwrap_or_default();
+        let keywords = self.keywords.unwrap_or_default();
 
-        check(&expander_factory, &input, &expected_result, &expected_diagnostics);
+        check(&keywords, &input, &expected_result, &expected_diagnostics);
     }
 }
 
 /// Check whether the given expander produces expected results and reports expected diagnostics.
 /// Panic if this is not true.
-fn check(expander_factory: &SchemeBase, input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
+
+fn check(keywords: &MagicKeywords, input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
+    use libeval::expand::expand;
     use liblocus::utils::collect_diagnostics;
     use libreader::intern_pool::with_formatting_pool;
 
@@ -793,19 +790,12 @@ fn check(expander_factory: &SchemeBase, input: &str, expected_result: &str, expe
     assert!(parsing_diagnostics.is_empty(), "parsing produced diagnostics");
 
     let (expand_result, expand_diagnostics) = collect_diagnostics(|handler| {
-        let environment = basic_scheme_environment(&pool);
+        let environment = basic_scheme_environment(&pool, keywords);
 
-        let expander = expander_factory.make(&pool);
+        let expression = expand(&datum, &environment, handler);
 
-        expander.expand(&datum, &environment, &handler, &expander)
+        with_formatting_pool(&pool, || format!("{:?}", expression))
     });
-
-    let expand_result = match expand_result {
-        ExpansionResult::Some(expand_result) =>
-            with_formatting_pool(&pool, || format!("{:?}", expand_result)),
-        ExpansionResult::None => format!("None"),
-        ExpansionResult::Unknown => format!("Unknown"),
-    };
 
     assert_eq!(expand_result, expected_result);
     assert_eq!(expand_diagnostics, expected_diagnostics);

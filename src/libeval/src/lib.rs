@@ -10,6 +10,7 @@
 //! This crate contains definitions of core Scheme expressions and a crude evaluator of them.
 
 pub mod environment;
+pub mod expand;
 pub mod expanders;
 pub mod expression;
 pub mod meaning;

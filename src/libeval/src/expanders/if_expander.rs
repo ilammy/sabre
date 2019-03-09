@@ -14,8 +14,8 @@ use libreader::datum::ScannedDatum;
 use libreader::intern_pool::Atom;
 
 use crate::environment::Environment;
-use crate::expanders::{Expander, ExpansionResult};
-use crate::expression::{Expression, ExpressionKind, Literal};
+use crate::expand::Expander;
+use crate::expression::{Expression, ExpressionKind};
 
 /// Expand `if` special forms into alternatives.
 pub struct IfExpander {
@@ -33,43 +33,37 @@ impl IfExpander {
 }
 
 impl Expander for IfExpander {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &dyn Expander) -> ExpansionResult {
-        use crate::expanders::utils::{is_named_form, expect_list_length_fixed, missing_last_span};
+    fn expand_form(
+        &self,
+        datum: &ScannedDatum,
+        environment: &Rc<Environment>,
+        diagnostic: &Handler,
+    ) -> Expression {
+        use crate::expand::expand;
+        use crate::expanders::utils::{expect_macro_use, missing_last_span};
 
-        // Filter out anything that certainly does not look as a if form.
-        let (dotted, values) = match is_named_form(datum, self.name) {
-            Some(v) => v,
-            None => { return ExpansionResult::Unknown; }
+        // The only valid form is (if condition consequent alternative). Expand the terms before
+        // gathering them up. Replace any missing terms with placeholder values.
+        let terms = expect_macro_use(datum, self.name, 4, diagnostic,
+            DiagnosticKind::err_expand_invalid_if);
+
+        let expand_or_recover = |term: Option<&ScannedDatum>| {
+            term.map(|datum| expand(datum, environment, diagnostic))
+                .unwrap_or(Expression {
+                    kind: ExpressionKind::Undefined,
+                    span: missing_last_span(datum),
+                    environment: environment.clone(),
+                })
         };
 
-        assert!(!values.is_empty());
+        let condition   = Box::new(expand_or_recover(terms.get(0)));
+        let consequent  = Box::new(expand_or_recover(terms.get(1)));
+        let alternative = Box::new(expand_or_recover(terms.get(2)));
 
-        // The only valid form is (if condition consequence alternative).
-        expect_list_length_fixed(datum, dotted, values, 4,
-            diagnostic, DiagnosticKind::err_expand_invalid_if);
-
-        // Recover from errors by using #f as placeholder values.
-        let expand_or_recover = |index| {
-            if let Some(term) = values.get(index) {
-                let result = expander.expand(term, environment, diagnostic, expander);
-                if let ExpansionResult::Some(expression) = result {
-                    return expression;
-                }
-            }
-            Expression {
-                kind: ExpressionKind::Literal(Literal::Boolean(false)),
-                span: missing_last_span(datum),
-                environment: environment.clone(),
-            }
-        };
-        let condition   = Box::new(expand_or_recover(1));
-        let consequence = Box::new(expand_or_recover(2));
-        let alternative = Box::new(expand_or_recover(3));
-
-        ExpansionResult::Some(Expression {
-            kind: ExpressionKind::Alternative(condition, consequence, alternative),
+        Expression {
+            kind: ExpressionKind::Alternative(condition, consequent, alternative),
             span: datum.span,
             environment: environment.clone(),
-        })
+        }
     }
 }

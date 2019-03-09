@@ -17,37 +17,37 @@ use libeval::meaning::{meaning, MeaningResult, Value};
 use std::rc::Rc;
 
 use libeval::environment::Environment;
-use libeval::expanders::{
-    ApplicationExpander, BasicExpander, BeginExpander, Expander, ExpanderStack, IfExpander,
-    LambdaExpander, QuoteExpander, SetExpander,
-};
+use libeval::expand::Expander;
+use libeval::expanders::{BeginExpander, IfExpander, LambdaExpander, QuoteExpander, SetExpander};
 use libeval::expression::Variable;
-use liblocus::diagnostics::DiagnosticKind;
+use liblocus::diagnostics::{DiagnosticKind, Span};
 use libreader::intern_pool::InternPool;
 
-fn standard_scheme(pool: &InternPool) -> Box<dyn Expander> {
-    Box::new(
-        ExpanderStack::new(Box::new(BasicExpander::new()))
-            .push(Box::new(ApplicationExpander::new()))
-            .push(Box::new( QuoteExpander::new(pool.intern("quote"))))
-            .push(Box::new( BeginExpander::new(pool.intern("begin"))))
-            .push(Box::new(    IfExpander::new(pool.intern("if"))))
-            .push(Box::new(   SetExpander::new(pool.intern("set!"))))
-            .push(Box::new(LambdaExpander::new(pool.intern("lambda"))))
-    )
+macro_rules! syntax {
+    ($pool:expr, $name:expr, $type:ty) => ({
+        let name = $pool.intern($name);
+        (Variable { name, span: Span::new(0, 0) }, Box::new(<$type>::new(name)))
+    })
 }
 
 fn basic_scheme_environment(pool: &InternPool) -> Rc<Environment> {
+    let keywords: Vec<(Variable, Box<Expander>)> = vec![
+        syntax!(pool, "quote",  QuoteExpander),
+        syntax!(pool, "begin",  BeginExpander),
+        syntax!(pool, "if",     IfExpander),
+        syntax!(pool, "set!",   SetExpander),
+        syntax!(pool, "lambda", LambdaExpander),
+    ];
     let imported_vars = [
-        Variable { name: pool.intern("car"), span: None },
-        Variable { name: pool.intern("cdr"), span: None },
-        Variable { name: pool.intern("cons"), span: None },
+        Variable { name: pool.intern("car"), span: Span::new(0, 0) },
+        Variable { name: pool.intern("cdr"), span: Span::new(0, 0) },
+        Variable { name: pool.intern("cons"), span: Span::new(0, 0) },
     ];
     let global_vars = [
-        Variable { name: pool.intern("*global*"), span: None },
+        Variable { name: pool.intern("*global*"), span: Span::new(0, 0) },
     ];
 
-    let imported_env = Environment::new_imported(&imported_vars);
+    let imported_env = Environment::new_imported(&imported_vars, keywords);
     let global_env = Environment::new_global(&global_vars, &imported_env);
 
     return global_env;
@@ -146,6 +146,15 @@ fn reference_undefined() {
         .check();
 }
 
+#[test]
+fn reference_syntactic() {
+    TestCase::new()
+        .input("begin")
+        .meaning("(Sequence (Undefined))")
+        .diagnostic(0, 5, DiagnosticKind::err_meaning_reference_to_syntactic_binding)
+        .check();
+}
+
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Alternative
 
@@ -217,6 +226,16 @@ fn assignment_imported() {
         .input("(set! car cdr)")
         .meaning("(Sequence (ImportedReference 1))")
         .diagnostic(6, 9, DiagnosticKind::err_meaning_assign_to_imported_binding)
+        .check();
+}
+
+#[test]
+fn assignment_syntactic() {
+    TestCase::new()
+        .input("(set! set! set!)")
+        .meaning("(Sequence (Undefined))")
+        .diagnostic( 6, 10, DiagnosticKind::err_meaning_assign_to_syntactic_binding)
+        .diagnostic(11, 15, DiagnosticKind::err_meaning_reference_to_syntactic_binding)
         .check();
 }
 
@@ -371,11 +390,33 @@ fn application_closed() {
 }
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+// Shadowing
+
+#[test]
+fn local_variables_shadow_special_forms() {
+    TestCase::new()
+        .input("((lambda (if) (if if if if)) (lambda (a b) (cons a b)))")
+        .meaning("(Sequence \
+                    (ProcedureCall (ClosureFixed 1 \
+                                    (Sequence \
+                                      (ProcedureCall \
+                                        (ShallowArgumentReference 0) \
+                                        (ShallowArgumentReference 0) \
+                                        (ShallowArgumentReference 0) \
+                                        (ShallowArgumentReference 0)))) \
+                      (ClosureFixed 2 \
+                       (Sequence \
+                         (ProcedureCall (ImportedReference 2) \
+                           (ShallowArgumentReference 0) \
+                           (ShallowArgumentReference 1))))))")
+        .check();
+}
+
+// - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use libeval::expanders::ExpansionResult;
 use libeval::expression::Expression;
-use liblocus::diagnostics::{Diagnostic, Span};
+use liblocus::diagnostics::Diagnostic;
 use libreader::datum::ScannedDatum;
 use libreader::lexer::StringScanner;
 use libreader::parser::Parser;
@@ -471,18 +512,14 @@ fn parse(pool: &InternPool, input: &str) -> Vec<ScannedDatum> {
 }
 
 fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
+    use libeval::expand::expand;
     use liblocus::utils::collect_diagnostics;
 
     let (expansion_result, expansion_diagnostics) = collect_diagnostics(|handler| {
         let environment = basic_scheme_environment(pool);
-        let expander = standard_scheme(pool);
 
         return data.iter()
-            .map(|d| expander.expand(d, &environment, &handler, expander.as_ref()))
-            .map(|e| match e {
-                ExpansionResult::Some(e) => e,
-                _ => panic!("expander did not produce an expression"),
-            })
+            .map(|datum| expand(datum, &environment, &handler))
             .collect();
     });
 

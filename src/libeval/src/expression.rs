@@ -53,6 +53,9 @@ pub enum ExpressionKind {
 
     /// Procedure call.
     Application(Vec<Expression>),
+
+    /// An expression producing undefined value.
+    Undefined,
 }
 
 /// Literal value.
@@ -83,8 +86,8 @@ pub struct Variable {
     /// Name of the variable.
     pub name: Atom,
 
-    /// Closest known source of the reference.
-    pub span: Option<Span>,
+    /// Definition of the variable.
+    pub span: Span,
 }
 
 /// Procedure argument list.
@@ -131,6 +134,8 @@ impl fmt::Debug for Expression {
                 write!(f, ")")?;
                 Ok(())
             }
+            ExpressionKind::Undefined =>
+                write!(f, "(Undefined)"),
         }
     }
 }
