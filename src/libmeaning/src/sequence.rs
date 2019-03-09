@@ -7,7 +7,7 @@
 
 //! Utilities for sequence splicing.
 
-use libeval::expression::{Expression, ExpressionKind};
+use libexpand::expression::{Expression, ExpressionKind};
 
 // I personally consider the splicing role of the (begin term ...) form to be a wart on Scheme
 // syntax and semantics. It could have been better if it was named "splice". Or did not exist

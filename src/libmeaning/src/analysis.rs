@@ -9,8 +9,8 @@
 
 use std::rc::Rc;
 
-use libeval::environment::{Environment, ReferenceKind};
-use libeval::expression::{Arguments, Expression, ExpressionKind, Literal, Variable};
+use libexpand::environment::{Environment, ReferenceKind};
+use libexpand::expression::{Arguments, Expression, ExpressionKind, Literal, Variable};
 use liblocus::diagnostics::{DiagnosticKind, Handler, Span};
 use libreader::datum::{DatumValue, ScannedDatum};
 use libreader::intern_pool::Atom;

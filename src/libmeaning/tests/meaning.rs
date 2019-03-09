@@ -16,10 +16,10 @@ use libmeaning::{meaning, MeaningResult, Value};
 
 use std::rc::Rc;
 
-use libeval::environment::Environment;
-use libeval::Expander;
-use libeval::expanders::{BeginExpander, IfExpander, LambdaExpander, QuoteExpander, SetExpander};
-use libeval::expression::Variable;
+use libexpand::environment::Environment;
+use libexpand::Expander;
+use libexpand::expanders::{BeginExpander, IfExpander, LambdaExpander, QuoteExpander, SetExpander};
+use libexpand::expression::Variable;
 use liblocus::diagnostics::{DiagnosticKind, Span};
 use libreader::intern_pool::InternPool;
 
@@ -431,7 +431,7 @@ fn local_variables_shadow_special_forms() {
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Test helpers
 
-use libeval::expression::Expression;
+use libexpand::expression::Expression;
 use liblocus::diagnostics::Diagnostic;
 use libreader::datum::ScannedDatum;
 use libreader::lexer::StringScanner;
@@ -532,7 +532,7 @@ fn parse(pool: &InternPool, input: &str) -> Vec<ScannedDatum> {
 }
 
 fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
-    use libeval::expand;
+    use libexpand::expand;
     use liblocus::utils::collect_diagnostics;
 
     let (expansion_result, expansion_diagnostics) = collect_diagnostics(|handler| {
