@@ -312,7 +312,7 @@ fn lambda_fixed_arguments() {
         .meaning("(Sequence \
                     (ClosureFixed 1 \
                      (Sequence \
-                       (Alternative (ShallowArgumentReference 0) \
+                       (Alternative (ArgumentReference 0 0) \
                          (Sequence (Constant 0) (Constant 1)) \
                          (Constant 2)))))")
         .check();
@@ -328,15 +328,15 @@ fn lambda_fixed_arguments_nested() {
         .meaning("(Sequence \
                     (ClosureFixed 3 \
                      (Sequence \
-                       (Alternative (ShallowArgumentReference 2) \
+                       (Alternative (ArgumentReference 0 2) \
                          (ClosureFixed 1 \
                           (Sequence \
-                            (ShallowArgumentReference 0) \
-                            (DeepArgumentReference 1 0))) \
+                            (ArgumentReference 0 0) \
+                            (ArgumentReference 1 0))) \
                          (ClosureFixed 1 \
                           (Sequence \
-                            (ShallowArgumentReference 0) \
-                            (DeepArgumentReference 1 1)))))))")
+                            (ArgumentReference 0 0) \
+                            (ArgumentReference 1 1)))))))")
         .check();
 }
 
@@ -381,8 +381,8 @@ fn application_closed() {
              (ProcedureCall (ClosureFixed 2 \
              (Sequence \
              (ProcedureCall (ImportedReference 2) \
-             (ShallowArgumentReference 0) \
-             (ShallowArgumentReference 1)))) \
+             (ArgumentReference 0 0) \
+             (ArgumentReference 0 1)))) \
              (Constant 0) \
              (Constant 1)))",
         )
@@ -400,15 +400,15 @@ fn local_variables_shadow_special_forms() {
                     (ProcedureCall (ClosureFixed 1 \
                                     (Sequence \
                                       (ProcedureCall \
-                                        (ShallowArgumentReference 0) \
-                                        (ShallowArgumentReference 0) \
-                                        (ShallowArgumentReference 0) \
-                                        (ShallowArgumentReference 0)))) \
+                                        (ArgumentReference 0 0) \
+                                        (ArgumentReference 0 0) \
+                                        (ArgumentReference 0 0) \
+                                        (ArgumentReference 0 0)))) \
                       (ClosureFixed 2 \
                        (Sequence \
                          (ProcedureCall (ImportedReference 2) \
-                           (ShallowArgumentReference 0) \
-                           (ShallowArgumentReference 1))))))")
+                           (ArgumentReference 0 0) \
+                           (ArgumentReference 0 1))))))")
         .check();
 }
 

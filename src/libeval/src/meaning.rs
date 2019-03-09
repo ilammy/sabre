@@ -28,13 +28,11 @@ pub struct Meaning {
 pub enum MeaningKind {
     Undefined,
     Constant(usize),
-    ShallowArgumentReference(usize),
-    DeepArgumentReference(usize, usize),
+    ArgumentReference(usize, usize),
     GlobalReference(usize),
     ImportedReference(usize),
     Alternative(Box<Meaning>, Box<Meaning>, Box<Meaning>),
-    ShallowArgumentSet(usize, Box<Meaning>),
-    DeepArgumentSet(usize, usize, Box<Meaning>),
+    ArgumentSet(usize, usize, Box<Meaning>),
     GlobalSet(usize, Box<Meaning>),
     Sequence(Vec<Meaning>),
     ClosureFixed(usize, Box<Meaning>),
@@ -48,20 +46,16 @@ impl fmt::Debug for Meaning {
                 write!(f, "(Undefined)"),
             MeaningKind::Constant(index) =>
                 write!(f, "(Constant {})", index),
-            MeaningKind::ShallowArgumentReference(index) =>
-                write!(f, "(ShallowArgumentReference {})", index),
-            MeaningKind::DeepArgumentReference(depth, index) =>
-                write!(f, "(DeepArgumentReference {} {})", depth, index),
+            MeaningKind::ArgumentReference(depth, index) =>
+                write!(f, "(ArgumentReference {} {})", depth, index),
             MeaningKind::GlobalReference(index) =>
                 write!(f, "(GlobalReference {})", index),
             MeaningKind::ImportedReference(index) =>
                 write!(f, "(ImportedReference {})", index),
             MeaningKind::Alternative(ref condition, ref consequent, ref alternate) =>
                 write!(f, "(Alternative {:?} {:?} {:?})", condition, consequent, alternate),
-            MeaningKind::ShallowArgumentSet(index, ref value) =>
-                write!(f, "(ShallowArgumentSet {} {:?})", index, value),
-            MeaningKind::DeepArgumentSet(depth, index, ref value) =>
-                write!(f, "(DeepArgumentSet {} {} {:?})", depth, index, value),
+            MeaningKind::ArgumentSet(depth, index, ref value) =>
+                write!(f, "(ArgumentSet {} {} {:?})", depth, index, value),
             MeaningKind::GlobalSet(index, ref value) =>
                 write!(f, "(GlobalSet {} {:?})", index, value),
             MeaningKind::Sequence(ref computations) => {
@@ -276,11 +270,7 @@ fn meaning_reference(
     if let Some(reference) = environment.resolve_variable(name) {
         match reference.kind {
             ReferenceKind::Local { depth, index } => {
-                if depth == 0 {
-                    MeaningKind::ShallowArgumentReference(index)
-                } else {
-                    MeaningKind::DeepArgumentReference(depth, index)
-                }
+                MeaningKind::ArgumentReference(depth, index)
             }
             ReferenceKind::Global { index } => {
                 MeaningKind::GlobalReference(index)
@@ -351,11 +341,7 @@ fn meaning_assignment(
     if let Some(ref reference) = reference {
         match reference.kind {
             ReferenceKind::Local { depth, index } => {
-                if depth == 0 {
-                    MeaningKind::ShallowArgumentSet(index, new_value)
-                } else {
-                    MeaningKind::DeepArgumentSet(depth, index, new_value)
-                }
+                MeaningKind::ArgumentSet(depth, index, new_value)
             }
             ReferenceKind::Global { index } => {
                 MeaningKind::GlobalSet(index, new_value)
