@@ -771,7 +771,7 @@ impl TestCase {
 /// Panic if this is not true.
 
 fn check(keywords: &MagicKeywords, input: &str, expected_result: &str, expected_diagnostics: &[Diagnostic]) {
-    use libeval::expand::expand;
+    use libeval::expand;
     use liblocus::utils::collect_diagnostics;
     use libreader::intern_pool::with_formatting_pool;
 

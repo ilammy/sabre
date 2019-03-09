@@ -17,7 +17,7 @@ use libmeaning::{meaning, MeaningResult, Value};
 use std::rc::Rc;
 
 use libeval::environment::Environment;
-use libeval::expand::Expander;
+use libeval::Expander;
 use libeval::expanders::{BeginExpander, IfExpander, LambdaExpander, QuoteExpander, SetExpander};
 use libeval::expression::Variable;
 use liblocus::diagnostics::{DiagnosticKind, Span};
@@ -532,7 +532,7 @@ fn parse(pool: &InternPool, input: &str) -> Vec<ScannedDatum> {
 }
 
 fn expand(pool: &InternPool, data: &[ScannedDatum]) -> Vec<Expression> {
-    use libeval::expand::expand;
+    use libeval::expand;
     use liblocus::utils::collect_diagnostics;
 
     let (expansion_result, expansion_diagnostics) = collect_diagnostics(|handler| {

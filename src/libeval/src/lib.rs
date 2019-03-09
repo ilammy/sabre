@@ -9,7 +9,10 @@
 //!
 //! This crate contains definitions of core Scheme expressions and a crude evaluator of them.
 
+mod expand;
+
 pub mod environment;
-pub mod expand;
 pub mod expanders;
 pub mod expression;
+
+pub use expand::{expand, Expander};
