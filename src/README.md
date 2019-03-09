@@ -5,5 +5,6 @@ Essential source code of Sabre.
 
 - `libeval` — demo expander and evaluator
 - `liblocus` — handling code locations and diagnostics
+- `libmeaning` — semantic analysis
 - `libreader` — S-expression parser
 - `libunicode` — Unicode support

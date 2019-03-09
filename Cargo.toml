@@ -2,6 +2,7 @@
 members = [
     "src/libeval",
     "src/liblocus",
+    "src/libmeaning",
     "src/libreader",
     "src/libunicode",
 ]
