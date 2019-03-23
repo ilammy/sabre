@@ -89,7 +89,7 @@ pub struct StringScanner<'a> {
     //
 
     /// Designated responsible for diagnostic processing.
-    diagnostic: &'a Handler,
+    handler: &'a Handler,
 }
 
 impl<'a> Scanner for StringScanner<'a> {
@@ -113,7 +113,7 @@ impl<'a> StringScanner<'a> {
             pos: 0,
             prev_pos: 0,
             folding_case: false,
-            diagnostic: handler,
+            handler,
         };
         scanner.read();
         scanner
@@ -282,8 +282,9 @@ impl<'a> StringScanner<'a> {
                     self.read();
                 }
                 None => {
-                    self.diagnostic.report(DiagnosticKind::fatal_lexer_unterminated_comment,
-                        Span::new(start, self.prev_pos));
+                    DiagnosticKind::fatal_lexer_unterminated_comment
+                        .report_at(start..self.prev_pos)
+                        .report_to(self.handler);
 
                     return Token::Unrecognized;
                 }
@@ -397,8 +398,9 @@ impl<'a> StringScanner<'a> {
         // like #\space or #\newline for these cases. So if we run in any of these abominations
         // (or if we run out of characters at all) then report it and get out.
         if self.cur.map_or(true, is_whitespace) {
-            self.diagnostic.report(DiagnosticKind::err_lexer_character_missing,
-                Span::new(self.prev_pos, self.prev_pos));
+            DiagnosticKind::err_lexer_character_missing
+                .report_at(self.prev_pos..self.prev_pos)
+                .report_to(self.handler);
 
             return Token::Character(REPLACEMENT_CHARACTER);
         }
@@ -428,8 +430,9 @@ impl<'a> StringScanner<'a> {
                     if let Some(c) = std::char::from_u32(value) {
                         return Token::Character(c);
                     } else {
-                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_unicode_range,
-                            Span::new(start, self.prev_pos));
+                        DiagnosticKind::err_lexer_invalid_unicode_range
+                            .report_at(start..self.prev_pos)
+                            .report_to(self.handler);
 
                         return Token::Character(REPLACEMENT_CHARACTER);
                     }
@@ -502,8 +505,9 @@ impl<'a> StringScanner<'a> {
             "space"     => { Token::Character('\u{0020}') }
             "tab"       => { Token::Character('\u{0009}') }
             _ => {
-                self.diagnostic.report(DiagnosticKind::err_lexer_unknown_character_name,
-                    Span::new(start, name_end));
+                DiagnosticKind::err_lexer_unknown_character_name
+                    .report_at(start..name_end)
+                    .report_to(self.handler);
 
                 Token::Character(REPLACEMENT_CHARACTER)
             }
@@ -538,8 +542,9 @@ impl<'a> StringScanner<'a> {
 
                 // Scan over and report everything else.
                 Some(_) => {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
-                        Span::new(self.prev_pos, self.pos));
+                    DiagnosticKind::err_lexer_invalid_number_character
+                        .report_at(self.prev_pos..self.pos)
+                        .report_to(self.handler);
                     self.read();
                 }
             }
@@ -555,8 +560,9 @@ impl<'a> StringScanner<'a> {
             self.read();
         } else {
             assert!(self.cur.map_or(true, is_delimiter));
-            self.diagnostic.report(DiagnosticKind::err_lexer_missing_datum_label_terminator,
-                Span::new(self.prev_pos, self.prev_pos));
+            DiagnosticKind::err_lexer_missing_datum_label_terminator
+                .report_at(self.prev_pos..self.prev_pos)
+                .report_to(self.handler);
         }
 
         let value = &self.buf[start..end];
@@ -610,8 +616,9 @@ impl<'a> StringScanner<'a> {
 
                 // If we suddenly run out of characters in the stream then we're toasted.
                 None => {
-                    self.diagnostic.report(DiagnosticKind::fatal_lexer_unterminated_string,
-                        Span::new(start, self.pos));
+                    DiagnosticKind::fatal_lexer_unterminated_string
+                        .report_at(start..self.pos)
+                        .report_to(self.handler);
 
                     return Token::Unrecognized;
                 }
@@ -657,8 +664,9 @@ impl<'a> StringScanner<'a> {
             // Any other character is not expected after a backslash, it is an error. Report
             // the error and return the character, assuming that the backslash itself is a typo.
             Some(c) => {
-                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_escape_sequence,
-                    Span::new(escape_start, self.pos));
+                DiagnosticKind::err_lexer_invalid_escape_sequence
+                    .report_at(escape_start..self.pos)
+                    .report_to(self.handler);
                 self.read();
                 Some(c)
             }
@@ -694,8 +702,9 @@ impl<'a> StringScanner<'a> {
                 // We do not expect any other character here or the EOF condition. If this happens
                 // then report bad syntax and get out.
                 Some(_) | None => {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_line_escape,
-                        Span::new(escape_start, self.prev_pos));
+                    DiagnosticKind::err_lexer_invalid_line_escape
+                        .report_at(escape_start..self.prev_pos)
+                        .report_to(self.handler);
 
                     return;
                 }
@@ -750,8 +759,9 @@ impl<'a> StringScanner<'a> {
                     // sequence, assuming that the user has forgotten to type the semicolon. This
                     // also includes the unexpected EOF which will be reported by the caller.
                     Some(_) | None => {
-                        self.diagnostic.report(DiagnosticKind::err_lexer_unicode_escape_missing_semicolon,
-                            Span::new(self.prev_pos, self.prev_pos));
+                        DiagnosticKind::err_lexer_unicode_escape_missing_semicolon
+                            .report_at(self.prev_pos..self.prev_pos)
+                            .report_to(self.handler);
                         break;
                     }
                 }
@@ -761,8 +771,9 @@ impl<'a> StringScanner<'a> {
             if let Some(c) = std::char::from_u32(value) {
                 return c;
             } else {
-                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_unicode_range,
-                    Span::new(escape_start, self.prev_pos));
+                DiagnosticKind::err_lexer_invalid_unicode_range
+                    .report_at(escape_start..self.prev_pos)
+                    .report_to(self.handler);
 
                 return REPLACEMENT_CHARACTER;
             }
@@ -773,14 +784,16 @@ impl<'a> StringScanner<'a> {
         // may have forgotten to type the only digit there). If anything else follows then "\x"
         // is an invalid escape sequence.
         if self.cur_is(';') {
-            self.diagnostic.report(DiagnosticKind::err_lexer_unicode_escape_missing_digits,
-                Span::new(self.prev_pos, self.prev_pos));
-            self.read();
+            DiagnosticKind::err_lexer_unicode_escape_missing_digits
+                .report_at(self.prev_pos..self.prev_pos)
+                .report_to(self.handler);
 
+            self.read();
             REPLACEMENT_CHARACTER
         } else {
-            self.diagnostic.report(DiagnosticKind::err_lexer_invalid_escape_sequence,
-                Span::new(escape_start, self.prev_pos));
+            DiagnosticKind::err_lexer_invalid_escape_sequence
+                .report_at(escape_start..self.prev_pos)
+                .report_to(self.handler);
 
             first_char
         }
@@ -814,8 +827,9 @@ impl<'a> StringScanner<'a> {
 
             // Report anything else as unknown.
             _ => {
-                self.diagnostic.report(DiagnosticKind::err_lexer_unknown_directive,
-                    Span::new(directive_start, name_end));
+                DiagnosticKind::err_lexer_unknown_directive
+                    .report_at(directive_start..name_end)
+                    .report_to(self.handler);
             }
         }
 
@@ -828,8 +842,9 @@ impl<'a> StringScanner<'a> {
         if !self.cur.map_or(true, is_delimiter) {
             // The first characters of identifiers are a bit more restrictive.
             if !is_identifier_initial(self.cur.unwrap()) {
-                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_identifier_character,
-                    Span::new(self.prev_pos, self.pos));
+                DiagnosticKind::err_lexer_invalid_identifier_character
+                    .report_at(self.prev_pos..self.pos)
+                    .report_to(self.handler);
             }
 
             self.read();
@@ -851,8 +866,9 @@ impl<'a> StringScanner<'a> {
 
                     // Report and scan over anything else.
                     Some(_) => {
-                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_identifier_character,
-                            Span::new(self.prev_pos, self.pos));
+                        DiagnosticKind::err_lexer_invalid_identifier_character
+                            .report_at(self.prev_pos..self.pos)
+                            .report_to(self.handler);
                         self.read();
                     }
                 }
@@ -868,8 +884,9 @@ impl<'a> StringScanner<'a> {
         // Warn the user if the identifier can be parsed as a number after normalization, maybe
         // they intended to write a number, but, for example, their editor used fullwidth digits.
         if looks_like_number_prefix(&value, 10) {
-            self.diagnostic.report(DiagnosticKind::warn_lexer_identifier_looks_like_number,
-                Span::new(start, end));
+            DiagnosticKind::warn_lexer_identifier_looks_like_number
+                .report_at(start..end)
+                .report_to(self.handler);
         }
 
         Token::Identifier(self.pool.intern_string(value))
@@ -908,8 +925,9 @@ impl<'a> StringScanner<'a> {
 
                 // If we suddenly run out of characters in the stream then we're toasted.
                 None => {
-                    self.diagnostic.report(DiagnosticKind::fatal_lexer_unterminated_identifier,
-                        Span::new(start, self.pos));
+                    DiagnosticKind::fatal_lexer_unterminated_identifier
+                        .report_at(start..self.pos)
+                        .report_to(self.handler);
 
                     return Token::Unrecognized;
                 }
@@ -951,8 +969,9 @@ impl<'a> StringScanner<'a> {
             // Any other character is not expected after a backslash, it is an error. Report
             // the error and return the character, assuming that the backslash itself is a typo.
             Some(c) => {
-                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_escape_sequence,
-                    Span::new(escape_start, self.pos));
+                DiagnosticKind::err_lexer_invalid_escape_sequence
+                    .report_at(escape_start..self.pos)
+                    .report_to(self.handler);
                 self.read();
                 Some(c)
             }
@@ -1001,10 +1020,9 @@ impl<'a> StringScanner<'a> {
         };
         if self.peculiar_identifier_ahead(check_radix) {
             if has_prefix {
-                self.diagnostic.report(
-                    DiagnosticKind::err_lexer_prefixed_identifier,
-                    Span::new(start, self.prev_pos),
-                );
+                DiagnosticKind::err_lexer_prefixed_identifier
+                    .report_at(start..self.prev_pos)
+                    .report_to(self.handler);
             }
 
             return self.scan_identifier();
@@ -1056,8 +1074,9 @@ impl<'a> StringScanner<'a> {
                 break;
             } else {
                 // Drop a warning about every non-final part. Valid numbers contain at most two.
-                self.diagnostic.report(DiagnosticKind::err_lexer_extra_complex_part,
-                    Span::new(part_start, part_end));
+                DiagnosticKind::err_lexer_extra_complex_part
+                    .report_at(part_start..part_end)
+                    .report_to(self.handler);
             }
         }
 
@@ -1066,8 +1085,9 @@ impl<'a> StringScanner<'a> {
         // Late check for radix of a number. Scheme does not allow to use exponent and float forms
         // with non-decimal numbers.
         if not_integer && (effective_radix != 10) {
-            self.diagnostic.report(DiagnosticKind::err_lexer_nondecimal_real,
-                radix_location.expect("non-decimal radix is always explicit"));
+            DiagnosticKind::err_lexer_nondecimal_real
+                .report_at(radix_location.expect("non-decimal radix is always explicit"))
+                .report_to(self.handler);
         }
 
         let value = &self.buf[start..end];
@@ -1113,8 +1133,9 @@ impl<'a> StringScanner<'a> {
                         *radix_value = Some(value);
                         *radix_location = Some(location);
                     } else {
-                        self.diagnostic.report(DiagnosticKind::err_lexer_multiple_number_radices,
-                            location);
+                        DiagnosticKind::err_lexer_multiple_number_radices
+                            .report_at(location)
+                            .report_to(self.handler);
                     }
                 }
 
@@ -1135,8 +1156,9 @@ impl<'a> StringScanner<'a> {
                         *exact_value = Some(value);
                         *exact_location = Some(location);
                     } else {
-                        self.diagnostic.report(DiagnosticKind::err_lexer_multiple_exactness,
-                            location);
+                        DiagnosticKind::err_lexer_multiple_exactness
+                            .report_at(location)
+                            .report_to(self.handler);
                     }
                 }
 
@@ -1147,8 +1169,9 @@ impl<'a> StringScanner<'a> {
                     // a prefix and forgotten to type the character between the hashes. Report the
                     // lone hash and continue scanning treating this hash a start of a new prefix.
                     if self.cur_is('#') {
-                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
-                            Span::new(start, self.prev_pos));
+                        DiagnosticKind::err_lexer_invalid_number_prefix
+                            .report_at(start..self.prev_pos)
+                            .report_to(self.handler);
                         continue;
                     }
 
@@ -1164,8 +1187,9 @@ impl<'a> StringScanner<'a> {
                     // Stop scanning the prefix if we encounter any of these immediately after
                     // the hash character.
                     if delimiter || digit || sign || dot {
-                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
-                            Span::new(start, self.prev_pos));
+                        DiagnosticKind::err_lexer_invalid_number_prefix
+                            .report_at(start..self.prev_pos)
+                            .report_to(self.handler);
                         break;
                     }
 
@@ -1173,8 +1197,9 @@ impl<'a> StringScanner<'a> {
                     // and continue scanning (maybe there are more prefixes ahead).
                     self.read();
 
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_prefix,
-                        Span::new(start, self.prev_pos));
+                    DiagnosticKind::err_lexer_invalid_number_prefix
+                        .report_at(start..self.prev_pos)
+                        .report_to(self.handler);
                 }
             }
         }
@@ -1227,20 +1252,24 @@ impl<'a> StringScanner<'a> {
 
             // Fractions must be exact, they cannot contain floating-point parts.
             if infnan_numerator {
-                self.diagnostic.report(DiagnosticKind::err_lexer_infnan_rational,
-                    Span::new(numerator_start, numerator_end));
+                DiagnosticKind::err_lexer_infnan_rational
+                    .report_at(numerator_start..numerator_end)
+                    .report_to(self.handler);
             }
             if infnan_denominator {
-                self.diagnostic.report(DiagnosticKind::err_lexer_infnan_rational,
-                    Span::new(denominator_start, denominator_end));
+                DiagnosticKind::err_lexer_infnan_rational
+                    .report_at(denominator_start..denominator_end)
+                    .report_to(self.handler);
             }
             if noninteger_numerator {
-                self.diagnostic.report(DiagnosticKind::err_lexer_noninteger_rational,
-                    Span::new(numerator_start, numerator_end));
+                DiagnosticKind::err_lexer_noninteger_rational
+                    .report_at(numerator_start..numerator_end)
+                    .report_to(self.handler);
             }
             if noninteger_denominator {
-                self.diagnostic.report(DiagnosticKind::err_lexer_noninteger_rational,
-                    Span::new(denominator_start, denominator_end));
+                DiagnosticKind::err_lexer_noninteger_rational
+                    .report_at(denominator_start..denominator_end)
+                    .report_to(self.handler);
             }
         }
 
@@ -1254,8 +1283,9 @@ impl<'a> StringScanner<'a> {
             && self.cur.map_or(true, is_delimiter)
             && !terminal_i
         {
-            self.diagnostic.report(DiagnosticKind::err_lexer_missing_i,
-                Span::new(self.prev_pos, self.prev_pos));
+            DiagnosticKind::err_lexer_missing_i
+                .report_at(self.prev_pos..self.prev_pos)
+                .report_to(self.handler);
         }
     }
 
@@ -1276,8 +1306,9 @@ impl<'a> StringScanner<'a> {
         if self.cur_is('+') || self.cur_is('-') {
             // Allow signs right after a rational slash, but report them.
             if rational_mode == RationalScanningMode::Denominator {
-                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
-                    Span::new(self.prev_pos, self.pos));
+                DiagnosticKind::err_lexer_invalid_number_character
+                    .report_at(self.prev_pos..self.pos)
+                    .report_to(self.handler);
             }
 
             // Scan over any extra signs that may follow the first one if the user was sleeping
@@ -1285,8 +1316,9 @@ impl<'a> StringScanner<'a> {
             // of a complex number.
             while self.peek_is('-') || self.peek_is('+') {
                 self.read();
-                self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
-                    Span::new(self.prev_pos, self.pos));
+                DiagnosticKind::err_lexer_invalid_number_character
+                    .report_at(self.prev_pos..self.pos)
+                    .report_to(self.handler);
             }
 
             // Handle IEEE 754 special values which must always have an explicit sign.
@@ -1299,8 +1331,9 @@ impl<'a> StringScanner<'a> {
                 // Scan over a terminating 'i', reporting it if it's in non-final position.
                 if self.cur_is('i') || self.cur_is('I') {
                     if self.peek_is('+') || self.peek_is('-') {
-                        self.diagnostic.report(DiagnosticKind::err_lexer_misplaced_i,
-                            Span::new(self.prev_pos, self.pos));
+                        DiagnosticKind::err_lexer_misplaced_i
+                            .report_at(self.prev_pos..self.pos)
+                            .report_to(self.handler);
                     } else {
                         // Guaranteed by scan_infnan_suffix().
                         assert!(self.peek().map_or(true, is_delimiter));
@@ -1330,8 +1363,9 @@ impl<'a> StringScanner<'a> {
                 }
 
                 if self.peek_is('+') || self.peek_is('-') || self.peek_is('@') {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_misplaced_i,
-                        Span::new(self.prev_pos, self.pos));
+                    DiagnosticKind::err_lexer_misplaced_i
+                        .report_at(self.prev_pos..self.pos)
+                        .report_to(self.handler);
 
                     *terminal_i = true;
                     self.read();
@@ -1361,8 +1395,9 @@ impl<'a> StringScanner<'a> {
                 // was sleeping and forgot to release the key. Do not treat them as starters
                 // of a complex number part.
                 while self.cur_is('-') || self.cur_is('+') {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
-                        Span::new(self.prev_pos, self.pos));
+                    DiagnosticKind::err_lexer_invalid_number_character
+                        .report_at(self.prev_pos..self.pos)
+                        .report_to(self.handler);
                     self.read();
                 }
             }
@@ -1411,13 +1446,15 @@ impl<'a> StringScanner<'a> {
                     // after it. Do not treat this sign as a delimiter of rectangular form
                     // of complex numbers. Just report this stuff as invalid characters.
 
-                    self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
-                        Span::new(self.prev_pos, self.pos));
+                    DiagnosticKind::err_lexer_invalid_number_character
+                        .report_at(self.prev_pos..self.pos)
+                        .report_to(self.handler);
                     self.read();
 
                     if self.cur_is('+') || self.cur_is('-') {
-                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
-                            Span::new(self.prev_pos, self.pos));
+                        DiagnosticKind::err_lexer_invalid_number_character
+                            .report_at(self.prev_pos..self.pos)
+                            .report_to(self.handler);
                         self.read();
                     }
                 }
@@ -1467,8 +1504,9 @@ impl<'a> StringScanner<'a> {
                     if (complex_mode != ComplexScanningMode::Argument)
                         && (self.peek_is('+') || self.peek_is('-')) =>
                 {
-                    self.diagnostic.report(DiagnosticKind::err_lexer_misplaced_i,
-                        Span::new(self.prev_pos, self.pos));
+                    DiagnosticKind::err_lexer_misplaced_i
+                        .report_at(self.prev_pos..self.pos)
+                        .report_to(self.handler);
 
                     seen_i = true;
                     break;
@@ -1486,11 +1524,13 @@ impl<'a> StringScanner<'a> {
                 // are digits of an unexpected radix (e.g., 9 used in binary literals).
                 Some(c) => {
                     if is_digit(10, c) {
-                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_digit,
-                            Span::new(self.prev_pos, self.pos));
+                        DiagnosticKind::err_lexer_invalid_number_digit
+                            .report_at(self.prev_pos..self.pos)
+                            .report_to(self.handler);
                     } else {
-                        self.diagnostic.report(DiagnosticKind::err_lexer_invalid_number_character,
-                            Span::new(self.prev_pos, self.pos));
+                        DiagnosticKind::err_lexer_invalid_number_character
+                            .report_at(self.prev_pos..self.pos)
+                            .report_to(self.handler);
                     }
                     self.read();
                 }
@@ -1506,8 +1546,9 @@ impl<'a> StringScanner<'a> {
             .chars()
             .any(|c| is_digit(check_radix, c))
         {
-            self.diagnostic.report(DiagnosticKind::err_lexer_digits_missing,
-                Span::new(start, end));
+            DiagnosticKind::err_lexer_digits_missing
+                .report_at(start..end)
+                .report_to(self.handler);
         }
 
         // Read over the 'i' we've seen before. This is done here so that the test above does not
@@ -1628,8 +1669,9 @@ impl<'a> StringScanner<'a> {
         let suffix_end = self.prev_pos;
 
         if suffix_start != suffix_end {
-            self.diagnostic.report(DiagnosticKind::err_lexer_infnan_suffix,
-                Span::new(suffix_start, suffix_end));
+            DiagnosticKind::err_lexer_infnan_suffix
+                .report_at(suffix_start..suffix_end)
+                .report_to(self.handler);
         }
     }
 
