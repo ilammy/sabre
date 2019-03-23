@@ -44,7 +44,7 @@ pub struct Parser<'a> {
     //
 
     /// Designated responsible for diagnostic processing.
-    diagnostic: &'a Handler,
+    handler: &'a Handler,
 }
 
 /// Result of a single datum parsing.
@@ -71,7 +71,7 @@ impl<'a> Parser<'a> {
                 tok: Token::Eof,
                 span: Span::new(0, 0),
             },
-            diagnostic: handler,
+            handler,
         };
         parser.bump();
         parser
@@ -166,8 +166,9 @@ impl<'a> Parser<'a> {
 
             // Dots are expected only in lists.
             Token::Dot => {
-                self.diagnostic.report(DiagnosticKind::err_parser_misplaced_dot,
-                    self.cur.span);
+                DiagnosticKind::err_parser_misplaced_dot
+                    .report_at(self.cur.span)
+                    .report_to(self.handler);
 
                 self.bump();
 
@@ -176,8 +177,9 @@ impl<'a> Parser<'a> {
 
             // Closing parentheses should be paired with opening ones.
             Token::Close(_) => {
-                self.diagnostic.report(DiagnosticKind::err_parser_extra_delimiter,
-                    self.cur.span);
+                DiagnosticKind::err_parser_extra_delimiter
+                    .report_at(self.cur.span)
+                    .report_to(self.handler);
 
                 self.bump();
 
@@ -250,8 +252,9 @@ impl<'a> Parser<'a> {
                 // should be handled by the list-parsing code, and EOF is EOF. Either way, there
                 // is no data for us here, so complain and bail out.
                 Token::Close(_) | Token::Dot | Token::Eof => {
-                    self.diagnostic.report(DiagnosticKind::err_parser_missing_datum,
-                        Span::new(start_span.to, start_span.to));
+                    DiagnosticKind::err_parser_missing_datum
+                        .report_at(start_span.to..start_span.to)
+                        .report_to(self.handler);
 
                     return Ok(None);
                 }
@@ -314,8 +317,9 @@ impl<'a> Parser<'a> {
                 // Bytevector literal is terminated by a closing parenthesis.
                 Token::Close(paren) => {
                     if paren != expected_paren {
-                        self.diagnostic.report(DiagnosticKind::err_parser_mismatched_delimiter,
-                            self.cur.span);
+                        DiagnosticKind::err_parser_mismatched_delimiter
+                            .report_at(self.cur.span)
+                            .report_to(self.handler);
                     }
 
                     break;
@@ -323,8 +327,9 @@ impl<'a> Parser<'a> {
 
                 // End of token stream means that we will never see the closing parenthesis.
                 Token::Eof => {
-                    self.diagnostic.report(DiagnosticKind::fatal_parser_unterminated_delimiter,
-                        start_span);
+                    DiagnosticKind::fatal_parser_unterminated_delimiter
+                        .report_at(start_span)
+                        .report_to(self.handler);
 
                     return Err(());
                 }
@@ -338,8 +343,9 @@ impl<'a> Parser<'a> {
                                 values.push(value);
                             }
                             _ => {
-                                self.diagnostic.report(DiagnosticKind::err_parser_invalid_bytevector_element,
-                                    datum.span);
+                                DiagnosticKind::err_parser_invalid_bytevector_element
+                                    .report_at(datum.span)
+                                    .report_to(self.handler);
                             }
                         }
                     }
@@ -380,8 +386,9 @@ impl<'a> Parser<'a> {
                 // Vectors are terminated by a closing parenthesis.
                 Token::Close(paren) => {
                     if paren != expected_paren {
-                        self.diagnostic.report(DiagnosticKind::err_parser_mismatched_delimiter,
-                            self.cur.span);
+                        DiagnosticKind::err_parser_mismatched_delimiter
+                            .report_at(self.cur.span)
+                            .report_to(self.handler);
                     }
 
                     break;
@@ -389,8 +396,9 @@ impl<'a> Parser<'a> {
 
                 // End of token stream means that we will never see the closing parenthesis.
                 Token::Eof => {
-                    self.diagnostic.report(DiagnosticKind::fatal_parser_unterminated_delimiter,
-                        start_span);
+                    DiagnosticKind::fatal_parser_unterminated_delimiter
+                        .report_at(start_span)
+                        .report_to(self.handler);
 
                     return Err(());
                 }
@@ -438,8 +446,9 @@ impl<'a> Parser<'a> {
                 // Lists are terminated by a closing parenthesis.
                 Token::Close(paren) => {
                     if paren != expected_paren {
-                        self.diagnostic.report(DiagnosticKind::err_parser_mismatched_delimiter,
-                            self.cur.span);
+                        DiagnosticKind::err_parser_mismatched_delimiter
+                            .report_at(self.cur.span)
+                            .report_to(self.handler);
                     }
 
                     break;
@@ -447,8 +456,9 @@ impl<'a> Parser<'a> {
 
                 // End of token stream means that we will never see the closing parenthesis.
                 Token::Eof => {
-                    self.diagnostic.report(DiagnosticKind::fatal_parser_unterminated_delimiter,
-                        start_span);
+                    DiagnosticKind::fatal_parser_unterminated_delimiter
+                        .report_at(start_span)
+                        .report_to(self.handler);
 
                     return Err(());
                 }
@@ -484,8 +494,9 @@ impl<'a> Parser<'a> {
         // Report the dots if this is not a dotted list.
         if !dotted_list {
             for location in dot_locations {
-                self.diagnostic.report(DiagnosticKind::err_parser_misplaced_dot,
-                    location);
+                DiagnosticKind::err_parser_misplaced_dot
+                    .report_at(location)
+                    .report_to(self.handler);
             }
         }
 
