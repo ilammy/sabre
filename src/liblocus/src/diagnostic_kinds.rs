@@ -9,6 +9,8 @@
 //!
 //! Here we keep our long list of all possible diagnostics that Sabre can produce.
 
+use crate::diagnostics::{DiagnosticBuilder, Span};
+
 /// Kinds of repoted diagnostics.
 #[allow(non_camel_case_types)]
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
@@ -148,4 +150,14 @@ pub enum DiagnosticKind {
 
     /// Semantic analysis has found a dereference of a syntactic variable.
     err_meaning_reference_to_syntactic_binding,
+}
+
+impl DiagnosticKind {
+    /// Report this diagnostic at specified span.
+    pub fn report_at(self, span: impl Into<Span>) -> DiagnosticBuilder {
+        DiagnosticBuilder {
+            kind: self,
+            span: span.into(),
+        }
+    }
 }

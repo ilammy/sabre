@@ -11,6 +11,7 @@
 //! error and warning messages, notifications, etc.
 
 use std::cell::RefCell;
+use std::ops::Range;
 
 // - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 // Spans
@@ -31,6 +32,15 @@ impl Span {
     pub fn new(from: usize, to: usize) -> Span {
         assert!(from <= to);
         Span { from, to }
+    }
+}
+
+impl From<Range<usize>> for Span {
+    fn from(range: Range<usize>) -> Self {
+        Span {
+            from: range.start,
+            to: range.end,
+        }
     }
 }
 
@@ -76,5 +86,19 @@ impl Handler {
     /// Immediately report a single diagnostic.
     pub fn report(&self, kind: DiagnosticKind, span: Span) {
         self.reporter.borrow_mut().report(Diagnostic { kind, span });
+    }
+}
+
+/// Diagnostic under construction.
+#[must_use]
+pub struct DiagnosticBuilder {
+    pub(crate) kind: DiagnosticKind,
+    pub(crate) span: Span,
+}
+
+impl DiagnosticBuilder {
+    /// Sets diagnostic span.
+    pub fn report_to(self, handler: &Handler) {
+        handler.report(self.kind, self.span);
     }
 }

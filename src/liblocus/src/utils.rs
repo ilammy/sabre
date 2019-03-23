@@ -64,7 +64,9 @@ mod tests {
     #[test]
     fn collect_some() {
         let (value, diagnostics) = collect_diagnostics(|diagnostic| {
-            diagnostic.report(DiagnosticKind::fatal_lexer_unterminated_comment, Span::new(0, 1));
+            DiagnosticKind::fatal_lexer_unterminated_comment
+                .report_to(diagnostic)
+                .report_at(0..1);
             diagnostic.report(DiagnosticKind::err_parser_misplaced_dot, Span::new(34, 51));
         });
         assert_eq!(value, ());
