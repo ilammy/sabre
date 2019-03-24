@@ -36,9 +36,9 @@ pub enum Value {
 }
 
 /// Analyzes meaning of provided expressions, report errors to provided handler.
-pub fn meaning(expressions: &[Expression], diagnostic: &Handler) -> MeaningResult {
+pub fn meaning(expressions: &[Expression], handler: &Handler) -> MeaningResult {
     let mut constants = Vec::new();
-    let body_sequence = meaning_body(expressions, diagnostic, &mut constants);
+    let body_sequence = meaning_body(expressions, handler, &mut constants);
 
     MeaningResult {
         sequence: body_sequence,
@@ -49,13 +49,13 @@ pub fn meaning(expressions: &[Expression], diagnostic: &Handler) -> MeaningResul
 /// Analyzes expression body.
 fn meaning_body(
     expressions: &[Expression],
-    diagnostic: &Handler,
+    handler: &Handler,
     constants: &mut Vec<Value>,
 ) -> Meaning {
     Meaning {
         kind: MeaningKind::Sequence(
             splice_in_sequences(expressions)
-                .map(|e| meaning_expression(e, diagnostic, constants))
+                .map(|e| meaning_expression(e, handler, constants))
                 .collect(),
         ),
         span: expressions_span(expressions),
@@ -80,7 +80,7 @@ fn expressions_span(expressions: &[Expression]) -> Span {
 /// Analyzes expressions.
 fn meaning_expression(
     expression: &Expression,
-    diagnostic: &Handler,
+    handler: &Handler,
     constants: &mut Vec<Value>,
 ) -> Meaning {
     Meaning {
@@ -88,26 +88,26 @@ fn meaning_expression(
             ExpressionKind::Literal(ref value) => meaning_literal(value, constants),
             ExpressionKind::Quotation(ref datum) => meaning_quote(datum, constants),
             ExpressionKind::Reference(name) => {
-                meaning_reference(name, expression.span, &expression.environment, diagnostic)
+                meaning_reference(name, expression.span, &expression.environment, handler)
             }
             ExpressionKind::Alternative(ref condition, ref consequent, ref alternate) => {
-                meaning_alternative(condition, consequent, alternate, diagnostic, constants)
+                meaning_alternative(condition, consequent, alternate, handler, constants)
             }
             ExpressionKind::Assignment(ref variable, ref value) => meaning_assignment(
                 variable,
                 value.as_ref(),
                 &expression.environment,
-                diagnostic,
+                handler,
                 constants,
             ),
             ExpressionKind::Sequence(ref expressions) => {
-                meaning_sequence(expressions, diagnostic, constants)
+                meaning_sequence(expressions, handler, constants)
             }
             ExpressionKind::Abstraction(ref arguments, ref body) => {
-                meaning_abstraction(arguments, body, diagnostic, constants)
+                meaning_abstraction(arguments, body, handler, constants)
             }
             ExpressionKind::Application(ref terms) => {
-                meaning_application(terms, diagnostic, constants)
+                meaning_application(terms, handler, constants)
             }
             ExpressionKind::Undefined => MeaningKind::Undefined,
         },
@@ -150,7 +150,7 @@ fn meaning_reference(
     name: Atom,
     span: Span,
     environment: &Rc<Environment>,
-    diagnostic: &Handler,
+    handler: &Handler,
 ) -> MeaningKind {
     if let Some(reference) = environment.resolve_variable(name) {
         match reference.kind {
@@ -159,8 +159,9 @@ fn meaning_reference(
             ReferenceKind::Imported { index } => MeaningKind::ImportedReference(index),
             ReferenceKind::Syntactic { .. } => {
                 // TODO: provide suggestions based on the environment
-                diagnostic.report(DiagnosticKind::err_meaning_reference_to_syntactic_binding,
-                    span);
+                DiagnosticKind::err_meaning_reference_to_syntactic_binding
+                    .report_at(span)
+                    .report_to(handler);
 
                 // Syntactic variables do not have runtime values, so return a placeholder.
                 MeaningKind::Undefined
@@ -168,7 +169,9 @@ fn meaning_reference(
         }
     } else {
         // TODO: provide suggestions based on the environment
-        diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable, span);
+        DiagnosticKind::err_meaning_unresolved_variable
+            .report_at(span)
+            .report_to(handler);
 
         // We cannot return an actual value or reference here, so return a poisoned value.
         MeaningKind::Undefined
@@ -180,13 +183,13 @@ fn meaning_alternative(
     condition: &Expression,
     consequent: &Expression,
     alternate: &Expression,
-    diagnostic: &Handler,
+    handler: &Handler,
     constants: &mut Vec<Value>,
 ) -> MeaningKind {
     MeaningKind::Alternative(
-        Box::new(meaning_expression(condition, diagnostic, constants)),
-        Box::new(meaning_expression(consequent, diagnostic, constants)),
-        Box::new(meaning_expression(alternate, diagnostic, constants)),
+        Box::new(meaning_expression(condition, handler, constants)),
+        Box::new(meaning_expression(consequent, handler, constants)),
+        Box::new(meaning_expression(alternate, handler, constants)),
     )
 }
 
@@ -195,7 +198,7 @@ fn meaning_assignment(
     variable: &Variable,
     value: &Expression,
     environment: &Rc<Environment>,
-    diagnostic: &Handler,
+    handler: &Handler,
     constants: &mut Vec<Value>,
 ) -> MeaningKind {
     let reference = environment.resolve_variable(variable.name);
@@ -205,22 +208,25 @@ fn meaning_assignment(
     if let Some(ref reference) = reference {
         if let ReferenceKind::Imported { .. } = reference.kind {
             // TODO: show where the variable is imported from
-            diagnostic.report(DiagnosticKind::err_meaning_assign_to_imported_binding,
-                variable.span);
+            DiagnosticKind::err_meaning_assign_to_imported_binding
+                .report_at(variable.span)
+                .report_to(handler);
         }
         if let ReferenceKind::Syntactic { .. } = reference.kind {
             // TODO: provide suggestions based on the environment
             // TODO: show where the variable is imported from
-            diagnostic.report(DiagnosticKind::err_meaning_assign_to_syntactic_binding,
-                variable.span);
+            DiagnosticKind::err_meaning_assign_to_syntactic_binding
+                .report_at(variable.span)
+                .report_to(handler);
         }
     } else {
         // TODO: provide suggestions based on the environment
-        diagnostic.report(DiagnosticKind::err_meaning_unresolved_variable,
-            variable.span);
+        DiagnosticKind::err_meaning_unresolved_variable
+            .report_at(variable.span)
+            .report_to(handler);
     }
 
-    let new_value = Box::new(meaning_expression(value, diagnostic, constants));
+    let new_value = Box::new(meaning_expression(value, handler, constants));
 
     if let Some(ref reference) = reference {
         match reference.kind {
@@ -248,7 +254,7 @@ fn meaning_assignment(
 /// Analyzes sequences.
 fn meaning_sequence(
     expressions: &[Expression],
-    diagnostic: &Handler,
+    handler: &Handler,
     constants: &mut Vec<Value>,
 ) -> MeaningKind {
     assert!(!expressions.is_empty(), "BUG: (begin) not handled");
@@ -256,7 +262,7 @@ fn meaning_sequence(
     MeaningKind::Sequence(
         expressions
             .iter()
-            .map(|e| meaning_expression(e, diagnostic, constants))
+            .map(|e| meaning_expression(e, handler, constants))
             .collect(),
     )
 }
@@ -265,13 +271,13 @@ fn meaning_sequence(
 fn meaning_abstraction(
     arguments: &Arguments,
     body: &[Expression],
-    diagnostic: &Handler,
+    handler: &Handler,
     constants: &mut Vec<Value>,
 ) -> MeaningKind {
     match *arguments {
         Arguments::Fixed(ref variables) => MeaningKind::ClosureFixed(
             variables.len(),
-            Box::new(meaning_body(body, diagnostic, constants)),
+            Box::new(meaning_body(body, handler, constants)),
         ),
     }
 }
@@ -279,15 +285,15 @@ fn meaning_abstraction(
 /// Analyzes procedure applications.
 fn meaning_application(
     terms: &[Expression],
-    diagnostic: &Handler,
+    handler: &Handler,
     constants: &mut Vec<Value>,
 ) -> MeaningKind {
     assert!(!terms.is_empty(), "BUG: empty application");
 
-    let procedure = Box::new(meaning_expression(&terms[0], diagnostic, constants));
+    let procedure = Box::new(meaning_expression(&terms[0], handler, constants));
     let arguments = terms[1..]
         .iter()
-        .map(|e| meaning_expression(e, diagnostic, constants))
+        .map(|e| meaning_expression(e, handler, constants))
         .collect();
 
     MeaningKind::ProcedureCall(procedure, arguments)
