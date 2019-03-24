@@ -9,7 +9,7 @@
 
 use std::rc::Rc;
 
-use liblocus::diagnostics::{DiagnosticKind, Handler, Span};
+use liblocus::diagnostics::{DiagnosticKind, Handler};
 use libreader::datum::{DatumValue, ScannedDatum};
 use libreader::intern_pool::Atom;
 
@@ -35,7 +35,7 @@ impl Expander for LambdaExpander {
         &self,
         datum: &ScannedDatum,
         environment: &Rc<Environment>,
-        diagnostic: &Handler,
+        handler: &Handler,
     ) -> Expression {
         use crate::expand::expand;
         use crate::expanders::utils::expect_macro_use;
@@ -47,17 +47,17 @@ impl Expander for LambdaExpander {
             datum,
             self.name,
             3..,
-            diagnostic,
+            handler,
             DiagnosticKind::err_expand_invalid_lambda,
         );
 
-        let arguments = expand_arguments(terms.get(0), diagnostic);
+        let arguments = expand_arguments(terms.get(0), handler);
         let new_environment = new_local_environment(&arguments, environment);
 
         let expressions = terms
             .iter()
             .skip(1)
-            .map(|datum| expand(datum, &new_environment, diagnostic))
+            .map(|datum| expand(datum, &new_environment, handler))
             .collect();
 
         Expression {
@@ -72,8 +72,8 @@ impl Expander for LambdaExpander {
 ///
 /// Simply ignore non-variables in the list, or fall back to empty argument list in case the
 /// problem is really severe.
-fn expand_arguments(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Arguments {
-    match expect_argument_list(datum, diagnostic) {
+fn expand_arguments(datum: Option<&ScannedDatum>, handler: &Handler) -> Arguments {
+    match expect_argument_list(datum, handler) {
         Some(arguments) => {
             let raw_variables: Vec<Variable> = arguments
                 .iter()
@@ -84,14 +84,15 @@ fn expand_arguments(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Argum
                             span: argument.span,
                         })
                     } else {
-                        diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
-                            argument.span);
+                        DiagnosticKind::err_expand_invalid_lambda
+                            .report_at(argument.span)
+                            .report_to(handler);
                         None
                     }
                 })
                 .collect();
 
-            Arguments::Fixed(deduplicate_variables(raw_variables, diagnostic))
+            Arguments::Fixed(deduplicate_variables(raw_variables, handler))
         }
         None => Arguments::Fixed(vec![]),
     }
@@ -100,7 +101,7 @@ fn expand_arguments(datum: Option<&ScannedDatum>, diagnostic: &Handler) -> Argum
 /// Extract argument list from the datum (if it really looks like an argument list).
 fn expect_argument_list<'b>(
     datum: Option<&'b ScannedDatum>,
-    diagnostic: &Handler,
+    handler: &Handler,
 ) -> Option<&'b [ScannedDatum]> {
     if let Some(datum) = datum {
         match datum.value {
@@ -110,14 +111,16 @@ fn expect_argument_list<'b>(
                 // fixed argument list and produce a diagnostic.
                 assert!(data.len() >= 2);
                 let last = data.len() - 1;
-                diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
-                    Span::new(data[last - 1].span.to, data[last].span.from));
+                DiagnosticKind::err_expand_invalid_lambda
+                    .report_at(data[last - 1].span.to..data[last].span.from)
+                    .report_to(handler);
 
                 Some(&data)
             }
             _ => {
-                diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
-                    datum.span);
+                DiagnosticKind::err_expand_invalid_lambda
+                    .report_at(datum.span)
+                    .report_to(handler);
                 None
             }
         }
@@ -127,15 +130,16 @@ fn expect_argument_list<'b>(
 }
 
 /// Check that arguments are not duplicated, report and remove duplicates.
-fn deduplicate_variables(raw_variables: Vec<Variable>, diagnostic: &Handler) -> Vec<Variable> {
+fn deduplicate_variables(raw_variables: Vec<Variable>, handler: &Handler) -> Vec<Variable> {
     let mut variables: Vec<Variable> = Vec::with_capacity(raw_variables.len());
 
     // Argument lists should be short, so this O(n^2) algorithm is okay.
     'next_variable: for variable in raw_variables {
         for previous in &variables {
             if variable.name == previous.name {
-                diagnostic.report(DiagnosticKind::err_expand_invalid_lambda,
-                    variable.span);
+                DiagnosticKind::err_expand_invalid_lambda
+                    .report_at(variable.span)
+                    .report_to(handler);
 
                 continue 'next_variable;
             }

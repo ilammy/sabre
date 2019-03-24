@@ -58,10 +58,10 @@ impl ExpanderStack {
 }
 
 impl Expander for ExpanderStack {
-    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, diagnostic: &Handler, expander: &dyn Expander) -> ExpansionResult {
+    fn expand(&self, datum: &ScannedDatum, environment: &Rc<Environment>, handler: &Handler, expander: &dyn Expander) -> ExpansionResult {
         let mut current = self.head.as_ref();
         loop {
-            let result = current.expand(datum, environment, diagnostic, expander);
+            let result = current.expand(datum, environment, handler, expander);
 
             if let ExpansionResult::Unknown = result {
                 if let Some(ref next) = self.tail {

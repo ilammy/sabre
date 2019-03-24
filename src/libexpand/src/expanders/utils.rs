@@ -95,7 +95,7 @@ pub fn expect_macro_use<'a, B: Into<MacroUseBounds>, E: Into<MacroUseErrors>>(
     datum: &'a ScannedDatum,
     keyword: Atom,
     bounds: B,
-    diagnostic: &Handler,
+    handler: &Handler,
     errors: E,
 ) -> &'a [ScannedDatum] {
     let bounds = bounds.into();
@@ -106,11 +106,15 @@ pub fn expect_macro_use<'a, B: Into<MacroUseBounds>, E: Into<MacroUseErrors>>(
 
     if terms.len() < bounds.min {
         let missing_terms = Span::new(terms[last].span.to, datum.span.to - 1);
-        diagnostic.report(errors.not_enough_terms.unwrap(), missing_terms);
+        errors.not_enough_terms.unwrap()
+            .report_at(missing_terms)
+            .report_to(handler);
     }
     if terms.len() > bounds.max {
         let extra_terms = Span::new(terms[bounds.max - 1].span.to, terms[last].span.to);
-        diagnostic.report(errors.too_many_terms.unwrap(), extra_terms);
+        errors.too_many_terms.unwrap()
+            .report_at(extra_terms)
+            .report_to(handler);
     }
 
     // Don't report an error for the dot if its falls into the range
@@ -118,7 +122,9 @@ pub fn expect_macro_use<'a, B: Into<MacroUseBounds>, E: Into<MacroUseErrors>>(
     if dotted && !((terms.len() > bounds.max) && (bounds.max > 1)) {
         assert!(terms.len() >= 2);
         let around_dot = Span::new(terms[last - 1].span.to, terms[last].span.from);
-        diagnostic.report(errors.dotted_form.unwrap(), around_dot);
+        errors.dotted_form.unwrap()
+            .report_at(around_dot)
+            .report_to(handler);
     }
 
     &terms[1..]

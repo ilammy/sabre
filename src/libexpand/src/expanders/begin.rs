@@ -35,7 +35,7 @@ impl Expander for BeginExpander {
         &self,
         datum: &ScannedDatum,
         environment: &Rc<Environment>,
-        diagnostic: &Handler,
+        handler: &Handler,
     ) -> Expression {
         use crate::expand::expand;
         use crate::expanders::utils::expect_macro_use;
@@ -46,13 +46,13 @@ impl Expander for BeginExpander {
             datum,
             self.name,
             2..,
-            diagnostic,
+            handler,
             DiagnosticKind::err_expand_invalid_begin,
         );
 
         let expressions = terms
             .iter()
-            .map(|datum| expand(datum, environment, diagnostic))
+            .map(|datum| expand(datum, environment, handler))
             .collect::<Vec<_>>();
 
         Expression {

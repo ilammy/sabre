@@ -35,7 +35,7 @@ impl Expander for IfExpander {
         &self,
         datum: &ScannedDatum,
         environment: &Rc<Environment>,
-        diagnostic: &Handler,
+        handler: &Handler,
     ) -> Expression {
         use crate::expand::expand;
         use crate::expanders::utils::{expect_macro_use, missing_last_span};
@@ -46,12 +46,12 @@ impl Expander for IfExpander {
             datum,
             self.name,
             4,
-            diagnostic,
+            handler,
             DiagnosticKind::err_expand_invalid_if,
         );
 
         let expand_or_recover = |term: Option<&ScannedDatum>| {
-            term.map(|datum| expand(datum, environment, diagnostic))
+            term.map(|datum| expand(datum, environment, handler))
                 .unwrap_or(Expression {
                     kind: ExpressionKind::Undefined,
                     span: missing_last_span(datum),

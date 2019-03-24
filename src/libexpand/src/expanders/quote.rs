@@ -35,7 +35,7 @@ impl Expander for QuoteExpander {
         &self,
         datum: &ScannedDatum,
         environment: &Rc<Environment>,
-        diagnostic: &Handler,
+        handler: &Handler,
     ) -> Expression {
         use crate::expanders::utils::expect_macro_use;
 
@@ -45,7 +45,7 @@ impl Expander for QuoteExpander {
             datum,
             self.name,
             2,
-            diagnostic,
+            handler,
             DiagnosticKind::err_expand_invalid_quote,
         );
 

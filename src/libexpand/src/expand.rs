@@ -14,7 +14,7 @@
 
 use std::rc::Rc;
 
-use liblocus::diagnostics::{DiagnosticKind, Handler, Span};
+use liblocus::diagnostics::{DiagnosticKind, Handler};
 use libreader::datum::{DatumValue, ScannedDatum};
 use libreader::intern_pool::Atom;
 
@@ -38,7 +38,7 @@ pub trait Expander {
         &self,
         datum: &ScannedDatum,
         environment: &Rc<Environment>,
-        diagnosic: &Handler,
+        handler: &Handler,
     ) -> Expression;
 }
 
@@ -50,7 +50,7 @@ pub trait Expander {
 pub fn expand(
     datum: &ScannedDatum,
     environment: &Rc<Environment>,
-    diagnostic: &Handler,
+    handler: &Handler,
 ) -> Expression {
     match datum.value {
         // Literal data does not contain any macros, it is retured as is.
@@ -70,23 +70,25 @@ pub fn expand(
 
         // Lists denote forms, so proceed with macro expansion in them.
         DatumValue::ProperList(ref terms) | DatumValue::DottedList(ref terms) => {
-            form(datum, terms, environment, diagnostic)
+            form(datum, terms, environment, handler)
         }
 
         // Labeled data cannot be used in programs, only in literal quoted data.
         // Report the error and assume the label never existed, reinvoking the expander.
         DatumValue::LabeledDatum(_, ref labeled_datum) => {
-            diagnostic.report(DiagnosticKind::err_expand_datum_label,
-                Span::new(datum.span.from, labeled_datum.span.from));
+            DiagnosticKind::err_expand_datum_label
+                .report_at(datum.span.from..labeled_datum.span.from)
+                .report_to(handler);
 
-            expand(labeled_datum, environment, diagnostic)
+            expand(labeled_datum, environment, handler)
         }
 
         // Datum labels cannot be used in programs, only in literal quoted data.
         // Report the error and use some placeholder value instead.
         DatumValue::LabelReference(_) => {
-            diagnostic.report(DiagnosticKind::err_expand_datum_label,
-                datum.span);
+            DiagnosticKind::err_expand_datum_label
+                .report_at(datum.span)
+                .report_to(handler);
 
             literal(datum, environment, Literal::Boolean(false))
         }
@@ -116,15 +118,16 @@ fn form(
     datum: &ScannedDatum,
     terms: &[ScannedDatum],
     environment: &Rc<Environment>,
-    diagnosic: &Handler,
+    handler: &Handler,
 ) -> Expression {
     // There are three forms of forms in Scheme.
     //
     // The first one is (), an empty list. It is invalid in Scheme and has no prescribed meaning.
     // Report an error and return some placeholder value.
     if terms.is_empty() {
-        diagnosic.report(DiagnosticKind::err_expand_invalid_application,
-            Span::new(datum.span.from + 1, datum.span.to - 1));
+        DiagnosticKind::err_expand_invalid_application
+            .report_at((datum.span.from + 1)..(datum.span.to - 1))
+            .report_to(handler);
         return Expression {
             kind: ExpressionKind::Application(vec![]),
             span: datum.span,
@@ -136,7 +139,7 @@ fn form(
     // to a syntactic keyword, and <data> is a proper, improper, or empty list of data. It is
     // the binding which distinguishes a macro use from a procedure call (an application).
     if let Some(expander) = is_macro_use(terms, environment) {
-        return expander.expand_form(datum, environment, diagnosic);
+        return expander.expand_form(datum, environment, handler);
     }
 
     // Applications have a form (procedure arguments ...) which must be a proper list. Report
@@ -144,13 +147,14 @@ fn form(
     if let DatumValue::DottedList(..) = datum.value {
         assert!(terms.len() >= 2);
         let last = terms.len() - 1;
-        diagnosic.report(DiagnosticKind::err_expand_invalid_application,
-            Span::new(terms[last - 1].span.to, terms[last].span.from));
+        DiagnosticKind::err_expand_invalid_application
+            .report_at((terms[last - 1].span.to)..(terms[last].span.from))
+            .report_to(handler);
     }
 
     let expressions = terms
         .iter()
-        .map(|datum| expand(datum, environment, diagnosic))
+        .map(|datum| expand(datum, environment, handler))
         .collect();
 
     Expression {
